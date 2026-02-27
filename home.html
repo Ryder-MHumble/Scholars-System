@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Scholar Database Overview Dashboard</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#2563EB", // Royal Blue
+                        secondary: "#475569", // Slate
+                        "background-light": "#F8FAFC",
+                        "background-dark": "#0F172A",
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#1E293B",
+                        "border-light": "#E2E8F0",
+                        "border-dark": "#334155",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                        body: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                        'lg': '0.75rem',
+                        'xl': '1rem',
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.5);
+            border-radius: 20px;
+        }
+
+        .custom-scroll.dark::-webkit-scrollbar-thumb {
+            background-color: rgba(71, 85, 105, 0.5);
+        }
+
+        .tree-line {
+            position: relative;
+        }
+
+        .tree-line::before {
+            content: '';
+            position: absolute;
+            left: -1rem;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: #E2E8F0;
+        }
+
+        .dark .tree-line::before {
+            background-color: #334155;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-100 font-body transition-colors duration-200 h-screen overflow-hidden flex flex-col">
+    <header
+        class="h-16 bg-surface-light dark:bg-surface-dark border-b border-border-light dark:border-border-dark flex items-center justify-between px-6 z-10 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-primary/10 dark:bg-primary/20 p-2 rounded-lg">
+                <span class="material-icons-round text-primary text-xl">school</span>
+            </div>
+            <h1 class="text-lg font-bold tracking-tight text-slate-900 dark:text-white">Academic Nexus <span
+                    class="text-slate-400 font-normal text-sm ml-2">Institutional Scholar Database</span></h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="relative hidden md:block w-96">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="material-icons-round text-slate-400 text-lg">search</span>
+                </span>
+                <input
+                    class="pl-10 pr-4 py-2 w-full bg-slate-50 dark:bg-slate-800 border border-border-light dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow placeholder-slate-400 dark:placeholder-slate-500"
+                    placeholder="Search scholars, institutions, or research topics..." type="text" />
+            </div>
+            <button
+                class="relative p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700/50 rounded-full transition-colors">
+                <span class="material-icons-round">notifications</span>
+                <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+            <div class="flex items-center gap-3 pl-4 border-l border-border-light dark:border-border-dark">
+                <img alt="User Avatar" class="w-8 h-8 rounded-full"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkgL7NJzr8St6e32oC4tWxkjGg4Veh1miPqI48Wtji9K9au7xqsWUbxxBQJcHfMkB9guRm5jMsnEczKSin7RvwWowFiFNEmbgZSXAMBfjcH9yASg3-_dBz_taSYcIxMSIXuzrjeZM7ik3-DTzW--K5xkwNILoL805jo6-Pn7OkQdLJIv7DwUETeUIOypERuNy1r7lpcLXNjyz59PdFrp7zQFcNfKUmKvBZJ62XAK4f27mfffpRsxwFsk7a0jlTIKpu0fpdiglOK84" />
+                <div class="hidden lg:block">
+                    <p class="text-sm font-medium leading-none">Admin User</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">System Administrator</p>
+                </div>
+            </div>
+        </div>
+    </header>
+    <div class="flex flex-1 overflow-hidden">
+        <aside
+            class="w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark overflow-y-auto custom-scroll flex-shrink-0 hidden md:flex flex-col">
+            <div class="p-4">
+                <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Organization Hierarchy
+                </h2>
+                <nav class="space-y-1">
+                    <div>
+                        <button
+                            class="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md group">
+                            <span
+                                class="material-icons-round text-slate-400 group-hover:text-primary transition-colors text-lg">arrow_drop_down</span>
+                            <span class="material-icons-round text-primary text-lg">account_balance</span>
+                            Tsinghua University
+                        </button>
+                        <div class="ml-4 pl-2 border-l border-border-light dark:border-border-dark mt-1 space-y-1">
+                            <button
+                                class="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md bg-slate-100 dark:bg-slate-800/50 font-medium">
+                                <span class="material-icons-round text-slate-400 text-lg">arrow_drop_down</span>
+                                Computer Science Dept.
+                            </button>
+                            <div class="ml-4 pl-2 border-l border-border-light dark:border-border-dark mt-1">
+                                <button
+                                    class="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-primary bg-primary/5 dark:bg-primary/10 rounded-md font-medium">
+                                    <span class="material-icons-round text-primary text-base">group</span>
+                                    AI Research Lab
+                                </button>
+                                <button
+                                    class="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md">
+                                    <span class="material-icons-round text-slate-400 text-base">group</span>
+                                    Systems Architecture
+                                </button>
+                            </div>
+                            <button
+                                class="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md">
+                                <span class="material-icons-round text-slate-400 text-lg">arrow_right</span>
+                                Automation Department
+                            </button>
+                        </div>
+                    </div>
+                    <div class="pt-2">
+                        <button
+                            class="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md group">
+                            <span
+                                class="material-icons-round text-slate-400 group-hover:text-primary transition-colors text-lg">arrow_right</span>
+                            <span
+                                class="material-icons-round text-slate-400 group-hover:text-primary transition-colors text-lg">science</span>
+                            Advanced Science Institute
+                        </button>
+                    </div>
+                </nav>
+            </div>
+            <div class="mt-auto p-4 border-t border-border-light dark:border-border-dark">
+                <div
+                    class="bg-gradient-to-br from-primary/10 to-blue-500/10 dark:from-primary/20 dark:to-blue-500/20 rounded-lg p-3">
+                    <p class="text-xs font-semibold text-primary mb-1">Database Status</p>
+                    <div class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        Syncing: 98%
+                    </div>
+                </div>
+            </div>
+        </aside>
+        <main class="flex-1 overflow-y-auto custom-scroll p-6 md:p-8 bg-background-light dark:bg-background-dark">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div
+                    class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-border-light dark:border-border-dark flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Scholars</p>
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mt-1">1,248</h3>
+                        <p class="text-xs text-green-600 dark:text-green-400 flex items-center mt-1">
+                            <span class="material-icons-round text-sm mr-1">trending_up</span> +12 this month
+                        </p>
+                    </div>
+                    <div class="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <span class="material-icons-round text-primary text-xl">people</span>
+                    </div>
+                </div>
+                <div
+                    class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-border-light dark:border-border-dark flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Active Projects</p>
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mt-1">386</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Across 14 departments</p>
+                    </div>
+                    <div class="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                        <span
+                            class="material-icons-round text-indigo-600 dark:text-indigo-400 text-xl">assignment</span>
+                    </div>
+                </div>
+                <div
+                    class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-border-light dark:border-border-dark flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Joint Research</p>
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mt-1">42</h3>
+                        <p class="text-xs text-green-600 dark:text-green-400 flex items-center mt-1">
+                            <span class="material-icons-round text-sm mr-1">arrow_upward</span> 5 new pending
+                        </p>
+                    </div>
+                    <div class="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                        <span class="material-icons-round text-purple-600 dark:text-purple-400 text-xl">hub</span>
+                    </div>
+                </div>
+                <div
+                    class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-border-light dark:border-border-dark flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">XAI Forums</p>
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mt-1">18</h3>
+                        <p class="text-xs text-orange-600 dark:text-orange-400 flex items-center mt-1">
+                            <span class="material-icons-round text-sm mr-1">event</span> Next: Oct 24
+                        </p>
+                    </div>
+                    <div class="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                        <span class="material-icons-round text-orange-600 dark:text-orange-400 text-xl">forum</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white">AI Research Lab Scholars</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Managing relationships, research
+                        directions, and institutional ties.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button
+                        class="flex items-center gap-2 px-3 py-2 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
+                        <span class="material-icons-round text-lg">filter_list</span>
+                        Filters
+                    </button>
+                    <button
+                        class="flex items-center gap-2 px-3 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+                        <span class="material-icons-round text-lg">add</span>
+                        Add Scholar
+                    </button>
+                </div>
+            </div>
+            <div
+                class="bg-surface-light dark:bg-surface-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr
+                                class="bg-slate-50 dark:bg-slate-800/50 border-b border-border-light dark:border-border-dark">
+                                <th
+                                    class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-10">
+                                    <input
+                                        class="rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary bg-transparent"
+                                        type="checkbox" />
+                                </th>
+                                <th
+                                    class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                    Scholar</th>
+                                <th
+                                    class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                    Research Direction</th>
+                                <th
+                                    class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                    Relationship Status</th>
+                                <th
+                                    class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                    Dynamic Updates</th>
+                                <th
+                                    class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">
+                                    Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border-light dark:divide-border-dark">
+                            <tr class="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                <td class="px-6 py-4">
+                                    <input
+                                        class="rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary bg-transparent"
+                                        type="checkbox" />
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div
+                                            class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-primary font-bold text-sm">
+                                            ZL
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900 dark:text-white">Dr. Zhang Li
+                                            </p>
+                                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                                zhang.li@tsinghua.edu.cn</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                        Deep Learning
+                                    </span>
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 ml-1">
+                                        NLP
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="space-y-1.5">
+                                        <div class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                            Advisory Committee
+                                        </div>
+                                        <div class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                            Adjunct Supervisor
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-xs text-slate-600 dark:text-slate-400">
+                                        <p class="mb-1"><span class="font-medium text-slate-900 dark:text-slate-200">New
+                                                Project:</span> Smart City AI</p>
+                                        <p class="text-slate-400 dark:text-slate-500">Updated 2 days ago</p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <button class="text-slate-400 hover:text-primary transition-colors p-1">
+                                        <span class="material-icons-round text-lg">edit</span>
+                                    </button>
+                                    <button class="text-slate-400 hover:text-primary transition-colors p-1">
+                                        <span class="material-icons-round text-lg">visibility</span>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                <td class="px-6 py-4">
+                                    <input
+                                        class="rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary bg-transparent"
+                                        type="checkbox" />
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div
+                                            class="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-sm">
+                                            WW
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900 dark:text-white">Prof. Wang
+                                                Wei</p>
+                                            <p class="text-xs text-slate-500 dark:text-slate-400">wei.wang@inst.ac.cn
+                                            </p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                        Computer Vision
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="space-y-1.5">
+                                        <div class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                            Joint Management
+                                        </div>
+                                        <div class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                                            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                            XAI Forum Speaker
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-xs text-slate-600 dark:text-slate-400">
+                                        <p class="mb-1"><span
+                                                class="font-medium text-slate-900 dark:text-slate-200">Award:</span>
+                                            IEEE Fellow</p>
+                                        <p class="text-slate-400 dark:text-slate-500">Updated 5 hours ago</p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <button class="text-slate-400 hover:text-primary transition-colors p-1">
+                                        <span class="material-icons-round text-lg">edit</span>
+                                    </button>
+                                    <button class="text-slate-400 hover:text-primary transition-colors p-1">
+                                        <span class="material-icons-round text-lg">visibility</span>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                <td class="px-6 py-4">
+                                    <input
+                                        class="rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary bg-transparent"
+                                        type="checkbox" />
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div
+                                            class="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                                            LC
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900 dark:text-white">Dr. Liu Chen
+                                            </p>
+                                            <p class="text-xs text-slate-500 dark:text-slate-400">c.liu@univ.edu</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
+                                        Robotics
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="space-y-1.5">
+                                        <div class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                                            <span class="w-2 h-2 rounded-full bg-pink-500"></span>
+                                            Potential Recruit
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-xs text-slate-600 dark:text-slate-400">
+                                        <p class="mb-1"><span
+                                                class="font-medium text-slate-900 dark:text-slate-200">Activity:</span>
+                                            Youth Forum</p>
+                                        <p class="text-slate-400 dark:text-slate-500">Updated 1 week ago</p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <button class="text-slate-400 hover:text-primary transition-colors p-1">
+                                        <span class="material-icons-round text-lg">edit</span>
+                                    </button>
+                                    <button class="text-slate-400 hover:text-primary transition-colors p-1">
+                                        <span class="material-icons-round text-lg">visibility</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div
+                    class="px-6 py-4 bg-slate-50 dark:bg-surface-dark border-t border-border-light dark:border-border-dark flex items-center justify-between">
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Showing <span class="font-medium">1</span> to
+                        <span class="font-medium">3</span> of <span class="font-medium">42</span> results</p>
+                    <div class="flex gap-2">
+                        <button
+                            class="px-3 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-border-light dark:border-border-dark rounded hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">Previous</button>
+                        <button
+                            class="px-3 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-border-light dark:border-border-dark rounded hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Next</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <aside
+            class="w-80 bg-surface-light dark:bg-surface-dark border-l border-border-light dark:border-border-dark hidden xl:block overflow-y-auto custom-scroll p-6">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white mb-4">Department Overview</h3>
+            <div class="mb-6">
+                <div
+                    class="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-lg mb-3 flex items-center justify-center">
+                    <span class="material-icons-round text-slate-400 text-4xl">bar_chart</span>
+                </div>
+                <h4 class="font-semibold text-slate-800 dark:text-slate-200">Research Impact</h4>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Citations have increased by 24% this quarter
+                    due to new joint publications.</p>
+            </div>
+            <div class="space-y-6">
+                <div>
+                    <h5 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Relationship
+                        Distribution</h5>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-600 dark:text-slate-300">Advisory</span>
+                                <span class="font-medium text-slate-900 dark:text-white">35%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
+                                <div class="bg-primary h-1.5 rounded-full" style="width: 35%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-600 dark:text-slate-300">Research Projects</span>
+                                <span class="font-medium text-slate-900 dark:text-white">45%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
+                                <div class="bg-indigo-500 h-1.5 rounded-full" style="width: 45%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-600 dark:text-slate-300">Student Mentorship</span>
+                                <span class="font-medium text-slate-900 dark:text-white">20%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
+                                <div class="bg-emerald-500 h-1.5 rounded-full" style="width: 20%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h5 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Recent Activity Log
+                    </h5>
+                    <ul class="space-y-4">
+                        <li class="relative pl-4 border-l-2 border-slate-200 dark:border-slate-700">
+                            <div class="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                            <p class="text-xs text-slate-800 dark:text-slate-200 font-medium">New Research Grant</p>
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Approved for Dr. Zhang Li •
+                                "Smart Grid Opt."</p>
+                        </li>
+                        <li class="relative pl-4 border-l-2 border-slate-200 dark:border-slate-700">
+                            <div class="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+                            <p class="text-xs text-slate-800 dark:text-slate-200 font-medium">Adjunct Professor Added
+                            </p>
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Prof. Michael Chen joined
+                                the department.</p>
+                        </li>
+                        <li class="relative pl-4 border-l-2 border-slate-200 dark:border-slate-700">
+                            <div
+                                class="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600">
+                            </div>
+                            <p class="text-xs text-slate-800 dark:text-slate-200 font-medium">Data Sync Completed</p>
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">HR Database sync finished
+                                successfully.</p>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+</body>
+
+</html>

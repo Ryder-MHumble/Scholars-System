@@ -1,0 +1,41 @@
+import type { ScholarRelationship } from '@/types';
+
+export const relationships: ScholarRelationship[] = [
+  // 导师-学生关系
+  { id: 'r001', fromScholarId: 's003', toScholarId: 's001', type: '导师', description: '博士生导师（2008-2013）' },
+  { id: 'r002', fromScholarId: 's003', toScholarId: 's005', type: '导师', description: '博士生导师（2010-2015）' },
+  { id: 'r003', fromScholarId: 's001', toScholarId: 's004', type: '导师', description: '博士生导师（2016-2021）' },
+  { id: 'r004', fromScholarId: 's001', toScholarId: 's006', type: '导师', description: '博士生导师（2020-至今）' },
+  { id: 'r005', fromScholarId: 's002', toScholarId: 's014', type: '导师', description: '博士生导师（2015-2020）' },
+  { id: 'r006', fromScholarId: 's007', toScholarId: 's008', type: '导师', description: '博士生导师（2014-2019）' },
+  { id: 'r007', fromScholarId: 's009', toScholarId: 's010', type: '导师', description: '博士生导师（2016-2021）' },
+  { id: 'r008', fromScholarId: 's009', toScholarId: 's012', type: '导师', description: '博士生导师（2019-至今）' },
+  { id: 'r009', fromScholarId: 's024', toScholarId: 's025', type: '导师', description: '博士生导师（2015-2020）' },
+  { id: 'r010', fromScholarId: 's024', toScholarId: 's026', type: '导师', description: '博士生导师（2020-至今）' },
+  { id: 'r011', fromScholarId: 's027', toScholarId: 's030', type: '导师', description: '博士生导师（2019-至今）' },
+  { id: 'r012', fromScholarId: 's047', toScholarId: 's049', type: '导师', description: '博士生导师（2014-2019）' },
+  { id: 'r013', fromScholarId: 's047', toScholarId: 's053', type: '导师', description: '博士生导师（2016-2021）' },
+  { id: 'r014', fromScholarId: 's048', toScholarId: 's050', type: '导师', description: '博士生导师（2005-2010）' },
+  { id: 'r015', fromScholarId: 's048', toScholarId: 's051', type: '导师', description: '博士生导师（2015-2020）' },
+  { id: 'r016', fromScholarId: 's056', toScholarId: 's057', type: '导师', description: '博士生导师（2017-2022）' },
+  { id: 'r017', fromScholarId: 's063', toScholarId: 's065', type: '导师', description: '博士生导师（2015-2020）' },
+  { id: 'r018', fromScholarId: 's068', toScholarId: 's069', type: '导师', description: '博士生导师（2016-2021）' },
+  { id: 'r019', fromScholarId: 's073', toScholarId: 's074', type: '导师', description: '博士生导师（2014-2019）' },
+  { id: 'r020', fromScholarId: 's073', toScholarId: 's076', type: '导师', description: '博士生导师（2017-2022）' },
+  // 合作者关系
+  { id: 'r021', fromScholarId: 's001', toScholarId: 's025', type: '合作者', description: '自然语言处理方向长期合作' },
+  { id: 'r022', fromScholarId: 's001', toScholarId: 's073', type: '合作者', description: '大语言模型应用合作研究' },
+  { id: 'r023', fromScholarId: 's002', toScholarId: 's020', type: '合作者', description: '视觉智能联合研究' },
+  { id: 'r024', fromScholarId: 's003', toScholarId: 's064', type: '合作者', description: '数据库系统联合研究' },
+  { id: 'r025', fromScholarId: 's007', toScholarId: 's070', type: '合作者', description: '处理器架构联合研究' },
+  { id: 'r026', fromScholarId: 's037', toScholarId: 's052', type: '合作者', description: '知识推理联合研究' },
+  { id: 'r027', fromScholarId: 's047', toScholarId: 's031', type: '合作者', description: '机器学习方向合作' },
+  { id: 'r028', fromScholarId: 's056', toScholarId: 's018', type: '合作者', description: '量子信息联合研究' },
+  { id: 'r029', fromScholarId: 's009', toScholarId: 's048', type: '合作者', description: '软件工程方法论合作' },
+  { id: 'r030', fromScholarId: 's045', toScholarId: 's076', type: '合作者', description: '对话系统联合研究' },
+  // 同事关系
+  { id: 'r031', fromScholarId: 's001', toScholarId: 's002', type: '同事', description: '同系同事' },
+  { id: 'r032', fromScholarId: 's001', toScholarId: 's003', type: '同事', description: '同系同事' },
+  { id: 'r033', fromScholarId: 's047', toScholarId: 's048', type: '同事', description: '同校同事' },
+  { id: 'r034', fromScholarId: 's073', toScholarId: 's075', type: '同事', description: '同校同事' },
+];
