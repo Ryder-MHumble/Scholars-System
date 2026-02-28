@@ -16,6 +16,7 @@ export type {
   DetailedAward,
   AwardCategory,
 } from "./scholar";
+export { SCHOLAR_DIVISIONS } from "./scholar";
 export type {
   Paper,
   ResearchProject,
@@ -25,3 +26,6 @@ export type {
   VenueType,
 } from "./academic";
 export type { ChangeAction, ChangeLogEntry } from "./changelog";
+export type { AgreementType, AgreementStatus, AgreementRecord } from "./agreement";
+export type { InteractionType, InteractionParticipant, InteractionRecord } from "./interaction";
+export type { ContactCategory, ExternalContact } from "./contact";

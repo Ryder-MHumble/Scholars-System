@@ -76,7 +76,20 @@ export interface Scholar {
   education?: Education[];
   experience?: Experience[];
   detailedAwards?: DetailedAward[];
+  // 共建导师专属字段
+  scholarDivision?: string;
+  mentorType?: '教学研究型' | '研究型';
+  talentPlans?: string[];
 }
+
+export const SCHOLAR_DIVISIONS = [
+  'AI核心和基础/AI安全',
+  'AI社会科学',
+  'AI+自然科学/生命科学',
+  'AI核心和基础/大模型',
+  'AI+工程技术',
+  '其他',
+] as const;
 
 export interface ScholarWithInstitution extends Scholar {
   universityName: string;

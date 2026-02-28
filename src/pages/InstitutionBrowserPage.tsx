@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   List,
   Building2,
+  Download,
 } from "lucide-react";
 import PageTransition from "@/layouts/PageTransition";
 import { universities } from "@/data/universities";
@@ -121,6 +122,46 @@ export default function InstitutionBrowserPage() {
     setSelectedDeptId(deptId);
   };
 
+  const handleExport = () => {
+    const selectedUni = universities.find((u) => u.id === selectedUniId);
+    const headers = ["姓名", "英文名", "所属院校", "院系", "职称", "研究方向", "学术荣誉", "H-Index", "论文数", "引用数", "邮箱", "个人主页"];
+    const rows = filteredScholars.map((s) => {
+      const uni = universities.find((u) => u.id === s.universityId);
+      const dept = uni?.departments.find((d) => d.id === s.departmentId);
+      return [
+        s.name,
+        s.nameEn ?? "",
+        uni?.name ?? "",
+        dept?.name ?? "",
+        s.title,
+        s.researchFields.join("；"),
+        s.honors.join("；"),
+        s.hIndex ?? "",
+        s.paperCount ?? "",
+        s.citationCount ?? "",
+        s.email ?? "",
+        s.homepage ?? "",
+      ];
+    });
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const filename = selectedDeptId
+      ? `${selectedUni?.shortName ?? "院校"}_${universities.find((u) => u.id === selectedUniId)?.departments.find((d) => d.id === selectedDeptId)?.name ?? "院系"}_学者名单.csv`
+      : selectedUniId
+      ? `${selectedUni?.shortName ?? "院校"}_学者名单.csv`
+      : "全部学者名单.csv";
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const filteredUniversities = useMemo(() => {
     if (!treeSearch.trim()) return universities;
     const q = treeSearch.toLowerCase();
@@ -227,6 +268,15 @@ export default function InstitutionBrowserPage() {
               <span className="text-xs text-gray-500">
                 {filteredScholars.length} 位学者
               </span>
+              <motion.button
+                onClick={handleExport}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                导出数据
+              </motion.button>
               <div className="flex border border-gray-200 rounded-lg overflow-hidden">
                 <button
                   onClick={() => setViewMode("grid")}
