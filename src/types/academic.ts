@@ -1,3 +1,5 @@
+export type VenueType = "Conference" | "Journal" | "Workshop" | "ArXiv";
+
 export interface Paper {
   id: string;
   title: string;
@@ -11,17 +13,21 @@ export interface Paper {
   citationCount?: number;
   isHighlight?: boolean;
   scholarId: string;
+  // Enhanced paper fields
+  views?: number;
+  bibtex?: string;
+  venueType?: VenueType;
 }
 
 export interface ResearchProject {
   id: string;
   name: string;
-  role: '负责人' | '参与者' | '骨干成员';
+  role: "负责人" | "参与者" | "骨干成员";
   fundingSource: string;
   amount?: string;
   startYear: number;
   endYear?: number;
-  status: '进行中' | '已结题';
+  status: "进行中" | "已结题";
   description?: string;
   scholarId: string;
 }
@@ -33,13 +39,13 @@ export interface Patent {
   inventors: string[];
   filingDate: string;
   grantDate?: string;
-  status: '已授权' | '审查中' | '已公开';
+  status: "已授权" | "审查中" | "已公开";
   scholarId: string;
 }
 
 export interface AcademicExchange {
   id: string;
-  type: '会议报告' | '特邀报告' | '访学' | '学术访问' | '合作研究';
+  type: "会议报告" | "特邀报告" | "访学" | "学术访问" | "合作研究";
   title: string;
   venue?: string;
   location?: string;
@@ -52,7 +58,7 @@ export interface AcademicExchange {
 export interface AdvisedStudent {
   id: string;
   name: string;
-  degree: '博士' | '硕士' | '博士后';
+  degree: "博士" | "硕士" | "博士后";
   startYear: number;
   endYear?: number;
   thesis?: string;

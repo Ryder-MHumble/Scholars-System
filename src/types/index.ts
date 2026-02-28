@@ -1,4 +1,8 @@
-export type { University, Department, InstitutionTreeNode } from './institution';
+export type {
+  University,
+  Department,
+  InstitutionTreeNode,
+} from "./institution";
 export type {
   Scholar,
   ScholarWithInstitution,
@@ -7,12 +11,17 @@ export type {
   ResearchField,
   RelationshipType,
   ScholarRelationship,
-} from './scholar';
+  Education,
+  Experience,
+  DetailedAward,
+  AwardCategory,
+} from "./scholar";
 export type {
   Paper,
   ResearchProject,
   Patent,
   AcademicExchange,
   AdvisedStudent,
-} from './academic';
-export type { ChangeAction, ChangeLogEntry } from './changelog';
+  VenueType,
+} from "./academic";
+export type { ChangeAction, ChangeLogEntry } from "./changelog";

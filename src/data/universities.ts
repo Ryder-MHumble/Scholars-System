@@ -19,11 +19,7 @@ export const universities: University[] = [
       { id: 'thu-ymsc', universityId: 'tsinghua', name: '丘成桐数学中心', scholarCount: 0 },
       { id: 'thu-life', universityId: 'tsinghua', name: '生命科学学院', scholarCount: 0 },
       { id: 'thu-sigs', universityId: 'tsinghua', name: '数据与信息研究院（深圳）', scholarCount: 0 },
-      { id: 'thu-grad', universityId: 'tsinghua', name: '研究生院', scholarCount: 0 },
-      { id: 'thu-gsa', universityId: 'tsinghua', name: '研究生会', scholarCount: 0 },
       { id: 'thu-aigov', universityId: 'tsinghua', name: '人工智能国际治理研究院', scholarCount: 0 },
-      { id: 'thu-intl', universityId: 'tsinghua', name: '国际处', scholarCount: 0 },
-      { id: 'thu-research', universityId: 'tsinghua', name: '科研院', scholarCount: 0 },
     ],
   },
   {

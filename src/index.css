@@ -18,6 +18,19 @@
   --color-honor-changjiang: #7c3aed;
   --color-honor-fellow: #0891b2;
 
+  /* Header gradient colors */
+  --gradient-header-from: #7c3aed;
+  --gradient-header-to: #3b82f6;
+
+  /* Award medal colors */
+  --color-medal-gold: #fbbf24;
+  --color-medal-silver: #9ca3af;
+  --color-medal-bronze: #c2410c;
+
+  /* Verification badge */
+  --color-verified: #10b981;
+  --color-claimed: #3b82f6;
+
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif;
 }
 
@@ -48,7 +61,6 @@
 
 body {
   margin: 0;
-  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

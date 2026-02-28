@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build Test</title>
+</head>
+<body>
+    <h1>Testing Built Application</h1>
+    <div id="root"></div>
+    <script type="module">
+        // Test if the built JS loads
+        import('./dist/assets/index-D92Pjr1e.js')
+            .then(() => {
+                console.log('✓ JavaScript loaded successfully');
+            })
+            .catch(err => {
+                console.error('✗ JavaScript failed to load:', err);
+                document.body.innerHTML += '<p style="color: red;">Error: ' + err.message + '</p>';
+            });
+    </script>
+</body>
+</html>
