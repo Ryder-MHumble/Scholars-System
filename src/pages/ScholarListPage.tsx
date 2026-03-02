@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,7 +13,6 @@ import {
   Plus,
   List,
   LayoutGrid,
-  SlidersHorizontal,
   BookOpen,
   Building2,
   Award,
@@ -196,105 +195,6 @@ function SidebarTree({
   );
 }
 
-/* ── filter popover ── */
-function FilterPopover({
-  open,
-  filterResearchField,
-  setFilterResearchField,
-  filterAcademician,
-  setFilterAcademician,
-  onReset,
-}: {
-  open: boolean;
-  filterResearchField: string;
-  setFilterResearchField: (v: string) => void;
-  filterAcademician: boolean;
-  setFilterAcademician: (v: boolean) => void;
-  onReset: () => void;
-}) {
-  return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          key="popover"
-          initial={{ opacity: 0, y: -6, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -6, scale: 0.97 }}
-          transition={{ duration: 0.15, ease: "easeOut" }}
-          className="absolute top-full right-0 mt-1.5 w-72 bg-white rounded-xl border border-gray-200 shadow-xl z-50 overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/80">
-            <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-primary-500" />
-              筛选条件
-            </span>
-            <button
-              onClick={onReset}
-              className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-0.5 transition-colors"
-            >
-              <X className="w-3 h-3" />
-              重置
-            </button>
-          </div>
-
-          <div className="px-4 py-4 space-y-5">
-            {/* 研究方向 */}
-            <section>
-              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                研究方向
-                {filterResearchField && (
-                  <span className="px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded-full font-semibold">
-                    已筛选
-                  </span>
-                )}
-              </h3>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
-                <input
-                  type="text"
-                  value={filterResearchField}
-                  onChange={(e) => setFilterResearchField(e.target.value)}
-                  placeholder="输入关键词..."
-                  className="w-full pl-7 pr-7 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow"
-                />
-                {filterResearchField && (
-                  <button
-                    onClick={() => setFilterResearchField("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </section>
-
-            <div className="h-px bg-gray-100" />
-
-            {/* 院士 */}
-            <section>
-              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                院士筛选
-              </h3>
-              <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={filterAcademician}
-                  onChange={() => setFilterAcademician(!filterAcademician)}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-xs font-medium text-gray-700 flex-1">
-                  仅显示院士
-                </span>
-                <Award className="w-3.5 h-3.5 text-amber-500" />
-              </label>
-            </section>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
 
 /* ── main component ── */
 export default function ScholarListPage() {
@@ -304,13 +204,7 @@ export default function ScholarListPage() {
 
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
-
-  const filterRef = useRef<HTMLDivElement>(null);
-
-  const [filterResearchField, setFilterResearchField] = useState("");
-  const [filterAcademician, setFilterAcademician] = useState(false);
 
   /* API state */
   const [apiData, setApiData] = useState<FacultyListResponse | null>(null);
@@ -388,17 +282,6 @@ export default function ScholarListPage() {
       });
   }, [page, activeUni, activeDept]);
 
-  /* filter popover outside-click */
-  useEffect(() => {
-    if (!filterOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
-        setFilterOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [filterOpen]);
 
   const handleSelectUni = (name: string | null) => {
     setActiveUni(name);
@@ -412,16 +295,10 @@ export default function ScholarListPage() {
     setPage(1);
   };
 
-  const resetFilters = () => {
-    setFilterResearchField("");
-    setFilterAcademician(false);
-  };
-
   const clearAll = () => {
     setQuery("");
     setActiveUni(null);
     setActiveDept(null);
-    resetFilters();
     setPage(1);
   };
 
@@ -438,43 +315,14 @@ export default function ScholarListPage() {
           s.research_areas.some((f) => f.toLowerCase().includes(q)),
       );
     }
-    if (filterResearchField.trim()) {
-      const rf = filterResearchField.toLowerCase();
-      result = result.filter((s) =>
-        s.research_areas.some((f) => f.toLowerCase().includes(rf)),
-      );
-    }
-    if (filterAcademician) {
-      result = result.filter(
-        (s) =>
-          s.is_academician ||
-          s.academic_titles.some(
-            (t) => t.includes("院士"),
-          ),
-      );
-    }
     return result;
-  }, [items, query, filterResearchField, filterAcademician]);
+  }, [items, query]);
 
   useEffect(() => {
     setPage(1);
-  }, [query, filterResearchField, filterAcademician]);
-
-  const activeFilterCount =
-    (filterResearchField ? 1 : 0) + (filterAcademician ? 1 : 0);
+  }, [query]);
 
   const filterChips: { label: string; onRemove: () => void }[] = [
-    ...(filterResearchField
-      ? [
-          {
-            label: `方向: ${filterResearchField}`,
-            onRemove: () => setFilterResearchField(""),
-          },
-        ]
-      : []),
-    ...(filterAcademician
-      ? [{ label: "仅院士", onRemove: () => setFilterAcademician(false) }]
-      : []),
     ...(activeUni
       ? [{ label: activeUni, onRemove: () => handleSelectUni(null) }]
       : []),
@@ -593,34 +441,6 @@ export default function ScholarListPage() {
                   />
                 </div>
 
-                <div ref={filterRef} className="relative">
-                  <button
-                    onClick={() => setFilterOpen((v) => !v)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-all",
-                      filterOpen || activeFilterCount > 0
-                        ? "bg-primary-50 text-primary-700 border-primary-200"
-                        : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
-                    )}
-                  >
-                    <SlidersHorizontal className="w-4 h-4" />
-                    筛选
-                    {activeFilterCount > 0 && (
-                      <span className="w-5 h-5 rounded-full bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center">
-                        {activeFilterCount}
-                      </span>
-                    )}
-                  </button>
-                  <FilterPopover
-                    open={filterOpen}
-                    filterResearchField={filterResearchField}
-                    setFilterResearchField={setFilterResearchField}
-                    filterAcademician={filterAcademician}
-                    setFilterAcademician={setFilterAcademician}
-                    onReset={resetFilters}
-                  />
-                </div>
-
                 <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <button
                     onClick={() => setViewMode("list")}
@@ -681,12 +501,6 @@ export default function ScholarListPage() {
                       </button>
                     </span>
                   ))}
-                  <button
-                    onClick={clearAll}
-                    className="text-xs text-gray-500 hover:text-gray-700 underline"
-                  >
-                    清除全部
-                  </button>
                 </motion.div>
               )}
             </AnimatePresence>

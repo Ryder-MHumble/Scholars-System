@@ -49,6 +49,9 @@ export interface FacultyDetail extends FacultyListItem {
   relation_updated_by: string;
   relation_updated_at: string;
   recent_updates: FacultyUpdate[];
+  representative_publications: PublicationRecord[];
+  patents: PatentRecord[];
+  awards: AwardRecord[];
   source_url: string;
   first_seen_at: string;
   last_seen_at: string;
@@ -102,6 +105,36 @@ export interface FacultyUpdate {
   created_at?: string;
 }
 
+export interface PublicationRecord {
+  title?: string;
+  venue?: string;
+  year?: string;
+  authors?: string;
+  url?: string;
+  citation_count?: number;
+  is_corresponding?: boolean;
+  added_by?: string;
+}
+
+export interface PatentRecord {
+  title?: string;
+  patent_no?: string;
+  year?: string;
+  inventors?: string;
+  patent_type?: string;
+  status?: string;
+  added_by?: string;
+}
+
+export interface AwardRecord {
+  title?: string;
+  year?: string;
+  level?: string;
+  grantor?: string;
+  description?: string;
+  added_by?: string;
+}
+
 export interface FacultyListResponse {
   total: number;
   page: number;
@@ -130,6 +163,34 @@ export interface RelationPatch {
   is_adjunct_supervisor?: boolean;
   is_potential_recruit?: boolean;
   institute_relation_notes?: string;
+}
+
+export interface FacultyDetailPatch {
+  name?: string;
+  name_en?: string;
+  bio?: string;
+  bio_en?: string;
+  position?: string;
+  department?: string;
+  secondary_departments?: string[];
+  email?: string;
+  phone?: string;
+  office?: string;
+  lab_url?: string;
+  google_scholar_url?: string;
+  dblp_url?: string;
+  orcid?: string;
+  phd_institution?: string;
+  phd_year?: string;
+  research_areas?: string[];
+  institute_relation_notes?: string;
+}
+
+export interface AchievementsPatch {
+  representative_publications?: PublicationRecord[];
+  patents?: PatentRecord[];
+  awards?: AwardRecord[];
+  updated_by?: string;
 }
 
 export async function fetchFacultyList(
@@ -168,6 +229,19 @@ export async function patchFacultyRelation(
   return res.json();
 }
 
+export async function patchFacultyDetail(
+  urlHash: string,
+  data: FacultyDetailPatch,
+): Promise<FacultyDetail> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to update faculty detail: ${res.status}`);
+  return res.json();
+}
+
 export async function postFacultyUpdate(
   urlHash: string,
   data: NewFacultyUpdate,
@@ -178,5 +252,18 @@ export async function postFacultyUpdate(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`Failed to post update: ${res.status}`);
+  return res.json();
+}
+
+export async function patchFacultyAchievements(
+  urlHash: string,
+  data: AchievementsPatch,
+): Promise<FacultyDetail> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/achievements`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to update achievements: ${res.status}`);
   return res.json();
 }
