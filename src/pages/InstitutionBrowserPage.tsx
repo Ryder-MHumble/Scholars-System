@@ -86,9 +86,9 @@ function TreeNode({
                     )}
                   >
                     <span className="truncate flex-1 text-left">{dept}</span>
-                    {deptCount > 0 && (
-                      <span className="text-gray-400 shrink-0">{deptCount}</span>
-                    )}
+                    <span className="text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded text-xs shrink-0">
+                      {deptCount}
+                    </span>
                   </button>
                 );
               })}

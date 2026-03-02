@@ -1,4 +1,5 @@
-const BASE_URL = "http://43.98.254.243:8001";
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
 
 export interface FacultyListItem {
   url_hash: string;
