@@ -12,6 +12,112 @@ VITE_API_BASE_URL=http://43.98.254.243:8001
 npm run dev
 ```
 
+## 在服务器上部署（内网/外网访问）
+
+### 开发环境运行（推荐用于测试）
+
+如果你想在服务器上运行 Vite 开发服务器，允许其他人访问：
+
+1. 确保防火墙允许端口 5173 的访问：
+```bash
+# Linux 防火墙
+sudo ufw allow 5173
+# 或检查 iptables
+sudo iptables -I INPUT -p tcp --dport 5173 -j ACCEPT
+```
+
+2. 创建 `.env.local` 文件：
+```
+VITE_API_BASE_URL=http://43.98.254.243:8001
+```
+
+3. 运行开发服务器：
+```bash
+npm run dev
+```
+
+4. 服务器地址（替换为你的实际 IP）：
+   - **本地访问**: `http://localhost:5173`
+   - **内网访问**: `http://192.168.x.x:5173` （当前服务器 IP）
+   - **外网访问**: `http://<公网IP>:5173` 或 `http://<域名>:5173`
+
+### 生产环境部署（推荐用于长期运行）
+
+使用构建产物 + 反向代理部署更稳定：
+
+#### 第 1 步：构建项目
+```bash
+npm run build
+```
+
+输出目录：`dist/`
+
+#### 第 2 步：配置 Web 服务器
+
+**使用 Nginx（推荐）**：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;  # 或服务器 IP
+
+    # 静态文件
+    location / {
+        root /path/to/dist;  # 修改为实际的 dist 目录路径
+        try_files $uri $uri/ /index.html;  # 前端路由 fallback
+    }
+
+    # API 代理（可选，避免跨域）
+    location /api/ {
+        proxy_pass http://43.98.254.243:8001/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+然后重启 Nginx：
+```bash
+sudo systemctl restart nginx
+```
+
+**使用 Node.js + Express**：
+
+```bash
+npm install -g serve
+serve -s dist -l 3000
+```
+
+然后通过 `http://server-ip:3000` 访问。
+
+#### 第 3 步：生产环境变量
+
+在启动前设置环境变量：
+```bash
+# 直接启动
+export VITE_API_BASE_URL=http://43.98.254.243:8001
+npm run dev
+
+# 或者在 .env.production 中配置
+```
+
+### 获取服务器 IP
+
+```bash
+# 查看所有 IP 地址
+hostname -I
+
+# 查看特定网卡 IP（如 eth0）
+ip addr show eth0
+```
+
+根据网络环境选择合适的 IP：
+- **内网 IP** (如 192.168.x.x)：用于同一局域网内的访问
+- **公网 IP** (如 x.x.x.x)：用于互联网访问
+- **域名** (如 example.com)：最推荐，稳定且易记
+
 ## Vercel 部署
 
 ### 前置条件
