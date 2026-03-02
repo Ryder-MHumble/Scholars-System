@@ -31,13 +31,16 @@ import {
   patchFacultyRelation,
   patchFacultyDetail,
   postFacultyUpdate,
+  deleteFacultyUpdate,
   patchFacultyAchievements,
   type FacultyDetail,
-  type NewFacultyUpdate,
   type FacultyDetailPatch,
+  type NewFacultyUpdate,
   type PublicationRecord,
   type PatentRecord,
   type AwardRecord,
+  type SupervisedStudent,
+  type ExchangeRecord,
 } from "@/services/facultyApi";
 import { StatsSidebar } from "@/components/scholar-detail/stats/StatsSidebar";
 import { PageSkeleton } from "@/components/scholar-detail/shared/SkeletonLoader";
@@ -51,50 +54,120 @@ import {
   listItem,
 } from "@/utils/animations";
 
-// ─── 可编辑的文本框 ──────────────────────────────────────────────
-interface EditableTextProps {
+// ─── 点击编辑字段组件 ─────────────────────────────────────────────
+interface ClickToEditFieldProps {
   value: string;
-  isEditMode: boolean;
-  onChange?: (value: string) => void;
-  className?: string;
+  onSave: (value: string) => Promise<void>;
+  placeholder?: string;
   multiline?: boolean;
+  renderValue?: React.ReactNode;
+  className?: string;
+  inputClassName?: string;
 }
 
-function EditableText({
+function ClickToEditField({
   value,
-  isEditMode,
-  onChange,
-  className = "",
+  onSave,
+  placeholder = "-",
   multiline = false,
-}: EditableTextProps) {
-  if (!isEditMode) {
-    return <span className={className}>{value}</span>;
-  }
+  renderValue,
+  className,
+  inputClassName,
+}: ClickToEditFieldProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
-  if (multiline) {
+  const handleStart = () => {
+    setEditValue(value);
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => setIsEditing(false);
+
+  const handleSave = async () => {
+    if (editValue === value) {
+      setIsEditing(false);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await onSave(editValue);
+      setIsEditing(false);
+    } catch {
+      // stay in edit mode on error
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isEditing) {
     return (
-      <textarea
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
-        className={cn(
-          "w-full p-2 border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500",
-          className
+      <div className={cn("flex items-start gap-1 flex-1", className)}>
+        {multiline ? (
+          <textarea
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            autoFocus
+            rows={3}
+            className={cn(
+              "flex-1 text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none",
+              inputClassName,
+            )}
+          />
+        ) : (
+          <input
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+              if (e.key === "Escape") handleCancel();
+            }}
+            className={cn(
+              "flex-1 text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500",
+              inputClassName,
+            )}
+          />
         )}
-        rows={3}
-      />
+        <div className="flex flex-col gap-0.5 shrink-0 pt-0.5">
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+            title="保存"
+          >
+            <Check className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={handleCancel}
+            className="p-1 text-gray-400 hover:bg-gray-100 rounded transition-colors"
+            title="取消"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange?.(e.target.value)}
+    <span
       className={cn(
-        "w-full px-2 py-1 border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500",
-        className
+        "cursor-pointer group inline-flex items-center gap-0.5 rounded px-0.5 -mx-0.5 transition-colors hover:bg-primary-50",
+        className,
       )}
-    />
+      onClick={handleStart}
+      title="点击编辑"
+    >
+      {value ? (
+        renderValue !== undefined ? renderValue : <span>{value}</span>
+      ) : (
+        <span className="text-gray-300 italic text-xs">{placeholder}</span>
+      )}
+      <Edit3 className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-50 text-primary-500" />
+    </span>
   );
 }
 
@@ -667,6 +740,120 @@ function EditAchievementsModal({
   );
 }
 
+// ─── 交往记录表单弹窗 ────────────────────────────────────────────
+interface ExchangeRecordFormModalProps {
+  record?: ExchangeRecord;
+  onClose: () => void;
+  onSubmit: (record: ExchangeRecord) => void;
+}
+
+function ExchangeRecordFormModal({ record, onClose, onSubmit }: ExchangeRecordFormModalProps) {
+  const [form, setForm] = useState<ExchangeRecord>({
+    type: record?.type ?? "",
+    date: record?.date ?? "",
+    title: record?.title ?? "",
+    organization: record?.organization ?? "",
+    description: record?.description ?? "",
+  });
+
+  const handleSubmit = () => {
+    if (!form.title?.trim()) return;
+    onSubmit(form);
+    onClose();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold text-gray-900">
+            {record ? "编辑交往记录" : "添加交往记录"}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">类型</label>
+            <input
+              type="text"
+              value={form.type ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+              placeholder="如：学术交流、人才称号、任职履新…"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">标题 *</label>
+            <input
+              value={form.title ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              placeholder="请输入标题"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">机构</label>
+            <input
+              value={form.organization ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, organization: e.target.value }))}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              placeholder="请输入相关机构"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">日期</label>
+            <input
+              type="date"
+              value={form.date ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">描述</label>
+            <textarea
+              value={form.description ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              rows={3}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-none"
+              placeholder="请输入详细描述"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!form.title?.trim()}
+            className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors disabled:opacity-50"
+          >
+            确定
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function ScholarDetailPageDemo() {
   const { scholarId } = useParams<{ scholarId: string }>();
   const [faculty, setFaculty] = useState<FacultyDetail | null>(null);
@@ -675,14 +862,17 @@ export default function ScholarDetailPageDemo() {
   const [showContactModal, setShowContactModal] = useState(false);
   const [showAddUpdate, setShowAddUpdate] = useState(false);
   const [bioExpanded, setBioExpanded] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editableFaculty, setEditableFaculty] = useState<FacultyDetail | null>(null);
   const [editableAchievements, setEditableAchievements] = useState<{
     publications: PublicationRecord[];
     patents: PatentRecord[];
     awards: AwardRecord[];
   } | null>(null);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
+  // 交往记录编辑状态
+  const [isExchangeEditMode, setIsExchangeEditMode] = useState(false);
+  const [editedExchangeRecords, setEditedExchangeRecords] = useState<ExchangeRecord[]>([]);
+  const [showExchangeRecordForm, setShowExchangeRecordForm] = useState(false);
+  const [editingExchangeIdx, setEditingExchangeIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!scholarId) return;
@@ -690,47 +880,12 @@ export default function ScholarDetailPageDemo() {
     setError(null);
     fetchFacultyDetail(scholarId)
       .then((data) => {
-        // 如果没有交往记录，添加示例数据用于展示
-        if (!data.academic_exchange_records || data.academic_exchange_records.length === 0) {
-          data.academic_exchange_records = [
-            {
-              type: "人才称号",
-              date: "2026-02-15",
-              title: "入选国家杰出青年科学基金",
-              organization: "国家自然科学基金委员会",
-              description: "2026年度国家杰出青年科学基金资助项目，项目编号为 12345678，资助强度为 150万元，主要研究方向为人工智能基础理论。",
-            },
-            {
-              type: "学术交流",
-              date: "2026-01-20",
-              title: "访问美国麻省理工学院",
-              organization: "MIT CSAIL",
-              description: "应邀访问美国麻省理工学院计算机科学与人工智能实验室，与知名教授David Gifford进行学术交流，探讨生物信息学和机器学习的交叉应用。",
-            },
-            {
-              type: "任职履新",
-              date: "2025-12-10",
-              title: "担任国家高层次人才培养计划青年学者",
-              organization: "教育部学位与研究生教育发展中心",
-              description: "获批入选国家高层次人才培养计划，将重点开展人工智能在生物医学领域的应用研究。",
-            },
-            {
-              type: "科研立项",
-              date: "2025-11-05",
-              title: "主持重点研发计划项目立项",
-              organization: "科技部",
-              description: "主持科技部国家重点研发计划项目《人工智能驱动的蛋白质结构预测与功能验证》，项目总经费 580万元，执行期 4年。",
-            },
-            {
-              type: "获奖信息",
-              date: "2025-10-01",
-              title: "获得国家自然科学奖二等奖",
-              organization: "国务院",
-              description: "凭借在深度学习理论基础方面的创新研究成果获得国家自然科学奖二等奖。",
-            },
-          ];
-        }
         setFaculty(data);
+        setEditableAchievements({
+          publications: data.representative_publications ?? [],
+          patents: data.patents ?? [],
+          awards: data.awards ?? [],
+        });
         setIsLoading(false);
       })
       .catch((err) => {
@@ -739,92 +894,71 @@ export default function ScholarDetailPageDemo() {
       });
   }, [scholarId]);
 
-  const handleEnterEditMode = () => {
-    setIsEditMode(true);
-    setEditableFaculty(faculty);
-    setEditableAchievements({
-      publications: faculty?.representative_publications ?? [],
-      patents: faculty?.patents ?? [],
-      awards: faculty?.awards ?? [],
-    });
+  // ── 单字段保存 (左侧基础信息点击编辑) ──────────────────────────
+  const handleFieldSave = async (patch: FacultyDetailPatch) => {
+    if (!faculty) return;
+    const updated = await patchFacultyDetail(faculty.url_hash, patch);
+    setFaculty(updated);
   };
 
-  const handleSaveEdit = async () => {
-    if (!editableFaculty || !faculty) return;
-    try {
-      // Build patch object with changed fields
-      const patch: FacultyDetailPatch = {};
+  // ── 指导学生保存 ──────────────────────────────────────────────
+  const handleStudentsSave = async (students: SupervisedStudent[]) => {
+    if (!faculty) return;
+    const updated = await patchFacultyRelation(faculty.url_hash, {
+      supervised_students: students,
+    });
+    setFaculty(updated);
+  };
 
-      // Compare and add changed fields
-      if (editableFaculty.name !== faculty.name) patch.name = editableFaculty.name;
-      if (editableFaculty.name_en !== faculty.name_en) patch.name_en = editableFaculty.name_en;
-      if (editableFaculty.bio !== faculty.bio) patch.bio = editableFaculty.bio;
-      if (editableFaculty.bio_en !== faculty.bio_en) patch.bio_en = editableFaculty.bio_en;
-      if (editableFaculty.position !== faculty.position) patch.position = editableFaculty.position;
-      if (editableFaculty.department !== faculty.department) patch.department = editableFaculty.department;
-      if (JSON.stringify(editableFaculty.secondary_departments) !== JSON.stringify(faculty.secondary_departments)) {
-        patch.secondary_departments = editableFaculty.secondary_departments;
-      }
-      if (editableFaculty.email !== faculty.email) patch.email = editableFaculty.email;
-      if (editableFaculty.phone !== faculty.phone) patch.phone = editableFaculty.phone;
-      if (editableFaculty.office !== faculty.office) patch.office = editableFaculty.office;
-      if (editableFaculty.lab_url !== faculty.lab_url) patch.lab_url = editableFaculty.lab_url;
-      if (editableFaculty.google_scholar_url !== faculty.google_scholar_url) patch.google_scholar_url = editableFaculty.google_scholar_url;
-      if (editableFaculty.dblp_url !== faculty.dblp_url) patch.dblp_url = editableFaculty.dblp_url;
-      if (editableFaculty.orcid !== faculty.orcid) patch.orcid = editableFaculty.orcid;
-      if (editableFaculty.phd_institution !== faculty.phd_institution) patch.phd_institution = editableFaculty.phd_institution;
-      if (editableFaculty.phd_year !== faculty.phd_year) patch.phd_year = editableFaculty.phd_year;
-      if (JSON.stringify(editableFaculty.research_areas) !== JSON.stringify(faculty.research_areas)) {
-        patch.research_areas = editableFaculty.research_areas;
-      }
-      if (editableFaculty.institute_relation_notes !== faculty.institute_relation_notes) {
-        patch.institute_relation_notes = editableFaculty.institute_relation_notes;
-      }
+  // ── 交往记录编辑处理 ──────────────────────────────────────────
+  const handleEnterExchangeEdit = () => {
+    setEditedExchangeRecords([...(faculty?.academic_exchange_records ?? [])]);
+    setIsExchangeEditMode(true);
+  };
 
-      // Check if achievements changed
-      const achievementsChanged = editableAchievements && (
-        JSON.stringify(editableAchievements.publications) !== JSON.stringify(faculty.representative_publications) ||
-        JSON.stringify(editableAchievements.patents) !== JSON.stringify(faculty.patents) ||
-        JSON.stringify(editableAchievements.awards) !== JSON.stringify(faculty.awards)
-      );
+  const handleCancelExchangeEdit = () => {
+    setIsExchangeEditMode(false);
+    setEditedExchangeRecords([]);
+    setShowExchangeRecordForm(false);
+    setEditingExchangeIdx(null);
+  };
 
-      // Save basic info if there are changes
-      if (Object.keys(patch).length > 0) {
-        const updated = await patchFacultyDetail(faculty.url_hash, patch);
-        setFaculty(updated);
-      }
+  const handleSaveExchangeRecords = async () => {
+    if (!faculty) return;
+    const updated = await patchFacultyRelation(faculty.url_hash, {
+      academic_exchange_records: editedExchangeRecords,
+    });
+    setFaculty(updated);
+    setIsExchangeEditMode(false);
+    setEditedExchangeRecords([]);
+    setShowExchangeRecordForm(false);
+    setEditingExchangeIdx(null);
+  };
 
-      // Save achievements if they changed
-      if (achievementsChanged && editableAchievements) {
-        const updated = await patchFacultyAchievements(faculty.url_hash, {
-          representative_publications: editableAchievements.publications,
-          patents: editableAchievements.patents,
-          awards: editableAchievements.awards,
-        });
-        setFaculty(updated);
-      }
-
-      if (Object.keys(patch).length === 0 && !achievementsChanged) {
-        setIsEditMode(false);
-        return;
-      }
-
-      setIsEditMode(false);
-    } catch (error) {
-      console.error("Failed to save:", error);
-      // Keep edit mode on error
+  const handleExchangeRecordSubmit = (record: ExchangeRecord) => {
+    if (editingExchangeIdx !== null) {
+      setEditedExchangeRecords((prev) => {
+        const updated = [...prev];
+        updated[editingExchangeIdx] = record;
+        return updated;
+      });
+      setEditingExchangeIdx(null);
+    } else {
+      setEditedExchangeRecords((prev) => [...prev, record]);
     }
   };
 
-  const handleCancelEdit = () => {
-    setIsEditMode(false);
-    setEditableFaculty(null);
-    setEditableAchievements(null);
+  const handleDeleteExchangeRecord = (idx: number) => {
+    setEditedExchangeRecords((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const updateEditableField = (field: keyof FacultyDetail, value: any) => {
-    if (editableFaculty) {
-      setEditableFaculty({ ...editableFaculty, [field]: value });
+  const handleDeleteUpdate = async (index: number) => {
+    if (!faculty) return;
+    try {
+      const updated = await deleteFacultyUpdate(faculty.url_hash, index);
+      setFaculty(updated);
+    } catch (error) {
+      console.error("Failed to delete update:", error);
     }
   };
 
@@ -843,16 +977,6 @@ export default function ScholarDetailPageDemo() {
       </div>
     );
   }
-
-  const statsData = {
-    papers: faculty.publications_count > 0 ? faculty.publications_count : 0,
-    citations: faculty.citations_count > 0 ? faculty.citations_count : 0,
-    hIndex: faculty.h_index > 0 ? faculty.h_index : 0,
-    gIndex: faculty.h_index > 0 ? Math.floor(faculty.h_index * 1.3) : 0,
-    sociability: 0,
-    diversity: 0,
-    activity: 0,
-  };
 
   // Build advised students from supervised_students
   const advisedStudents = (faculty.supervised_students ?? []).map((s, idx) => ({
@@ -1021,7 +1145,13 @@ export default function ScholarDetailPageDemo() {
             patents={editableAchievements.patents}
             awards={editableAchievements.awards}
             onClose={() => setShowAchievementsModal(false)}
-            onSubmit={(data) => {
+            onSubmit={async (data) => {
+              const updated = await patchFacultyAchievements(faculty.url_hash, {
+                representative_publications: data.publications,
+                patents: data.patents,
+                awards: data.awards,
+              });
+              setFaculty(updated);
               setEditableAchievements({
                 publications: data.publications,
                 patents: data.patents,
@@ -1029,6 +1159,20 @@ export default function ScholarDetailPageDemo() {
               });
               setShowAchievementsModal(false);
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Exchange Record Form Modal */}
+      <AnimatePresence>
+        {(showExchangeRecordForm || editingExchangeIdx !== null) && (
+          <ExchangeRecordFormModal
+            record={editingExchangeIdx !== null ? editedExchangeRecords[editingExchangeIdx] : undefined}
+            onClose={() => {
+              setShowExchangeRecordForm(false);
+              setEditingExchangeIdx(null);
+            }}
+            onSubmit={handleExchangeRecordSubmit}
           />
         )}
       </AnimatePresence>
@@ -1081,40 +1225,33 @@ export default function ScholarDetailPageDemo() {
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
                       <h2 className="text-lg font-bold text-gray-900 leading-snug">
-                        <EditableText
-                          value={isEditMode ? editableFaculty?.name || "" : faculty.name}
-                          isEditMode={isEditMode}
-                          onChange={(val) => updateEditableField("name", val)}
-                          className="block"
+                        <ClickToEditField
+                          value={faculty.name}
+                          onSave={async (val) => handleFieldSave({ name: val })}
+                          className="text-lg font-bold text-gray-900"
                         />
                       </h2>
-                      {faculty.name_en && (
-                        <div className="text-sm text-gray-500">
-                          <EditableText
-                            value={isEditMode ? editableFaculty?.name_en || "" : faculty.name_en}
-                            isEditMode={isEditMode}
-                            onChange={(val) => updateEditableField("name_en", val)}
-                          />
-                        </div>
-                      )}
-                      {faculty.position && (
-                        <div className="text-sm text-gray-600">
-                          <EditableText
-                            value={isEditMode ? editableFaculty?.position || "" : faculty.position}
-                            isEditMode={isEditMode}
-                            onChange={(val) => updateEditableField("position", val)}
-                          />
-                        </div>
-                      )}
-                      {faculty.department && (
-                        <div className="text-xs text-gray-400">
-                          <EditableText
-                            value={isEditMode ? editableFaculty?.department || "" : faculty.department}
-                            isEditMode={isEditMode}
-                            onChange={(val) => updateEditableField("department", val)}
-                          />
-                        </div>
-                      )}
+                      <div className="text-sm text-gray-500">
+                        <ClickToEditField
+                          value={faculty.name_en || ""}
+                          onSave={async (val) => handleFieldSave({ name_en: val })}
+                          placeholder="点击添加英文名"
+                        />
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <ClickToEditField
+                          value={faculty.position || ""}
+                          onSave={async (val) => handleFieldSave({ position: val })}
+                          placeholder="点击添加职称"
+                        />
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        <ClickToEditField
+                          value={faculty.department || ""}
+                          onSave={async (val) => handleFieldSave({ department: val })}
+                          placeholder="点击添加院系"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1122,11 +1259,7 @@ export default function ScholarDetailPageDemo() {
                   {faculty.university && (
                     <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-3">
                       <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                      <EditableText
-                        value={isEditMode ? editableFaculty?.university || "" : faculty.university}
-                        isEditMode={isEditMode}
-                        onChange={(val) => updateEditableField("university", val)}
-                      />
+                      <span>{faculty.university}</span>
                     </div>
                   )}
 
@@ -1153,42 +1286,6 @@ export default function ScholarDetailPageDemo() {
                     </div>
                   )}
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 mb-4">
-                    {isEditMode ? (
-                      <>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={handleSaveEdit}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          保存
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={handleCancelEdit}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-all duration-200"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                          取消
-                        </motion.button>
-                      </>
-                    ) : (
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleEnterEditMode}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        编辑
-                      </motion.button>
-                    )}
-                  </div>
-
                   {/* Data completeness */}
                   <div className="flex items-center justify-between text-xs text-gray-400 pt-3 border-t border-gray-100">
                     <div className="flex items-center gap-1">
@@ -1202,162 +1299,135 @@ export default function ScholarDetailPageDemo() {
                 </div>
 
                 {/* Contact */}
-                {(faculty.email || faculty.phone || faculty.profile_url || faculty.office || isEditMode) && (
-                  <div className="px-5 py-4 border-t border-gray-100">
-                    <SideLabel icon={Mail} title="联系方式" />
-                    <div className="space-y-2.5">
-                      <div className="flex items-center gap-2.5 text-sm">
-                        <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        {isEditMode ? (
-                          <EditableText
-                            value={editableFaculty?.email || ""}
-                            isEditMode={true}
-                            onChange={(val) => updateEditableField("email", val)}
-                            className="text-sm flex-1"
-                          />
-                        ) : faculty.email ? (
-                          <a
-                            href={`mailto:${faculty.email}`}
-                            className="hover:text-primary-600 truncate transition-colors text-gray-600"
-                          >
-                            {faculty.email}
-                          </a>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2.5 text-sm">
-                        <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <EditableText
-                          value={isEditMode ? editableFaculty?.phone || "" : faculty.phone || "-"}
-                          isEditMode={isEditMode}
-                          onChange={(val) => updateEditableField("phone", val)}
-                          className={!isEditMode && !faculty.phone ? "text-gray-400" : "text-gray-600"}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2.5 text-sm">
-                        <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <EditableText
-                          value={isEditMode ? editableFaculty?.office || "" : faculty.office || "-"}
-                          isEditMode={isEditMode}
-                          onChange={(val) => updateEditableField("office", val)}
-                          className={!isEditMode && !faculty.office ? "text-gray-400" : "text-gray-600"}
-                        />
-                      </div>
-                      {(faculty.profile_url || isEditMode) && (
-                        <div className="flex items-center gap-2.5 text-sm">
-                          <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          {isEditMode ? (
-                            <EditableText
-                              value={editableFaculty?.profile_url || faculty.profile_url || ""}
-                              isEditMode={true}
-                              onChange={(val) => updateEditableField("profile_url", val)}
-                              className="text-sm flex-1"
-                            />
-                          ) : (
+                <div className="px-5 py-4 border-t border-gray-100">
+                  <SideLabel icon={Mail} title="联系方式" />
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2.5 text-sm">
+                      <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <ClickToEditField
+                        value={faculty.email || ""}
+                        onSave={async (val) => handleFieldSave({ email: val })}
+                        placeholder="点击添加邮箱"
+                        renderValue={
+                          faculty.email ? (
                             <a
-                              href={faculty.profile_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="hover:text-primary-600 flex items-center gap-1 transition-colors text-gray-600"
+                              href={`mailto:${faculty.email}`}
+                              className="hover:text-primary-600 truncate transition-colors text-gray-600"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              个人主页
-                              <ExternalLink className="w-3 h-3 shrink-0" />
+                              {faculty.email}
                             </a>
-                          )}
-                        </div>
-                      )}
+                          ) : undefined
+                        }
+                      />
                     </div>
+                    <div className="flex items-center gap-2.5 text-sm">
+                      <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <ClickToEditField
+                        value={faculty.phone || ""}
+                        onSave={async (val) => handleFieldSave({ phone: val })}
+                        placeholder="点击添加电话"
+                        className={!faculty.phone ? "text-gray-400" : "text-gray-600"}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2.5 text-sm">
+                      <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <ClickToEditField
+                        value={faculty.office || ""}
+                        onSave={async (val) => handleFieldSave({ office: val })}
+                        placeholder="点击添加办公室"
+                        className={!faculty.office ? "text-gray-400" : "text-gray-600"}
+                      />
+                    </div>
+                    {faculty.profile_url && (
+                      <div className="flex items-center gap-2.5 text-sm">
+                        <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <a
+                          href={faculty.profile_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-primary-600 flex items-center gap-1 transition-colors text-gray-600"
+                        >
+                          个人主页
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Academic Links */}
-                {(faculty.google_scholar_url || faculty.dblp_url || faculty.lab_url || faculty.orcid || isEditMode) && (
+                {(faculty.google_scholar_url || faculty.dblp_url || faculty.lab_url || faculty.orcid) && (
                   <div className="px-5 py-4 border-t border-gray-100">
                     <SideLabel icon={Link2} title="学术链接" />
                     <div className="space-y-2">
-                      {(faculty.google_scholar_url || isEditMode) && (
+                      {faculty.google_scholar_url && (
                         <div className="text-xs">
                           <label className="text-gray-400 block mb-1">Google Scholar</label>
-                          {isEditMode ? (
-                            <input
-                              type="url"
-                              value={editableFaculty?.google_scholar_url || ""}
-                              onChange={(e) => updateEditableField("google_scholar_url", e.target.value)}
-                              placeholder="https://..."
-                              className="w-full text-xs border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-500 px-2 py-1"
-                            />
-                          ) : faculty.google_scholar_url ? (
-                            <a
-                              href={faculty.google_scholar_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary-600 hover:underline truncate block"
-                            >
-                              {faculty.google_scholar_url}
-                            </a>
-                          ) : null}
+                          <ClickToEditField
+                            value={faculty.google_scholar_url}
+                            onSave={async (val) => handleFieldSave({ google_scholar_url: val })}
+                            renderValue={
+                              <a
+                                href={faculty.google_scholar_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary-600 hover:underline truncate block"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {faculty.google_scholar_url}
+                              </a>
+                            }
+                          />
                         </div>
                       )}
-                      {(faculty.dblp_url || isEditMode) && (
+                      {faculty.dblp_url && (
                         <div className="text-xs">
                           <label className="text-gray-400 block mb-1">DBLP</label>
-                          {isEditMode ? (
-                            <input
-                              type="url"
-                              value={editableFaculty?.dblp_url || ""}
-                              onChange={(e) => updateEditableField("dblp_url", e.target.value)}
-                              placeholder="https://..."
-                              className="w-full text-xs border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-500 px-2 py-1"
-                            />
-                          ) : faculty.dblp_url ? (
-                            <a
-                              href={faculty.dblp_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary-600 hover:underline truncate block"
-                            >
-                              {faculty.dblp_url}
-                            </a>
-                          ) : null}
+                          <ClickToEditField
+                            value={faculty.dblp_url}
+                            onSave={async (val) => handleFieldSave({ dblp_url: val })}
+                            renderValue={
+                              <a
+                                href={faculty.dblp_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary-600 hover:underline truncate block"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {faculty.dblp_url}
+                              </a>
+                            }
+                          />
                         </div>
                       )}
-                      {(faculty.lab_url || isEditMode) && (
+                      {faculty.lab_url && (
                         <div className="text-xs">
                           <label className="text-gray-400 block mb-1">实验室网站</label>
-                          {isEditMode ? (
-                            <input
-                              type="url"
-                              value={editableFaculty?.lab_url || ""}
-                              onChange={(e) => updateEditableField("lab_url", e.target.value)}
-                              placeholder="https://..."
-                              className="w-full text-xs border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-500 px-2 py-1"
-                            />
-                          ) : faculty.lab_url ? (
-                            <a
-                              href={faculty.lab_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary-600 hover:underline truncate block"
-                            >
-                              {faculty.lab_url}
-                            </a>
-                          ) : null}
+                          <ClickToEditField
+                            value={faculty.lab_url}
+                            onSave={async (val) => handleFieldSave({ lab_url: val })}
+                            renderValue={
+                              <a
+                                href={faculty.lab_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary-600 hover:underline truncate block"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {faculty.lab_url}
+                              </a>
+                            }
+                          />
                         </div>
                       )}
-                      {(faculty.orcid || isEditMode) && (
+                      {faculty.orcid && (
                         <div className="text-xs">
                           <label className="text-gray-400 block mb-1">ORCID</label>
-                          {isEditMode ? (
-                            <input
-                              value={editableFaculty?.orcid || ""}
-                              onChange={(e) => updateEditableField("orcid", e.target.value)}
-                              placeholder="XXXX-XXXX-XXXX-XXXX"
-                              className="w-full text-xs border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-500 px-2 py-1"
-                            />
-                          ) : faculty.orcid ? (
-                            <span className="text-gray-600">{faculty.orcid}</span>
-                          ) : null}
+                          <ClickToEditField
+                            value={faculty.orcid}
+                            onSave={async (val) => handleFieldSave({ orcid: val })}
+                          />
                         </div>
                       )}
                     </div>
@@ -1365,119 +1435,91 @@ export default function ScholarDetailPageDemo() {
                 )}
 
                 {/* Bio */}
-                {(bioText || isEditMode) && (
+                {bioText && (
                   <div className="px-5 py-4 border-t border-gray-100">
                     <SideLabel icon={User} title="个人简介" />
-                    {isEditMode ? (
-                      <textarea
-                        value={editableFaculty?.bio ?? ""}
-                        onChange={(e) => updateEditableField("bio", e.target.value)}
-                        placeholder="请输入个人简介"
-                        className="w-full text-sm border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 p-2"
-                        rows={4}
-                      />
-                    ) : (
-                      <>
-                        <p className="text-sm text-gray-600 leading-relaxed">
-                          {bioNeedsExpand && !bioExpanded
-                            ? bioText.slice(0, BIO_LIMIT) + "..."
-                            : bioText}
-                        </p>
-                        {bioNeedsExpand && (
-                          <button
-                            onClick={() => setBioExpanded((v) => !v)}
-                            className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 transition-colors"
-                          >
-                            {bioExpanded ? (
-                              <>
-                                <ChevronUp className="w-3 h-3" /> 收起
-                              </>
-                            ) : (
-                              <>
-                                <ChevronDown className="w-3 h-3" /> 展开全文
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </>
-                    )}
+                    <ClickToEditField
+                      value={bioText}
+                      onSave={async (val) => handleFieldSave({ bio: val })}
+                      multiline
+                      renderValue={
+                        <>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            {bioNeedsExpand && !bioExpanded
+                              ? bioText.slice(0, BIO_LIMIT) + "..."
+                              : bioText}
+                          </p>
+                          {bioNeedsExpand && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setBioExpanded((v) => !v); }}
+                              className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+                            >
+                              {bioExpanded ? (
+                                <><ChevronUp className="w-3 h-3" /> 收起</>
+                              ) : (
+                                <><ChevronDown className="w-3 h-3" /> 展开全文</>
+                              )}
+                            </button>
+                          )}
+                        </>
+                      }
+                    />
                   </div>
                 )}
 
                 {/* Education */}
                 {(() => {
-                  const editPhdInst = editableFaculty?.phd_institution || faculty.phd_institution;
-                  const editPhdYear = editableFaculty?.phd_year || faculty.phd_year;
-                  const eduItems = faculty.education && faculty.education.length > 0
-                    ? faculty.education
-                    : editPhdInst
-                    ? [
-                        {
-                          degree: "博士",
-                          institution: editPhdInst,
-                          major: "",
-                          year: editPhdYear || "",
-                          end_year: "",
-                        },
-                      ]
-                    : [];
-                  if (eduItems.length === 0 && !isEditMode) return null;
+                  const eduItems =
+                    faculty.education && faculty.education.length > 0
+                      ? faculty.education
+                      : faculty.phd_institution
+                      ? [
+                          {
+                            degree: "博士",
+                            institution: faculty.phd_institution,
+                            major: "",
+                            year: faculty.phd_year || "",
+                            end_year: "",
+                          },
+                        ]
+                      : [];
+                  if (eduItems.length === 0) return null;
                   return (
                     <div className="px-5 py-4 border-t border-gray-100">
                       <SideLabel icon={GraduationCap} title="教育经历" />
-                      {isEditMode ? (
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-xs font-medium text-gray-500 block mb-1">博士学位授予机构</label>
-                            <input
-                              type="text"
-                              value={editableFaculty?.phd_institution || ""}
-                              onChange={(e) => updateEditableField("phd_institution", e.target.value)}
-                              placeholder="请输入博士学位授予机构"
-                              className="w-full text-sm border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 px-2 py-1"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-gray-500 block mb-1">博士学位获得年份</label>
-                            <input
-                              type="text"
-                              value={editableFaculty?.phd_year || ""}
-                              onChange={(e) => updateEditableField("phd_year", e.target.value)}
-                              placeholder="例：2015"
-                              className="w-full text-sm border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 px-2 py-1"
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {eduItems.map((edu, i) => (
-                            <div key={i} className="relative pl-5">
-                              <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-primary-500 border-2 border-white shadow-sm" />
-                              {i < eduItems.length - 1 && (
-                                <div className="absolute left-[4px] top-4 w-0.5 h-full bg-gray-200" />
-                              )}
-                              <div className="space-y-0.5">
-                                <div className="flex items-start justify-between gap-2">
-                                  <span className="text-sm font-semibold text-gray-800">
-                                    {edu.degree || "学历"}
+                      <div className="space-y-4">
+                        {eduItems.map((edu, i) => (
+                          <div key={i} className="relative pl-5">
+                            <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-primary-500 border-2 border-white shadow-sm" />
+                            {i < eduItems.length - 1 && (
+                              <div className="absolute left-[4px] top-4 w-0.5 h-full bg-gray-200" />
+                            )}
+                            <div className="space-y-0.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="text-sm font-semibold text-gray-800">
+                                  {edu.degree || "学历"}
+                                </span>
+                                {(edu.year || edu.end_year) && (
+                                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                                    {edu.end_year
+                                      ? `${edu.year}–${edu.end_year}`
+                                      : edu.year}
                                   </span>
-                                  {(edu.year || edu.end_year) && (
-                                    <span className="text-xs text-gray-400 whitespace-nowrap">
-                                      {edu.end_year
-                                        ? `${edu.year}–${edu.end_year}`
-                                        : edu.year}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-sm text-gray-600">{edu.institution}</div>
-                                {edu.major && (
-                                  <div className="text-xs text-gray-400">{edu.major}</div>
                                 )}
                               </div>
+                              <div className="text-sm text-gray-600">
+                                <ClickToEditField
+                                  value={String(edu.institution || "")}
+                                  onSave={async (val) => handleFieldSave({ phd_institution: val })}
+                                />
+                              </div>
+                              {edu.major && (
+                                <div className="text-xs text-gray-400">{edu.major}</div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   );
                 })()}
@@ -1514,29 +1556,33 @@ export default function ScholarDetailPageDemo() {
                 )}
 
                 {/* Research Areas */}
-                {((faculty.research_areas && faculty.research_areas.length > 0) || isEditMode) && (
+                {faculty.research_areas && faculty.research_areas.length > 0 && (
                   <div className="px-5 py-4 border-t border-gray-100">
                     <SideLabel icon={BookOpen} title="研究方向" />
-                    {isEditMode ? (
-                      <textarea
-                        value={(editableFaculty?.research_areas ?? []).join(", ")}
-                        onChange={(e) => updateEditableField("research_areas", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
-                        placeholder="请输入研究方向，多个方向用逗号分隔"
-                        className="w-full text-sm border border-primary-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 p-2"
-                        rows={3}
-                      />
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {(editableFaculty?.research_areas ?? faculty.research_areas).slice(0, 10).map((area) => (
-                          <span
-                            key={area}
-                            className="text-xs px-2 py-1 bg-primary-50 text-primary-700 rounded-full border border-primary-100"
-                          >
-                            {area}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <ClickToEditField
+                      value={faculty.research_areas.join(", ")}
+                      onSave={async (val) =>
+                        handleFieldSave({
+                          research_areas: val
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      multiline
+                      renderValue={
+                        <div className="flex flex-wrap gap-1.5">
+                          {faculty.research_areas.slice(0, 10).map((area) => (
+                            <span
+                              key={area}
+                              className="text-xs px-2 py-1 bg-primary-50 text-primary-700 rounded-full border border-primary-100"
+                            >
+                              {area}
+                            </span>
+                          ))}
+                        </div>
+                      }
+                    />
                   </div>
                 )}
               </motion.div>
@@ -1597,54 +1643,153 @@ export default function ScholarDetailPageDemo() {
                       </button>
                     ))}
                   </div>
-                  {faculty.institute_relation_notes && (
-                    <p className="mt-3 text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
-                      {faculty.institute_relation_notes}
-                    </p>
-                  )}
+                  {faculty.institute_relation_notes ? (
+                    <ClickToEditField
+                      value={faculty.institute_relation_notes}
+                      onSave={async (val) => {
+                        const updated = await patchFacultyRelation(faculty.url_hash, {
+                          institute_relation_notes: val,
+                        });
+                        setFaculty(updated);
+                      }}
+                      multiline
+                      renderValue={
+                        <p className="mt-1 text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
+                          {faculty.institute_relation_notes}
+                        </p>
+                      }
+                    />
+                  ) : null}
                 </div>
 
                 {/* Exchange Records */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                    交往记录
-                  </p>
-                  {faculty.academic_exchange_records && faculty.academic_exchange_records.length > 0 ? (
-                    <div className="space-y-3">
-                      {faculty.academic_exchange_records.map((record, index) => (
-                        <motion.div
-                          key={index}
-                          variants={listItem}
-                          className="p-4 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all duration-200"
+                  <div className="flex items-center gap-2 mb-3">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                      交往记录
+                    </p>
+                    {!isExchangeEditMode ? (
+                      <button
+                        onClick={handleEnterExchangeEdit}
+                        className="ml-auto flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 rounded-full transition-colors"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        编辑
+                      </button>
+                    ) : (
+                      <div className="ml-auto flex gap-1">
+                        <button
+                          onClick={handleSaveExchangeRecords}
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-600 text-white hover:bg-green-700 rounded-full transition-colors"
                         >
-                          <div className="flex items-start gap-3 flex-wrap mb-2">
-                            {record.type && (
-                              <span
-                                className={cn(
-                                  "text-xs px-2.5 py-1 rounded-full font-semibold whitespace-nowrap",
-                                  exchangeTypeColor[record.type] ?? "bg-gray-100 text-gray-600",
-                                )}
-                              >
-                                {record.type}
-                              </span>
-                            )}
-                            {record.date && (
-                              <span className="text-xs text-gray-500 flex items-center gap-1 whitespace-nowrap">
-                                <Calendar className="w-3 h-3" />
-                                {record.date}
-                              </span>
-                            )}
+                          <Check className="w-3 h-3" />
+                          保存
+                        </button>
+                        <button
+                          onClick={handleCancelExchangeEdit}
+                          className="px-2.5 py-1 text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-full transition-colors"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Edit mode: show editedExchangeRecords */}
+                  {isExchangeEditMode ? (
+                    <div className="space-y-2 p-3 bg-primary-50/20 rounded-lg border border-primary-100">
+                      {editedExchangeRecords.length === 0 && (
+                        <p className="text-sm text-gray-400 text-center py-4">暂无交往记录</p>
+                      )}
+                      {editedExchangeRecords.map((record, index) => (
+                        <div
+                          key={index}
+                          className="p-3 rounded-lg border border-gray-100 bg-gray-50/50 flex items-start gap-2"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              {record.type && (
+                                <span
+                                  className={cn(
+                                    "text-xs px-2 py-0.5 rounded-full font-semibold",
+                                    exchangeTypeColor[record.type] ?? "bg-gray-100 text-gray-600",
+                                  )}
+                                >
+                                  {record.type}
+                                </span>
+                              )}
+                              {record.date && (
+                                <span className="text-xs text-gray-400">{record.date}</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-700 truncate">
+                              {[record.title, record.organization].filter(Boolean).join(" · ")}
+                            </p>
                           </div>
-                          <p className="text-sm text-gray-700 leading-relaxed">
-                            {[record.title, record.organization, record.description]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </p>
-                        </motion.div>
+                          <div className="flex gap-1 shrink-0">
+                            <button
+                              onClick={() => setEditingExchangeIdx(index)}
+                              className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                              title="编辑"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteExchangeRecord(index)}
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="删除"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       ))}
+                      <button
+                        onClick={() => setShowExchangeRecordForm(true)}
+                        className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 border border-dashed border-primary-300 text-primary-600 rounded-lg text-sm hover:bg-primary-50 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> 添加交往记录
+                      </button>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400 text-center py-6">暂无交往记录</p>
+                    /* View mode */
+                    faculty.academic_exchange_records && faculty.academic_exchange_records.length > 0 ? (
+                      <div className="space-y-3">
+                        {faculty.academic_exchange_records.map((record, index) => (
+                          <motion.div
+                            key={index}
+                            variants={listItem}
+                            className="p-4 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all duration-200"
+                          >
+                            <div className="flex items-start gap-3 flex-wrap mb-2">
+                              {record.type && (
+                                <span
+                                  className={cn(
+                                    "text-xs px-2.5 py-1 rounded-full font-semibold whitespace-nowrap",
+                                    exchangeTypeColor[record.type] ?? "bg-gray-100 text-gray-600",
+                                  )}
+                                >
+                                  {record.type}
+                                </span>
+                              )}
+                              {record.date && (
+                                <span className="text-xs text-gray-500 flex items-center gap-1 whitespace-nowrap">
+                                  <Calendar className="w-3 h-3" />
+                                  {record.date}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-700 leading-relaxed">
+                              {[record.title, record.organization, record.description]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          </motion.div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-400 text-center py-6">暂无交往记录</p>
+                    )
                   )}
                 </div>
               </motion.div>
@@ -1688,6 +1833,15 @@ export default function ScholarDetailPageDemo() {
                             )}
                             {update.published_at && (
                               <span>{update.published_at.slice(0, 10)}</span>
+                            )}
+                            {update.added_by?.startsWith("user:") && (
+                              <button
+                                onClick={() => handleDeleteUpdate(i)}
+                                className="ml-1 px-1.5 py-0.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="删除"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1762,292 +1916,236 @@ export default function ScholarDetailPageDemo() {
                 </motion.div>
               )}
 
-              {/* ─ 代表性论文 ─ */}
-              {faculty.representative_publications && faculty.representative_publications.length > 0 ? (
-                <motion.div
-                  variants={slideInUp}
-                  className="bg-white rounded-xl border border-gray-200 shadow-sm p-6"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <BookOpen className="w-5 h-5 text-primary-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">代表性论文</h3>
-                    <span className="ml-auto text-xs text-gray-400">
-                      {faculty.representative_publications.length} 篇
-                    </span>
-                    {isEditMode && (
-                      <button
-                        onClick={() => setShowAchievementsModal(true)}
-                        className="ml-2 px-2 py-1 text-xs bg-primary-100 text-primary-600 hover:bg-primary-200 rounded transition-colors"
-                      >
-                        编辑
-                      </button>
+              {/* ─ 学术成就 ─ */}
+              <motion.div
+                variants={slideInUp}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm p-6"
+              >
+                {/* 卡片标题 */}
+                <div className="flex items-center gap-2 mb-5">
+                  <Trophy className="w-5 h-5 text-primary-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">学术成就</h3>
+                  <button
+                    onClick={() => setShowAchievementsModal(true)}
+                    className="ml-auto flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-100 text-primary-600 hover:bg-primary-200 rounded-full transition-colors"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    编辑
+                  </button>
+                </div>
+
+                {/* ── 代表性论文 ── */}
+                <div className="mb-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BookOpen className="w-4 h-4 text-gray-400" />
+                    <h4 className="text-sm font-semibold text-gray-600">代表性论文</h4>
+                    {faculty.representative_publications && faculty.representative_publications.length > 0 && (
+                      <span className="text-xs text-gray-400">{faculty.representative_publications.length} 篇</span>
                     )}
                   </div>
-                  <div className="space-y-3">
-                    {faculty.representative_publications.map((pub, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <div className="flex-1">
+                  {faculty.representative_publications && faculty.representative_publications.length > 0 ? (
+                    <>
+                      <div className="space-y-3">
+                        {faculty.representative_publications.map((pub, i) => (
+                          <div
+                            key={i}
+                            className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-800 leading-snug">
+                                    {pub.title || "论文"}
+                                  </p>
+                                  {pub.is_corresponding && (
+                                    <span className="inline-block text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded mt-1">
+                                      通讯作者
+                                    </span>
+                                  )}
+                                </div>
+                                {pub.citation_count !== undefined && pub.citation_count > 0 && (
+                                  <span className="text-xs text-gray-500 whitespace-nowrap">
+                                    被引 {pub.citation_count}
+                                  </span>
+                                )}
+                              </div>
+                              {pub.venue && (
+                                <p className="text-xs text-gray-500 mb-1">
+                                  {pub.venue}
+                                  {pub.year && ` (${pub.year})`}
+                                </p>
+                              )}
+                              {pub.authors && (
+                                <p className="text-xs text-gray-400 truncate">{pub.authors}</p>
+                              )}
+                            </div>
+                            {pub.url && (
+                              <a
+                                href={pub.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary-600 hover:text-primary-700 flex-shrink-0"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {faculty.publications_count > 0 && (
+                        <p className="text-xs text-gray-400 text-center mt-3 pt-3 border-t border-gray-100">
+                          总计约 {faculty.publications_count} 篇，可前往{" "}
+                          {faculty.dblp_url ? (
+                            <a href={faculty.dblp_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">DBLP</a>
+                          ) : "DBLP"}{" "}
+                          或{" "}
+                          {faculty.google_scholar_url ? (
+                            <a href={faculty.google_scholar_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">Google Scholar</a>
+                          ) : "Google Scholar"}{" "}
+                          查看全部
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-4">
+                      论文详情暂未收录
+                      {(faculty.dblp_url || faculty.google_scholar_url) && (
+                        <>，可前往{" "}
+                          {faculty.dblp_url ? (
+                            <a href={faculty.dblp_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">DBLP</a>
+                          ) : "DBLP"}{" "}
+                          或{" "}
+                          {faculty.google_scholar_url ? (
+                            <a href={faculty.google_scholar_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">Google Scholar</a>
+                          ) : "Google Scholar"}{" "}
+                          查看
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
+
+                {/* ── 专利 ── */}
+                <div className="pt-4 border-t border-gray-100 mb-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Award className="w-4 h-4 text-gray-400" />
+                    <h4 className="text-sm font-semibold text-gray-600">专利</h4>
+                    {faculty.patents && faculty.patents.length > 0 && (
+                      <span className="text-xs text-gray-400">{faculty.patents.length} 项</span>
+                    )}
+                  </div>
+                  {faculty.patents && faculty.patents.length > 0 ? (
+                    <div className="space-y-3">
+                      {faculty.patents.map((patent, i) => (
+                        <div
+                          key={i}
+                          className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
                               <p className="text-sm font-medium text-gray-800 leading-snug">
-                                {pub.title || "论文"}
+                                {patent.title || "专利"}
                               </p>
-                              {pub.is_corresponding && (
-                                <span className="inline-block text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded mt-1">
-                                  通讯作者
+                              {patent.year && (
+                                <span className="text-xs text-gray-500 whitespace-nowrap">
+                                  {patent.year}
                                 </span>
                               )}
                             </div>
-                            {pub.citation_count !== undefined && pub.citation_count > 0 && (
-                              <span className="text-xs text-gray-500 whitespace-nowrap">
-                                被引 {pub.citation_count}
-                              </span>
+                            <div className="flex flex-wrap gap-2 text-xs text-gray-500 mb-1">
+                              {patent.patent_no && (
+                                <span className="bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                                  {patent.patent_no}
+                                </span>
+                              )}
+                              {patent.patent_type && (
+                                <span className="bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                                  {patent.patent_type}
+                                </span>
+                              )}
+                              {patent.status && (
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded border",
+                                  patent.status === "已授权" ? "bg-green-50 border-green-200 text-green-700" : "bg-blue-50 border-blue-200 text-blue-700"
+                                )}>
+                                  {patent.status}
+                                </span>
+                              )}
+                            </div>
+                            {patent.inventors && (
+                              <p className="text-xs text-gray-400 truncate">
+                                发明人: {patent.inventors}
+                              </p>
                             )}
                           </div>
-                          {pub.venue && (
-                            <p className="text-xs text-gray-500 mb-1">
-                              {pub.venue}
-                              {pub.year && ` (${pub.year})`}
-                            </p>
-                          )}
-                          {pub.authors && (
-                            <p className="text-xs text-gray-400 truncate">{pub.authors}</p>
-                          )}
                         </div>
-                        {pub.url && (
-                          <a
-                            href={pub.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary-600 hover:text-primary-700 flex-shrink-0"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {faculty.publications_count > 0 && (
-                    <p className="text-xs text-gray-400 text-center mt-4 pt-4 border-t border-gray-100">
-                      总计约 {faculty.publications_count} 篇论文，可前往{" "}
-                      {faculty.dblp_url ? (
-                        <a
-                          href={faculty.dblp_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:underline"
-                        >
-                          DBLP
-                        </a>
-                      ) : (
-                        "DBLP"
-                      )}{" "}
-                      或{" "}
-                      {faculty.google_scholar_url ? (
-                        <a
-                          href={faculty.google_scholar_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:underline"
-                        >
-                          Google Scholar
-                        </a>
-                      ) : (
-                        "Google Scholar"
-                      )}{" "}
-                      查看全部
-                    </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-4">暂无专利数据</p>
                   )}
-                </motion.div>
-              ) : (
-                <motion.div
-                  variants={slideInUp}
-                  className="bg-white rounded-xl border border-gray-200 shadow-sm p-6"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <BookOpen className="w-5 h-5 text-primary-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      论文{" "}
-                      {faculty.publications_count > 0 && (
-                        <span className="text-primary-600">
-                          共约 {faculty.publications_count} 篇
-                        </span>
-                      )}
-                    </h3>
-                  </div>
-                  <p className="text-sm text-gray-400 text-center py-8">
-                    论文详情数据暂未收录，可前往{" "}
-                    {faculty.dblp_url ? (
-                      <a
-                        href={faculty.dblp_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline"
-                      >
-                        DBLP
-                      </a>
-                    ) : (
-                      "DBLP"
-                    )}{" "}
-                    或{" "}
-                    {faculty.google_scholar_url ? (
-                      <a
-                        href={faculty.google_scholar_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline"
-                      >
-                        Google Scholar
-                      </a>
-                    ) : (
-                      "Google Scholar"
-                    )}{" "}
-                    查看
-                  </p>
-                </motion.div>
-              )}
+                </div>
 
-              {/* ─ 专利 ─ */}
-              {faculty.patents && faculty.patents.length > 0 && (
-                <motion.div
-                  variants={slideInUp}
-                  className="bg-white rounded-xl border border-gray-200 shadow-sm p-6"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <Award className="w-5 h-5 text-primary-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">专利</h3>
-                    <span className="ml-auto text-xs text-gray-400">
-                      {faculty.patents.length} 项
-                    </span>
-                    {isEditMode && (
-                      <button
-                        onClick={() => setShowAchievementsModal(true)}
-                        className="ml-2 px-2 py-1 text-xs bg-primary-100 text-primary-600 hover:bg-primary-200 rounded transition-colors"
-                      >
-                        编辑
-                      </button>
+                {/* ── 荣誉奖项 ── */}
+                <div className="pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Trophy className="w-4 h-4 text-gray-400" />
+                    <h4 className="text-sm font-semibold text-gray-600">荣誉奖项</h4>
+                    {faculty.awards && faculty.awards.length > 0 && (
+                      <span className="text-xs text-gray-400">{faculty.awards.length} 个</span>
                     )}
                   </div>
-                  <div className="space-y-3">
-                    {faculty.patents.map((patent, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className="text-sm font-medium text-gray-800 leading-snug">
-                              {patent.title || "专利"}
-                            </p>
-                            {patent.year && (
-                              <span className="text-xs text-gray-500 whitespace-nowrap">
-                                {patent.year}
-                              </span>
+                  {faculty.awards && faculty.awards.length > 0 ? (
+                    <div className="space-y-3">
+                      {faculty.awards.map((award, i) => (
+                        <div
+                          key={i}
+                          className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <p className="text-sm font-medium text-gray-800 leading-snug">
+                                {award.title || "奖项"}
+                              </p>
+                              {award.year && (
+                                <span className="text-xs text-gray-500 whitespace-nowrap">
+                                  {award.year}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-xs mb-1">
+                              {award.level && (
+                                <span className="bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700">
+                                  {award.level}
+                                </span>
+                              )}
+                              {award.grantor && (
+                                <span className="bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 text-gray-600">
+                                  {award.grantor}
+                                </span>
+                              )}
+                            </div>
+                            {award.description && (
+                              <p className="text-xs text-gray-500 leading-relaxed">
+                                {award.description}
+                              </p>
                             )}
                           </div>
-                          <div className="flex flex-wrap gap-2 text-xs text-gray-500 mb-1">
-                            {patent.patent_no && (
-                              <span className="bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
-                                {patent.patent_no}
-                              </span>
-                            )}
-                            {patent.patent_type && (
-                              <span className="bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
-                                {patent.patent_type}
-                              </span>
-                            )}
-                            {patent.status && (
-                              <span className={cn(
-                                "px-1.5 py-0.5 rounded border",
-                                patent.status === "已授权" ? "bg-green-50 border-green-200 text-green-700" : "bg-blue-50 border-blue-200 text-blue-700"
-                              )}>
-                                {patent.status}
-                              </span>
-                            )}
-                          </div>
-                          {patent.inventors && (
-                            <p className="text-xs text-gray-400 truncate">
-                              发明人: {patent.inventors}
-                            </p>
-                          )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* ─ 奖项 ─ */}
-              {faculty.awards && faculty.awards.length > 0 && (
-                <motion.div
-                  variants={slideInUp}
-                  className="bg-white rounded-xl border border-gray-200 shadow-sm p-6"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <Trophy className="w-5 h-5 text-primary-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">奖项</h3>
-                    <span className="ml-auto text-xs text-gray-400">
-                      {faculty.awards.length} 个
-                    </span>
-                    {isEditMode && (
-                      <button
-                        onClick={() => setShowAchievementsModal(true)}
-                        className="ml-2 px-2 py-1 text-xs bg-primary-100 text-primary-600 hover:bg-primary-200 rounded transition-colors"
-                      >
-                        编辑
-                      </button>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    {faculty.awards.map((award, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className="text-sm font-medium text-gray-800 leading-snug">
-                              {award.title || "奖项"}
-                            </p>
-                            {award.year && (
-                              <span className="text-xs text-gray-500 whitespace-nowrap">
-                                {award.year}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-2 text-xs mb-1">
-                            {award.level && (
-                              <span className="bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700">
-                                {award.level}
-                              </span>
-                            )}
-                            {award.grantor && (
-                              <span className="bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 text-gray-600">
-                                {award.grantor}
-                              </span>
-                            )}
-                          </div>
-                          {award.description && (
-                            <p className="text-xs text-gray-500 leading-relaxed">
-                              {award.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-4">暂无荣誉奖项数据</p>
+                  )}
+                </div>
+              </motion.div>
             </motion.main>
 
             {/* ══ Right Sidebar ══ */}
             <motion.div variants={slideInRight} initial="hidden" animate="visible">
               <StatsSidebar
-                stats={statsData}
                 advisedStudents={advisedStudents}
+                onSave={handleStudentsSave}
               />
             </motion.div>
           </div>

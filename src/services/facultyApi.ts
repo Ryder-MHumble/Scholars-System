@@ -163,6 +163,11 @@ export interface RelationPatch {
   is_adjunct_supervisor?: boolean;
   is_potential_recruit?: boolean;
   institute_relation_notes?: string;
+  supervised_students?: SupervisedStudent[];
+  joint_research_projects?: string[];
+  joint_management_roles?: string[];
+  academic_exchange_records?: ExchangeRecord[];
+  relation_updated_by?: string;
 }
 
 export interface FacultyDetailPatch {
@@ -252,6 +257,17 @@ export async function postFacultyUpdate(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`Failed to post update: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteFacultyUpdate(
+  urlHash: string,
+  updateIdx: number,
+): Promise<FacultyDetail> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/updates/${updateIdx}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to delete update: ${res.status}`);
   return res.json();
 }
 

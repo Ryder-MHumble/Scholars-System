@@ -4,196 +4,32 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   X,
-  GraduationCap,
   Eye,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  ChevronRight as ChevronRightIcon,
   Plus,
   List,
   LayoutGrid,
-  BookOpen,
-  Building2,
-  Award,
 } from "lucide-react";
 import {
   fetchFacultyList,
-  type FacultyListItem,
   type FacultyListResponse,
 } from "@/services/facultyApi";
 import { universities as staticUniversities } from "@/data/universities";
 import { cn } from "@/utils/cn";
 import { getAvatarColor, getInitial } from "@/utils/avatar";
+import { AcademicianBadge } from "@/components/common/AcademicianBadge";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { Pagination } from "@/components/common/Pagination";
+import { ScholarCard } from "@/components/common/ScholarCard";
+import {
+  UniversitySidebarTree,
+  type UniNode,
+} from "@/components/common/UniversitySidebarTree";
+import { useUniversityCounts } from "@/hooks/useUniversityCounts";
 
 const PAGE_SIZE = 20;
 
 type ViewMode = "list" | "grid";
 
-/* ── academician badge ── */
-function AcademicianBadge({
-  isAcademician,
-  academicTitles,
-}: {
-  isAcademician: boolean;
-  academicTitles: string[];
-}) {
-  const isCAS =
-    isAcademician ||
-    academicTitles.some(
-      (t) => t.includes("中国科学院") || t.includes("科学院院士"),
-    );
-  const isCAE = academicTitles.some(
-    (t) => t.includes("中国工程院") || t.includes("工程院院士"),
-  );
-  if (!isCAS && !isCAE) return null;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0",
-        isCAS
-          ? "bg-red-50 text-red-600 border border-red-200"
-          : "bg-orange-50 text-orange-600 border border-orange-200",
-      )}
-    >
-      <Award className="w-2.5 h-2.5" />
-      {isCAS ? "中科院" : "工程院"}
-    </span>
-  );
-}
-
-/* ── sidebar university tree built from API data ── */
-interface UniNode {
-  name: string;
-  departments: string[];
-  count: number;
-}
-
-function SidebarTree({
-  sidebarSearch,
-  activeUni,
-  activeDept,
-  onSelectUni,
-  onSelectDept,
-  uniNodes,
-  totalCount,
-}: {
-  sidebarSearch: string;
-  activeUni: string | null;
-  activeDept: string | null;
-  onSelectUni: (name: string | null) => void;
-  onSelectDept: (uniName: string, deptName: string) => void;
-  uniNodes: UniNode[];
-  totalCount: number;
-}) {
-  const [expandedUnis, setExpandedUnis] = useState<Set<string>>(new Set());
-
-  const toggleUni = (name: string) =>
-    setExpandedUnis((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-
-  const q = sidebarSearch.toLowerCase().trim();
-
-  const visibleUnis = useMemo(() => {
-    if (!q) return uniNodes;
-    return uniNodes.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) ||
-        u.departments.some((d) => d.toLowerCase().includes(q)),
-    );
-  }, [q, uniNodes]);
-
-  return (
-    <nav className="space-y-0.5 px-3">
-      <button
-        onClick={() => onSelectUni(null)}
-        className={cn(
-          "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-          !activeUni && !activeDept
-            ? "bg-primary-50 text-primary-700 font-medium"
-            : "text-gray-600 hover:bg-gray-50",
-        )}
-      >
-        <Building2 className="w-4 h-4 shrink-0 text-gray-400" />
-        <span>全部院校</span>
-        <span className="ml-auto text-[10px] text-gray-400">{totalCount}</span>
-      </button>
-
-      {visibleUnis.map((uni) => {
-        const expanded = q ? true : expandedUnis.has(uni.name);
-        const isUniActive = activeUni === uni.name && !activeDept;
-        const visibleDepts = q
-          ? uni.departments.filter((d) => d.toLowerCase().includes(q))
-          : uni.departments;
-
-        return (
-          <div key={uni.name}>
-            <div className="flex items-center">
-              <button
-                onClick={() => toggleUni(uni.name)}
-                className="p-1 text-gray-400 hover:text-gray-600 shrink-0"
-              >
-                {expanded ? (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronRightIcon className="w-3.5 h-3.5" />
-                )}
-              </button>
-              <button
-                onClick={() => onSelectUni(uni.name)}
-                className={cn(
-                  "flex-1 flex items-center gap-2 px-1.5 py-1.5 rounded-md text-sm transition-colors min-w-0",
-                  isUniActive
-                    ? "bg-primary-50 text-primary-700 font-medium"
-                    : "text-gray-700 hover:bg-gray-50",
-                )}
-              >
-                <GraduationCap className="w-3.5 h-3.5 shrink-0 text-primary-400" />
-                <span className="truncate text-sm">{uni.name}</span>
-                <span className="ml-auto text-[10px] text-gray-400 shrink-0">
-                  {uni.count}
-                </span>
-              </button>
-            </div>
-
-            <AnimatePresence initial={false}>
-              {expanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden ml-4 pl-2 border-l border-gray-100"
-                >
-                  {visibleDepts.map((dept) => (
-                    <div key={dept} className="flex items-center my-0.5">
-                      <button
-                        onClick={() => onSelectDept(uni.name, dept)}
-                        className={cn(
-                          "flex-1 flex items-center gap-2 px-2 py-1 rounded-md transition-colors min-w-0",
-                          activeDept === dept && activeUni === uni.name
-                            ? "bg-primary-50 text-primary-700 font-medium"
-                            : "text-gray-600 hover:bg-gray-50",
-                        )}
-                      >
-                        <BookOpen className="w-3 h-3 shrink-0 text-gray-300" />
-                        <span className="truncate text-xs">{dept}</span>
-                      </button>
-                    </div>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        );
-      })}
-    </nav>
-  );
-}
 
 
 /* ── main component ── */
@@ -211,49 +47,8 @@ export default function ScholarListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* Dynamic counts from API (keyed by university::department) */
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [totalCount, setTotalCount] = useState(0);
-
-  /* Load API data to get counts for sidebar tree */
-  useEffect(() => {
-    const loadCountsFromAPI = async () => {
-      try {
-        let allItems: FacultyListItem[] = [];
-        let page = 1;
-        let totalPages = 1;
-        let total = 0;
-
-        // Fetch all pages to calculate counts
-        while (page <= totalPages) {
-          const res = await fetchFacultyList(page, 200);
-          allItems = allItems.concat(res.items);
-          totalPages = res.total_pages;
-          total = res.total;
-          page++;
-        }
-
-        // Build counts map
-        const countsMap: Record<string, number> = {};
-        for (const item of allItems) {
-          if (item.university) {
-            countsMap[item.university] = (countsMap[item.university] ?? 0) + 1;
-          }
-          if (item.university && item.department) {
-            const key = `${item.university}::${item.department}`;
-            countsMap[key] = (countsMap[key] ?? 0) + 1;
-          }
-        }
-
-        setCounts(countsMap);
-        setTotalCount(total);
-      } catch {
-        // Fallback: set empty counts, user can still see tree
-        setTotalCount(0);
-      }
-    };
-    loadCountsFromAPI();
-  }, []);
+  /* Get dynamic counts from API for sidebar tree */
+  const { counts, totalCount } = useUniversityCounts();
 
   /* Use static universities + dynamic counts from API */
   const uniNodes = useMemo<UniNode[]>(() => {
@@ -374,7 +169,7 @@ export default function ScholarListPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar py-1 pb-4">
-            <SidebarTree
+            <UniversitySidebarTree
               sidebarSearch={sidebarSearch}
               activeUni={activeUni}
               activeDept={activeDept}
@@ -382,6 +177,7 @@ export default function ScholarListPage() {
               onSelectDept={handleSelectDept}
               uniNodes={uniNodes}
               totalCount={totalCount}
+              onSearchChange={setSidebarSearch}
             />
           </div>
 
@@ -507,9 +303,7 @@ export default function ScholarListPage() {
 
             {/* Content */}
             {isLoading ? (
-              <div className="flex items-center justify-center py-24">
-                <div className="w-8 h-8 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-              </div>
+              <LoadingSpinner />
             ) : error ? (
               <div className="bg-white rounded-xl border border-red-100 flex flex-col items-center justify-center py-16 text-red-400">
                 <p className="text-sm">{error}</p>
@@ -679,59 +473,12 @@ export default function ScholarListPage() {
                       </div>
 
                       {/* Pagination */}
-                      <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-                        <p className="text-xs text-gray-500">
-                          第 {page} / {serverTotalPages} 页，共{" "}
-                          <span className="font-medium">{serverTotal}</span> 条
-                        </p>
-                        {serverTotalPages > 1 && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setPage(Math.max(1, page - 1))}
-                              disabled={page === 1}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                            >
-                              <ChevronLeft className="w-3 h-3" />
-                              上一页
-                            </button>
-                            {Array.from(
-                              { length: Math.min(serverTotalPages, 7) },
-                              (_, i) => {
-                                let p: number;
-                                if (serverTotalPages <= 7) p = i + 1;
-                                else if (page <= 4) p = i + 1;
-                                else if (page >= serverTotalPages - 3)
-                                  p = serverTotalPages - 6 + i;
-                                else p = page - 3 + i;
-                                return (
-                                  <button
-                                    key={p}
-                                    onClick={() => setPage(p)}
-                                    className={cn(
-                                      "w-8 h-8 text-xs font-medium rounded-lg transition-colors",
-                                      p === page
-                                        ? "bg-primary-500 text-white"
-                                        : "text-gray-500 bg-white border border-gray-200 hover:bg-gray-50",
-                                    )}
-                                  >
-                                    {p}
-                                  </button>
-                                );
-                              },
-                            )}
-                            <button
-                              onClick={() =>
-                                setPage(Math.min(serverTotalPages, page + 1))
-                              }
-                              disabled={page === serverTotalPages}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                            >
-                              下一页
-                              <ChevronRight className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <Pagination
+                        page={page}
+                        totalPages={serverTotalPages}
+                        totalItems={serverTotal}
+                        onPageChange={setPage}
+                      />
                     </div>
                   </motion.div>
                 ) : (
@@ -745,120 +492,19 @@ export default function ScholarListPage() {
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {filtered.map((s, i) => (
-                        <motion.div
-                          key={s.url_hash}
-                          initial={{ opacity: 0, scale: 0.97 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: i * 0.02 }}
-                        >
-                          <Link
-                            to={`/scholars/${s.url_hash}`}
-                            className="block bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md hover:border-primary-100 transition-all group"
-                          >
-                            <div className="flex items-start gap-3 mb-3">
-                              {s.photo_url ? (
-                                <img
-                                  src={s.photo_url}
-                                  alt={s.name}
-                                  className="w-11 h-11 rounded-full object-cover shrink-0"
-                                />
-                              ) : (
-                                <div
-                                  className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-                                  style={{
-                                    backgroundColor: getAvatarColor(s.name),
-                                  }}
-                                >
-                                  {getInitial(s.name)}
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-600 transition-colors truncate">
-                                  {s.name}
-                                </p>
-                                {s.name_en && (
-                                  <p className="text-[10px] text-gray-400 truncate">
-                                    {s.name_en}
-                                  </p>
-                                )}
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  {s.position || "—"}
-                                </p>
-                              </div>
-                            </div>
-
-                            {(s.is_academician || s.academic_titles.length > 0) && (
-                              <div className="mb-2 flex flex-wrap gap-1">
-                                {s.academic_titles.slice(0, 2).map((t) => (
-                                  <span
-                                    key={t}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200"
-                                  >
-                                    <Award className="w-2.5 h-2.5" />
-                                    {t.length > 10 ? t.slice(0, 10) + "..." : t}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
-                            <div className="flex items-center gap-1.5 mb-3 text-xs text-gray-500">
-                              <Building2 className="w-3 h-3 shrink-0 text-gray-400" />
-                              <span className="truncate">
-                                {s.university}
-                                {s.department && (
-                                  <span className="text-gray-400">
-                                    {" "}
-                                    · {s.department}
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-
-                            <div className="flex flex-wrap gap-1">
-                              {s.research_areas.slice(0, 3).map((f) => (
-                                <span
-                                  key={f}
-                                  className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary-50 text-primary-700 border border-primary-100"
-                                >
-                                  {f}
-                                </span>
-                              ))}
-                              {s.research_areas.length > 3 && (
-                                <span className="px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 border border-gray-200">
-                                  +{s.research_areas.length - 3}
-                                </span>
-                              )}
-                            </div>
-                          </Link>
-                        </motion.div>
+                        <ScholarCard key={s.url_hash} scholar={s} index={i} />
                       ))}
                     </div>
 
                     {serverTotalPages > 1 && (
-                      <div className="mt-6 flex items-center justify-between">
-                        <p className="text-xs text-gray-500">
-                          第 {page} / {serverTotalPages} 页，共 {serverTotal} 条
-                        </p>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => setPage(Math.max(1, page - 1))}
-                            disabled={page === 1}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                          >
-                            <ChevronLeft className="w-3 h-3" />
-                            上一页
-                          </button>
-                          <button
-                            onClick={() =>
-                              setPage(Math.min(serverTotalPages, page + 1))
-                            }
-                            disabled={page === serverTotalPages}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                          >
-                            下一页
-                            <ChevronRight className="w-3 h-3" />
-                          </button>
-                        </div>
+                      <div className="mt-6">
+                        <Pagination
+                          page={page}
+                          totalPages={serverTotalPages}
+                          totalItems={serverTotal}
+                          onPageChange={setPage}
+                          compact={true}
+                        />
                       </div>
                     )}
                   </motion.div>

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { GraduationCap, MapPin } from "lucide-react";
+import { GraduationCap, MapPin, Plus, Check, Edit3, Trash2 } from "lucide-react";
 import { cn } from "@/utils/cn";
+import type { SupervisedStudent } from "@/services/facultyApi";
 
 interface AdvisedStudent {
   id: string;
@@ -11,19 +13,9 @@ interface AdvisedStudent {
   currentPosition?: string;
 }
 
-interface StatsData {
-  papers: number;
-  citations: number;
-  hIndex: number;
-  gIndex: number;
-  sociability: number;
-  diversity: number;
-  activity: number;
-}
-
 interface Props {
-  stats: StatsData;
   advisedStudents: AdvisedStudent[];
+  onSave?: (students: SupervisedStudent[]) => Promise<void>;
 }
 
 const degreeColor: Record<AdvisedStudent["degree"], string> = {
@@ -32,173 +24,140 @@ const degreeColor: Record<AdvisedStudent["degree"], string> = {
   博士后: "bg-emerald-100 text-emerald-700 border-emerald-200",
 };
 
-export function StatsSidebar({ stats, advisedStudents }: Props) {
-  const radarMetrics = [
-    { label: "Citation", value: Math.min(stats.citations / 5000, 1), angle: 0 },
-    { label: "H-Index", value: Math.min(stats.hIndex / 150, 1), angle: 60 },
-    { label: "Diversity", value: stats.diversity / 10, angle: 120 },
-    { label: "Sociability", value: stats.sociability / 10, angle: 180 },
-    { label: "Activity", value: stats.activity / 150, angle: 240 },
-    { label: "#Papers", value: Math.min(stats.papers / 400, 1), angle: 300 },
-  ];
+const DEGREE_OPTIONS = ["博士", "硕士", "博士后"] as const;
 
-  const centerX = 100;
-  const centerY = 100;
-  const radius = 80;
+const emptyNewStudent = () => ({
+  name: "",
+  degree: "博士" as "博士" | "硕士" | "博士后",
+  startYear: "",
+  endYear: "",
+  currentPosition: "",
+});
 
-  const points = radarMetrics
-    .map((metric) => {
-      const angle = (metric.angle - 90) * (Math.PI / 180);
-      const r = radius * metric.value;
-      const x = centerX + r * Math.cos(angle);
-      const y = centerY + r * Math.sin(angle);
-      return `${x},${y}`;
-    })
-    .join(" ");
+export function StatsSidebar({ advisedStudents, onSave }: Props) {
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedStudents, setEditedStudents] = useState<AdvisedStudent[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newStudent, setNewStudent] = useState(emptyNewStudent());
 
-  const gridLevels = [0.2, 0.4, 0.6, 0.8, 1];
+  const handleEnterEdit = () => {
+    setEditedStudents([...advisedStudents]);
+    setIsEditMode(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditedStudents([]);
+    setShowAddForm(false);
+    setEditingIdx(null);
+    setNewStudent(emptyNewStudent());
+  };
+
+  const handleSave = async () => {
+    if (!onSave) return;
+    setIsSaving(true);
+    try {
+      const apiStudents: SupervisedStudent[] = editedStudents.map((s) => ({
+        name: s.name,
+        degree: s.degree,
+        start_year: s.startYear,
+        end_year: s.endYear,
+        current_position: s.currentPosition,
+      }));
+      await onSave(apiStudents);
+      setIsEditMode(false);
+      setShowAddForm(false);
+      setEditingIdx(null);
+    } catch (e) {
+      console.error("Failed to save students:", e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = (idx: number) => {
+    setEditedStudents((prev) => prev.filter((_, i) => i !== idx));
+    if (editingIdx === idx) setEditingIdx(null);
+  };
+
+  const handleUpdate = (idx: number, field: string, value: any) => {
+    setEditedStudents((prev) => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleAddStudent = () => {
+    if (!newStudent.name.trim()) return;
+    const student: AdvisedStudent = {
+      id: String(Date.now()),
+      name: newStudent.name.trim(),
+      degree: newStudent.degree,
+      startYear: Number(newStudent.startYear) || 0,
+      endYear: newStudent.endYear ? Number(newStudent.endYear) : undefined,
+      currentPosition: newStudent.currentPosition.trim() || undefined,
+    };
+    setEditedStudents((prev) => [...prev, student]);
+    setNewStudent(emptyNewStudent());
+    setShowAddForm(false);
+  };
+
+  const displayStudents = isEditMode ? editedStudents : advisedStudents;
 
   return (
     <aside className="w-80 shrink-0 space-y-4">
-      {/* Stats Radar Chart */}
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2 }}
-        className="bg-white rounded-xl border border-gray-200 shadow-sm p-6"
-      >
-        <h3 className="text-base font-semibold text-gray-900 mb-4">作者统计</h3>
-
-        <div className="relative w-full aspect-square mb-6">
-          <svg viewBox="0 0 200 200" className="w-full h-full">
-            {gridLevels.map((level, i) => {
-              const gridPoints = radarMetrics
-                .map((metric) => {
-                  const angle = (metric.angle - 90) * (Math.PI / 180);
-                  const r = radius * level;
-                  const x = centerX + r * Math.cos(angle);
-                  const y = centerY + r * Math.sin(angle);
-                  return `${x},${y}`;
-                })
-                .join(" ");
-              return (
-                <polygon
-                  key={i}
-                  points={gridPoints}
-                  fill="none"
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-              );
-            })}
-
-            {radarMetrics.map((metric, i) => {
-              const angle = (metric.angle - 90) * (Math.PI / 180);
-              const x = centerX + radius * Math.cos(angle);
-              const y = centerY + radius * Math.sin(angle);
-              return (
-                <line
-                  key={i}
-                  x1={centerX}
-                  y1={centerY}
-                  x2={x}
-                  y2={y}
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-              );
-            })}
-
-            <polygon
-              points={points}
-              fill="rgba(37, 99, 235, 0.2)"
-              stroke="#2563eb"
-              strokeWidth="2"
-            />
-
-            {radarMetrics.map((metric, i) => {
-              const angle = (metric.angle - 90) * (Math.PI / 180);
-              const r = radius * metric.value;
-              const x = centerX + r * Math.cos(angle);
-              const y = centerY + r * Math.sin(angle);
-              return <circle key={i} cx={x} cy={y} r="3" fill="#2563eb" />;
-            })}
-
-            {radarMetrics.map((metric, i) => {
-              const angle = (metric.angle - 90) * (Math.PI / 180);
-              const labelR = radius + 20;
-              const x = centerX + labelR * Math.cos(angle);
-              const y = centerY + labelR * Math.sin(angle);
-              return (
-                <text
-                  key={i}
-                  x={x}
-                  y={y}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="text-xs fill-gray-600 font-medium"
-                >
-                  {metric.label}
-                </text>
-              );
-            })}
-          </svg>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <div className="text-gray-500">#Papers:</div>
-            <div className="font-semibold text-gray-900">{stats.papers}</div>
-          </div>
-          <div>
-            <div className="text-gray-500">#Citation:</div>
-            <div className="font-semibold text-gray-900">
-              {stats.citations.toLocaleString()}
-            </div>
-          </div>
-          <div>
-            <div className="text-gray-500">H-Index:</div>
-            <div className="font-semibold text-gray-900">{stats.hIndex}</div>
-          </div>
-          <div>
-            <div className="text-gray-500">G-Index:</div>
-            <div className="font-semibold text-gray-900">{stats.gIndex}</div>
-          </div>
-          <div>
-            <div className="text-gray-500">Sociability:</div>
-            <div className="font-semibold text-gray-900">{stats.sociability}</div>
-          </div>
-          <div>
-            <div className="text-gray-500">Diversity:</div>
-            <div className="font-semibold text-gray-900">{stats.diversity}</div>
-          </div>
-          <div className="col-span-2">
-            <div className="text-gray-500">Activity:</div>
-            <div className="font-semibold text-gray-900">{stats.activity}</div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Advised Students */}
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.3 }}
         className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
       >
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+        <div className={cn("px-5 py-4 border-b border-gray-100 flex items-center gap-2 transition-colors", isEditMode && "bg-primary-50/40")}>
           <GraduationCap className="w-4 h-4 text-primary-600" />
           <h3 className="text-sm font-semibold text-gray-900">指导学生</h3>
           <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-            {advisedStudents.length} 人
+            {displayStudents.length} 人
           </span>
+          {onSave && !isEditMode && (
+            <button
+              onClick={handleEnterEdit}
+              className="ml-1 flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 rounded-full transition-colors"
+            >
+              <Edit3 className="w-3 h-3" />
+              编辑
+            </button>
+          )}
+          {isEditMode && (
+            <div className="flex gap-1 ml-1">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-600 text-white hover:bg-green-700 rounded-full transition-colors disabled:opacity-50"
+              >
+                <Check className="w-3 h-3" />
+                {isSaving ? "保存中" : "保存"}
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="px-2.5 py-1 text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-full transition-colors"
+              >
+                取消
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="px-5 py-3 max-h-[480px] overflow-y-auto custom-scrollbar">
-          {advisedStudents.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">暂无数据</p>
+          {displayStudents.length === 0 && !showAddForm ? (
+            <div className="flex flex-col items-center gap-2 py-8">
+              <GraduationCap className="w-8 h-8 text-gray-200" />
+              <p className="text-sm text-gray-400">暂无指导学生记录</p>
+            </div>
           ) : (
-            advisedStudents.map((student, index) => (
+            displayStudents.map((student, index) => (
               <motion.div
                 key={student.id}
                 initial={{ opacity: 0, x: -10 }}
@@ -209,32 +168,197 @@ export function StatsSidebar({ stats, advisedStudents }: Props) {
                 <div className="flex-shrink-0 w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-semibold text-sm">
                   {student.name.charAt(0)}
                 </div>
+
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-sm font-medium text-gray-900">{student.name}</span>
-                    <span
-                      className={cn(
-                        "text-[10px] px-1.5 py-0.5 rounded border font-medium",
-                        degreeColor[student.degree],
-                      )}
-                    >
-                      {student.degree}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500 mb-1">
-                    {student.endYear
-                      ? `${student.startYear}–${student.endYear}`
-                      : `${student.startYear}–在读`}
-                  </div>
-                  {student.currentPosition && (
-                    <div className="flex items-center gap-1 text-xs text-gray-400">
-                      <MapPin className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{student.currentPosition}</span>
+                  {isEditMode && editingIdx === index ? (
+                    /* Inline edit form for existing student */
+                    <div className="space-y-1.5">
+                      <input
+                        type="text"
+                        value={student.name}
+                        onChange={(e) => handleUpdate(index, "name", e.target.value)}
+                        placeholder="姓名"
+                        className="w-full text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                      />
+                      <select
+                        value={student.degree}
+                        onChange={(e) => handleUpdate(index, "degree", e.target.value)}
+                        className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                      >
+                        {DEGREE_OPTIONS.map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          value={String(student.startYear || "")}
+                          onChange={(e) =>
+                            handleUpdate(index, "startYear", Number(e.target.value) || 0)
+                          }
+                          placeholder="入学年份"
+                          className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                        />
+                        <input
+                          type="text"
+                          value={String(student.endYear || "")}
+                          onChange={(e) =>
+                            handleUpdate(
+                              index,
+                              "endYear",
+                              e.target.value ? Number(e.target.value) : undefined,
+                            )
+                          }
+                          placeholder="毕业年份"
+                          className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={student.currentPosition || ""}
+                        onChange={(e) => handleUpdate(index, "currentPosition", e.target.value)}
+                        placeholder="当前职位"
+                        className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                      />
+                      <button
+                        onClick={() => setEditingIdx(null)}
+                        className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors"
+                      >
+                        <Check className="w-3 h-3" /> 完成
+                      </button>
                     </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-sm font-medium text-gray-900">{student.name}</span>
+                        <span
+                          className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded border font-medium",
+                            degreeColor[student.degree],
+                          )}
+                        >
+                          {student.degree}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mb-1">
+                        {student.endYear
+                          ? `${student.startYear}–${student.endYear}`
+                          : `${student.startYear}–在读`}
+                      </div>
+                      {student.currentPosition && (
+                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                          <MapPin className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{student.currentPosition}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
+
+                {isEditMode && editingIdx !== index && (
+                  <div className="flex gap-1 shrink-0 self-center">
+                    <button
+                      onClick={() => setEditingIdx(index)}
+                      className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                      title="编辑"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(index)}
+                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                      title="删除"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </motion.div>
             ))
+          )}
+
+          {/* Add student form */}
+          {isEditMode && showAddForm && (
+            <div className="mt-2 p-3 border border-primary-100 bg-primary-50/30 rounded-lg space-y-2">
+              <p className="text-xs font-semibold text-primary-700">添加学生</p>
+              <input
+                type="text"
+                value={newStudent.name}
+                onChange={(e) => setNewStudent((p) => ({ ...p, name: e.target.value }))}
+                placeholder="姓名 *"
+                className="w-full text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              />
+              <select
+                value={newStudent.degree}
+                onChange={(e) =>
+                  setNewStudent((p) => ({
+                    ...p,
+                    degree: e.target.value as "博士" | "硕士" | "博士后",
+                  }))
+                }
+                className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              >
+                {DEGREE_OPTIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-1">
+                <input
+                  type="text"
+                  value={newStudent.startYear}
+                  onChange={(e) => setNewStudent((p) => ({ ...p, startYear: e.target.value }))}
+                  placeholder="入学年份"
+                  className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                />
+                <input
+                  type="text"
+                  value={newStudent.endYear}
+                  onChange={(e) => setNewStudent((p) => ({ ...p, endYear: e.target.value }))}
+                  placeholder="毕业年份"
+                  className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                />
+              </div>
+              <input
+                type="text"
+                value={newStudent.currentPosition}
+                onChange={(e) =>
+                  setNewStudent((p) => ({ ...p, currentPosition: e.target.value }))
+                }
+                placeholder="当前职位"
+                className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              />
+              <div className="flex gap-1">
+                <button
+                  onClick={handleAddStudent}
+                  disabled={!newStudent.name.trim()}
+                  className="flex-1 px-3 py-1.5 bg-primary-600 text-white text-xs rounded hover:bg-primary-700 transition-colors disabled:opacity-50"
+                >
+                  添加
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setNewStudent(emptyNewStudent());
+                  }}
+                  className="flex-1 px-3 py-1.5 border border-gray-200 text-gray-600 text-xs rounded hover:bg-gray-50 transition-colors"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isEditMode && !showAddForm && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="w-full mt-3 flex items-center justify-center gap-1.5 px-4 py-2.5 border border-dashed border-primary-300 text-primary-600 rounded-lg text-sm hover:bg-primary-50 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> 添加学生
+            </button>
           )}
         </div>
       </motion.div>

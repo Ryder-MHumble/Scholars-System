@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import ScholarListPage from "./pages/ScholarListPage";
-import ScholarDetailPageDemo from "./pages/ScholarDetailPageDemo";
+import ScholarDetailPage from "./pages/ScholarDetailPage";
 import AddScholarPage from "./pages/AddScholarPage";
 
 export default function App() {
@@ -15,7 +15,7 @@ export default function App() {
             <Route path="scholars/add" element={<AddScholarPage />} />
             <Route
               path="scholars/:scholarId"
-              element={<ScholarDetailPageDemo />}
+              element={<ScholarDetailPage />}
             />
           </Routes>
         </AnimatePresence>
