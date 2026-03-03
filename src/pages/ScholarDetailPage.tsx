@@ -39,7 +39,6 @@ import {
   type PublicationRecord,
   type PatentRecord,
   type AwardRecord,
-  type SupervisedStudent,
   type ExchangeRecord,
   type EducationRecord,
   type ManagementRole,
@@ -153,15 +152,6 @@ export default function ScholarDetailPageDemo() {
     });
     setFaculty(updated);
     setShowManagementRolesModal(false);
-  };
-
-  // ── 指导学生保存 ──────────────────────────────────────────────
-  const handleStudentsSave = async (students: SupervisedStudent[]) => {
-    if (!faculty) return;
-    const updated = await patchFacultyRelation(faculty.url_hash, {
-      supervised_students: students,
-    });
-    setFaculty(updated);
   };
 
   // ── 任职经历内联编辑处理 ─────────────────────────────────────────
@@ -287,16 +277,6 @@ export default function ScholarDetailPageDemo() {
       </div>
     );
   }
-
-  // Build advised students from supervised_students
-  const advisedStudents = (faculty.supervised_students ?? []).map((s, idx) => ({
-    id: String(idx),
-    name: s.name ?? "未知",
-    degree: (s.degree as "博士" | "硕士" | "博士后") ?? "博士",
-    startYear: Number(s.start_year) || 0,
-    endYear: s.end_year ? Number(s.end_year) : undefined,
-    currentPosition: s.current_position,
-  }));
 
   // Relation badges from boolean flags
   const relationBadges = [
@@ -1779,10 +1759,7 @@ export default function ScholarDetailPageDemo() {
               initial="hidden"
               animate="visible"
             >
-              <StatsSidebar
-                advisedStudents={advisedStudents}
-                onSave={handleStudentsSave}
-              />
+              <StatsSidebar urlHash={faculty.url_hash} />
             </motion.div>
           </div>
         </div>
