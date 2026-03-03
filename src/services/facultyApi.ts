@@ -347,7 +347,9 @@ export async function patchFacultyAchievements(
   return res.json();
 }
 
-export async function fetchStudents(urlHash: string): Promise<StudentListResponse> {
+export async function fetchStudents(
+  urlHash: string,
+): Promise<StudentListResponse> {
   const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/students`);
   if (!res.ok) throw new Error(`Failed to fetch students: ${res.status}`);
   return res.json();
@@ -371,18 +373,58 @@ export async function patchStudent(
   studentId: string,
   data: StudentPatch,
 ): Promise<StudentRecord> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/students/${studentId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  const res = await fetch(
+    `${BASE_URL}/api/v1/faculty/${urlHash}/students/${studentId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
   if (!res.ok) throw new Error(`Failed to update student: ${res.status}`);
   return res.json();
 }
 
-export async function deleteStudent(urlHash: string, studentId: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/students/${studentId}`, {
-    method: "DELETE",
-  });
+export async function deleteStudent(
+  urlHash: string,
+  studentId: string,
+): Promise<void> {
+  const res = await fetch(
+    `${BASE_URL}/api/v1/faculty/${urlHash}/students/${studentId}`,
+    {
+      method: "DELETE",
+    },
+  );
   if (!res.ok) throw new Error(`Failed to delete student: ${res.status}`);
+}
+
+export interface FacultyStatsResponse {
+  by_university: Array<{ university: string; count: number }>;
+  by_department: Array<{
+    university: string;
+    department: string;
+    count: number;
+  }>;
+}
+
+export async function fetchFacultyStats(): Promise<FacultyStatsResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/stats`);
+  if (!res.ok) throw new Error(`Failed to fetch faculty stats: ${res.status}`);
+  return res.json();
+}
+
+export interface FacultySource {
+  id: string;
+  name: string;
+}
+
+export interface FacultySourcesResponse {
+  sources: FacultySource[];
+}
+
+export async function fetchFacultySources(): Promise<FacultySourcesResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/sources`);
+  if (!res.ok)
+    throw new Error(`Failed to fetch faculty sources: ${res.status}`);
+  return res.json();
 }

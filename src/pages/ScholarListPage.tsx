@@ -1,12 +1,19 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Eye, Plus, List, LayoutGrid } from "lucide-react";
+import {
+  Search,
+  X,
+  Eye,
+  Plus,
+  List,
+  LayoutGrid,
+  AlertCircle,
+} from "lucide-react";
 import {
   fetchFacultyList,
   type FacultyListResponse,
 } from "@/services/facultyApi";
-import { universities as staticUniversities } from "@/data/universities";
 import { cn } from "@/utils/cn";
 import { getAvatarColor, getInitial } from "@/utils/avatar";
 import { AcademicianBadge } from "@/components/common/AcademicianBadge";
@@ -17,6 +24,7 @@ import {
   UniversitySidebarTree,
   type UniNode,
 } from "@/components/common/UniversitySidebarTree";
+import { UniversitySidebarSkeleton } from "@/components/common/UniversitySidebarSkeleton";
 import { useUniversityCounts } from "@/hooks/useUniversityCounts";
 
 const PAGE_SIZE = 20;
@@ -43,17 +51,25 @@ export default function ScholarListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* Get dynamic counts from API for sidebar tree */
-  const { counts, totalCount } = useUniversityCounts();
+  /* Get dynamic universities and counts from API */
+  const {
+    universities,
+    totalCount,
+    loading: uniLoading,
+    error: uniError,
+  } = useUniversityCounts();
 
-  /* Use static universities + dynamic counts from API */
+  /* Build sidebar nodes from real API data */
   const uniNodes = useMemo<UniNode[]>(() => {
-    return staticUniversities.map((uni) => ({
+    return universities.map((uni) => ({
       name: uni.name,
-      departments: uni.departments.map((d) => d.name),
-      count: counts[uni.name] ?? 0,
+      departments: Object.entries(uni.departments).map(([name, count]) => ({
+        name,
+        count,
+      })),
+      count: uni.count,
     }));
-  }, [counts]);
+  }, [universities]);
 
   /* Load paginated data based on filters */
   useEffect(() => {
@@ -180,16 +196,33 @@ export default function ScholarListPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar py-1 pb-4">
-            <UniversitySidebarTree
-              sidebarSearch={sidebarSearch}
-              activeUni={activeUni}
-              activeDept={activeDept}
-              onSelectUni={handleSelectUni}
-              onSelectDept={handleSelectDept}
-              uniNodes={uniNodes}
-              totalCount={totalCount}
-              onSearchChange={setSidebarSearch}
-            />
+            {uniLoading ? (
+              <UniversitySidebarSkeleton />
+            ) : uniError ? (
+              <div className="flex flex-col items-center justify-center py-8 px-4">
+                <AlertCircle className="w-8 h-8 mb-2 text-red-400" />
+                <p className="text-xs text-red-600 text-center">加载失败</p>
+                <p className="text-[10px] text-gray-400 mt-1 text-center">
+                  {uniError}
+                </p>
+              </div>
+            ) : uniNodes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                <AlertCircle className="w-8 h-8 mb-2 opacity-50" />
+                <p className="text-xs">暂无高校数据</p>
+              </div>
+            ) : (
+              <UniversitySidebarTree
+                sidebarSearch={sidebarSearch}
+                activeUni={activeUni}
+                activeDept={activeDept}
+                onSelectUni={handleSelectUni}
+                onSelectDept={handleSelectDept}
+                uniNodes={uniNodes}
+                totalCount={totalCount}
+                onSearchChange={setSidebarSearch}
+              />
+            )}
           </div>
 
           <div className="p-3 border-t border-gray-100 shrink-0">

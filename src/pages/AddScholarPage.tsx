@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Handshake,
 } from "lucide-react";
-import { universities } from "@/data/universities";
 import { cn } from "@/utils/cn";
 import type { AcademicTitle, AcademicHonor } from "@/types";
 import { FormSection } from "@/components/ui/FormSection";
@@ -21,6 +20,7 @@ import { Field } from "@/components/ui/Field";
 import { TextInput } from "@/components/ui/TextInput";
 import { TextareaInput } from "@/components/ui/TextareaInput";
 import { SelectInput } from "@/components/ui/SelectInput";
+import { useUniversityCounts } from "@/hooks/useUniversityCounts";
 
 const ALL_TITLES: AcademicTitle[] = [
   "教授",
@@ -198,6 +198,18 @@ function SuccessOverlay({ onBack }: { onBack: () => void }) {
 /* ── Main page ── */
 export default function AddScholarPage() {
   const navigate = useNavigate();
+  const { universities: uniData, loading: uniLoading } = useUniversityCounts();
+
+  // Derive select-friendly options from the same hook used by the sidebar
+  const universityOptions = useMemo(
+    () =>
+      uniData.map((uni) => ({
+        name: uni.name,
+        departments: Object.keys(uni.departments),
+      })),
+    [uniData],
+  );
+
   const [form, setForm] = useState<FormData>(initialForm);
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormData, boolean>>
@@ -207,7 +219,10 @@ export default function AddScholarPage() {
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const selectedUni = universities.find((u) => u.id === form.universityId);
+  const selectedUni = useMemo(
+    () => universityOptions.find((u) => u.name === form.universityId),
+    [universityOptions, form.universityId],
+  );
 
   const toggleHonor = (h: AcademicHonor) =>
     set(
@@ -330,11 +345,12 @@ export default function AddScholarPage() {
                     set("universityId", v);
                     set("departmentId", "");
                   }}
-                  placeholder="请选择院校"
+                  placeholder={uniLoading ? "院校加载中..." : "请选择院校"}
                   error={errors.universityId}
+                  disabled={uniLoading}
                 >
-                  {universities.map((u) => (
-                    <option key={u.id} value={u.id}>
+                  {universityOptions.map((u) => (
+                    <option key={u.name} value={u.name}>
                       {u.name}
                     </option>
                   ))}
@@ -351,12 +367,15 @@ export default function AddScholarPage() {
                     form.universityId ? "请选择院系" : "请先选择院校"
                   }
                   error={errors.departmentId}
+                  disabled={!form.universityId || uniLoading}
                 >
-                  {(selectedUni?.departments ?? []).map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
+                  {selectedUni && selectedUni.departments.length > 0
+                    ? selectedUni.departments.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))
+                    : form.universityId && <option disabled>无可用院系</option>}
                 </SelectInput>
                 {errors.departmentId && (
                   <p className="mt-1 text-xs text-red-500">请选择所属院系</p>
