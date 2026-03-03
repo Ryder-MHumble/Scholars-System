@@ -11,9 +11,14 @@ import { getAvatarColor, getInitial } from "@/utils/avatar";
 interface ScholarCardProps {
   scholar: FacultyListItem;
   index?: number;
+  state?: any;
 }
 
-export function ScholarCard({ scholar: s, index = 0 }: ScholarCardProps) {
+export function ScholarCard({
+  scholar: s,
+  index = 0,
+  state,
+}: ScholarCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.97 }}
@@ -22,6 +27,7 @@ export function ScholarCard({ scholar: s, index = 0 }: ScholarCardProps) {
     >
       <Link
         to={`/scholars/${s.url_hash}`}
+        state={state}
         className="block bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md hover:border-primary-100 transition-all group"
       >
         <div className="flex items-start gap-3 mb-3">
@@ -46,13 +52,9 @@ export function ScholarCard({ scholar: s, index = 0 }: ScholarCardProps) {
               {s.name}
             </p>
             {s.name_en && (
-              <p className="text-[10px] text-gray-400 truncate">
-                {s.name_en}
-              </p>
+              <p className="text-[10px] text-gray-400 truncate">{s.name_en}</p>
             )}
-            <p className="text-xs text-gray-500 mt-0.5">
-              {s.position || "—"}
-            </p>
+            <p className="text-xs text-gray-500 mt-0.5">{s.position || "—"}</p>
           </div>
         </div>
 
@@ -75,10 +77,7 @@ export function ScholarCard({ scholar: s, index = 0 }: ScholarCardProps) {
           <span className="truncate">
             {s.university}
             {s.department && (
-              <span className="text-gray-400">
-                {" "}
-                · {s.department}
-              </span>
+              <span className="text-gray-400"> · {s.department}</span>
             )}
           </span>
         </div>

@@ -16,6 +16,11 @@ import {
 import { universities } from "@/data/universities";
 import { cn } from "@/utils/cn";
 import type { AcademicTitle, AcademicHonor } from "@/types";
+import { FormSection } from "@/components/ui/FormSection";
+import { Field } from "@/components/ui/Field";
+import { TextInput } from "@/components/ui/TextInput";
+import { TextareaInput } from "@/components/ui/TextareaInput";
+import { SelectInput } from "@/components/ui/SelectInput";
 
 const ALL_TITLES: AcademicTitle[] = [
   "教授",
@@ -41,12 +46,12 @@ const ALL_HONORS: AcademicHonor[] = [
 ];
 
 const SCHOLAR_DIVISIONS = [
-  'AI核心和基础/AI安全',
-  'AI社会科学',
-  'AI+自然科学/生命科学',
-  'AI核心和基础/大模型',
-  'AI+工程技术',
-  '其他',
+  "AI核心和基础/AI安全",
+  "AI社会科学",
+  "AI+自然科学/生命科学",
+  "AI核心和基础/大模型",
+  "AI+工程技术",
+  "其他",
 ] as const;
 
 interface FormData {
@@ -67,7 +72,7 @@ interface FormData {
   citationCount: string;
   paperCount: string;
   scholarDivision: string;
-  mentorType: '教学研究型' | '研究型' | '';
+  mentorType: "教学研究型" | "研究型" | "";
   talentPlans: string[];
 }
 
@@ -92,136 +97,6 @@ const initialForm: FormData = {
   mentorType: "",
   talentPlans: [],
 };
-
-/* ── Section wrapper ── */
-function FormSection({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2.5 px-6 py-4 border-b border-gray-100 bg-gray-50">
-        <span className="text-primary-500">{icon}</span>
-        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
-      </div>
-      <div className="px-6 py-5">{children}</div>
-    </div>
-  );
-}
-
-/* ── Input field ── */
-function Field({
-  label,
-  required,
-  children,
-  hint,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-        {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      {children}
-      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
-    </div>
-  );
-}
-
-/* ── Text input ── */
-function TextInput({
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  error,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-  error?: boolean;
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={cn(
-        "w-full px-3 py-2.5 text-sm bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow placeholder-gray-300",
-        error ? "border-red-300 ring-1 ring-red-300" : "border-gray-200",
-      )}
-    />
-  );
-}
-
-/* ── Textarea ── */
-function TextareaInput({
-  value,
-  onChange,
-  placeholder,
-  rows = 4,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  rows?: number;
-}) {
-  return (
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={rows}
-      className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow placeholder-gray-300 resize-none"
-    />
-  );
-}
-
-/* ── Select ── */
-function SelectInput({
-  value,
-  onChange,
-  children,
-  placeholder,
-  error,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  children: React.ReactNode;
-  placeholder?: string;
-  error?: boolean;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={cn(
-        "w-full px-3 py-2.5 text-sm bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow appearance-none cursor-pointer",
-        error ? "border-red-300 ring-1 ring-red-300" : "border-gray-200",
-        !value ? "text-gray-300" : "text-gray-800",
-      )}
-    >
-      {placeholder && (
-        <option value="" disabled>
-          {placeholder}
-        </option>
-      )}
-      {children}
-    </select>
-  );
-}
 
 /* ── Research fields tag input ── */
 function ResearchFieldInput({
@@ -324,9 +199,9 @@ function SuccessOverlay({ onBack }: { onBack: () => void }) {
 export default function AddScholarPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormData>(initialForm);
-  const [errors, setErrors] = useState<Partial<Record<keyof FormData, boolean>>>(
-    {},
-  );
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof FormData, boolean>>
+  >({});
   const [submitted, setSubmitted] = useState(false);
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) =>
@@ -536,10 +411,7 @@ export default function AddScholarPage() {
           </FormSection>
 
           {/* 研究方向 */}
-          <FormSection
-            icon={<BookOpen className="w-4 h-4" />}
-            title="研究方向"
-          >
+          <FormSection icon={<BookOpen className="w-4 h-4" />} title="研究方向">
             <ResearchFieldInput
               fields={form.researchFields}
               onChange={(v) => set("researchFields", v)}
@@ -594,7 +466,10 @@ export default function AddScholarPage() {
           </FormSection>
 
           {/* 合作信息 */}
-          <FormSection icon={<Handshake className="w-4 h-4" />} title="合作信息">
+          <FormSection
+            icon={<Handshake className="w-4 h-4" />}
+            title="合作信息"
+          >
             <div className="space-y-5">
               <Field label="学部分类">
                 <SelectInput
@@ -603,14 +478,19 @@ export default function AddScholarPage() {
                   placeholder="请选择学部"
                 >
                   {SCHOLAR_DIVISIONS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
                   ))}
                 </SelectInput>
               </Field>
               <Field label="导师类型">
                 <div className="flex gap-4">
-                  {(['教学研究型', '研究型'] as const).map((type) => (
-                    <label key={type} className="flex items-center gap-2 cursor-pointer">
+                  {(["教学研究型", "研究型"] as const).map((type) => (
+                    <label
+                      key={type}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
                       <input
                         type="radio"
                         name="mentorType"
@@ -639,7 +519,10 @@ export default function AddScholarPage() {
             title="学术指标"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <Field label="H 指数" hint="根据 Google Scholar 或 Web of Science">
+              <Field
+                label="H 指数"
+                hint="根据 Google Scholar 或 Web of Science"
+              >
                 <TextInput
                   value={form.hIndex}
                   onChange={(v) => set("hIndex", v)}

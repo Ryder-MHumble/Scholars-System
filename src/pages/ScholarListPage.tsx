@@ -1,14 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Search,
-  X,
-  Eye,
-  Plus,
-  List,
-  LayoutGrid,
-} from "lucide-react";
+import { Search, X, Eye, Plus, List, LayoutGrid } from "lucide-react";
 import {
   fetchFacultyList,
   type FacultyListResponse,
@@ -30,17 +23,20 @@ const PAGE_SIZE = 20;
 
 type ViewMode = "list" | "grid";
 
-
-
 /* ── main component ── */
 export default function ScholarListPage() {
-  const [sidebarSearch, setSidebarSearch] = useState("");
-  const [activeUni, setActiveUni] = useState<string | null>(null);
-  const [activeDept, setActiveDept] = useState<string | null>(null);
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
+  // Initialize state from URL params
+  const activeUni = searchParams.get("university");
+  const activeDept = searchParams.get("department");
+  const pageParam = searchParams.get("page");
+
+  const [sidebarSearch, setSidebarSearch] = useState("");
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(pageParam ? parseInt(pageParam, 10) : 1);
 
   /* API state */
   const [apiData, setApiData] = useState<FacultyListResponse | null>(null);
@@ -77,24 +73,31 @@ export default function ScholarListPage() {
       });
   }, [page, activeUni, activeDept]);
 
-
   const handleSelectUni = (name: string | null) => {
-    setActiveUni(name);
-    setActiveDept(null);
-    setPage(1);
+    const newParams = new URLSearchParams(searchParams);
+    if (name) {
+      newParams.set("university", name);
+      newParams.delete("department");
+    } else {
+      newParams.delete("university");
+      newParams.delete("department");
+    }
+    newParams.set("page", "1");
+    setSearchParams(newParams);
   };
 
   const handleSelectDept = (uniName: string, deptName: string) => {
-    setActiveUni(uniName);
-    setActiveDept(deptName);
-    setPage(1);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("university", uniName);
+    newParams.set("department", deptName);
+    newParams.set("page", "1");
+    setSearchParams(newParams);
   };
 
   const clearAll = () => {
     setQuery("");
-    setActiveUni(null);
-    setActiveDept(null);
-    setPage(1);
+    const newParams = new URLSearchParams();
+    setSearchParams(newParams);
   };
 
   /* Client-side filtering on top of API results */
@@ -113,6 +116,17 @@ export default function ScholarListPage() {
     return result;
   }, [items, query]);
 
+  // Update page in URL when it changes
+  useEffect(() => {
+    const newParams = new URLSearchParams(searchParams);
+    if (page === 1) {
+      newParams.delete("page");
+    } else {
+      newParams.set("page", String(page));
+    }
+    setSearchParams(newParams, { replace: true });
+  }, [page, setSearchParams]);
+
   useEffect(() => {
     setPage(1);
   }, [query]);
@@ -125,10 +139,7 @@ export default function ScholarListPage() {
       ? [
           {
             label: activeDept,
-            onRemove: () => {
-              setActiveDept(null);
-              setPage(1);
-            },
+            onRemove: () => handleSelectUni(activeUni),
           },
         ]
       : []),
@@ -187,11 +198,17 @@ export default function ScholarListPage() {
                 数据库状态
               </p>
               <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
-                <span className={cn(
-                  "w-1.5 h-1.5 rounded-full shrink-0",
-                  totalCount > 0 ? "bg-emerald-500" : "bg-amber-500 animate-pulse"
-                )} />
-                {totalCount > 0 ? `已收录 ${totalCount} 位师资` : "数据加载中..."}
+                <span
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full shrink-0",
+                    totalCount > 0
+                      ? "bg-emerald-500"
+                      : "bg-amber-500 animate-pulse",
+                  )}
+                />
+                {totalCount > 0
+                  ? `已收录 ${totalCount} 位师资`
+                  : "数据加载中..."}
               </div>
             </div>
           </div>
@@ -219,7 +236,8 @@ export default function ScholarListPage() {
                   位学者
                   {(activeUni || activeDept) && (
                     <span className="text-gray-400">
-                      {" "}· {activeDept ?? activeUni}
+                      {" "}
+                      · {activeDept ?? activeUni}
                     </span>
                   )}
                 </p>
@@ -377,6 +395,7 @@ export default function ScholarListPage() {
                                 <td className="px-5 py-3.5">
                                   <Link
                                     to={`/scholars/${s.url_hash}`}
+                                    state={{ from: location }}
                                     className="flex items-center gap-3"
                                   >
                                     {s.photo_url ? (
@@ -460,6 +479,7 @@ export default function ScholarListPage() {
                                 <td className="px-5 py-3.5 text-right">
                                   <Link
                                     to={`/scholars/${s.url_hash}`}
+                                    state={{ from: location }}
                                     className="inline-flex text-gray-400 hover:text-primary-600 transition-colors p-1"
                                     title="查看详情"
                                   >
@@ -492,7 +512,12 @@ export default function ScholarListPage() {
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {filtered.map((s, i) => (
-                        <ScholarCard key={s.url_hash} scholar={s} index={i} />
+                        <ScholarCard
+                          key={s.url_hash}
+                          scholar={s}
+                          index={i}
+                          state={{ from: location }}
+                        />
                       ))}
                     </div>
 

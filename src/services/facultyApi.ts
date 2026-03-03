@@ -1,5 +1,6 @@
-const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
+const BASE_URL = import.meta.env.DEV
+  ? ""
+  : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
 
 export interface FacultyListItem {
   url_hash: string;
@@ -165,7 +166,7 @@ export interface RelationPatch {
   institute_relation_notes?: string;
   supervised_students?: SupervisedStudent[];
   joint_research_projects?: string[];
-  joint_management_roles?: string[];
+  joint_management_roles?: ManagementRole[];
   academic_exchange_records?: ExchangeRecord[];
   relation_updated_by?: string;
 }
@@ -173,6 +174,7 @@ export interface RelationPatch {
 export interface FacultyDetailPatch {
   name?: string;
   name_en?: string;
+  photo_url?: string;
   bio?: string;
   bio_en?: string;
   position?: string;
@@ -189,6 +191,7 @@ export interface FacultyDetailPatch {
   phd_year?: string;
   research_areas?: string[];
   institute_relation_notes?: string;
+  education?: EducationRecord[];
 }
 
 export interface AchievementsPatch {
@@ -215,7 +218,9 @@ export async function fetchFacultyList(
   return res.json();
 }
 
-export async function fetchFacultyDetail(urlHash: string): Promise<FacultyDetail> {
+export async function fetchFacultyDetail(
+  urlHash: string,
+): Promise<FacultyDetail> {
   const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}`);
   if (!res.ok) throw new Error(`Failed to fetch faculty detail: ${res.status}`);
   return res.json();
@@ -238,12 +243,13 @@ export async function patchFacultyDetail(
   urlHash: string,
   data: FacultyDetailPatch,
 ): Promise<FacultyDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}`, {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/basic`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`Failed to update faculty detail: ${res.status}`);
+  if (!res.ok)
+    throw new Error(`Failed to update faculty detail: ${res.status}`);
   return res.json();
 }
 
@@ -264,9 +270,12 @@ export async function deleteFacultyUpdate(
   urlHash: string,
   updateIdx: number,
 ): Promise<FacultyDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/updates/${updateIdx}`, {
-    method: "DELETE",
-  });
+  const res = await fetch(
+    `${BASE_URL}/api/v1/faculty/${urlHash}/updates/${updateIdx}`,
+    {
+      method: "DELETE",
+    },
+  );
   if (!res.ok) throw new Error(`Failed to delete update: ${res.status}`);
   return res.json();
 }
@@ -275,11 +284,14 @@ export async function patchFacultyAchievements(
   urlHash: string,
   data: AchievementsPatch,
 ): Promise<FacultyDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/achievements`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  const res = await fetch(
+    `${BASE_URL}/api/v1/faculty/${urlHash}/achievements`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
   if (!res.ok) throw new Error(`Failed to update achievements: ${res.status}`);
   return res.json();
 }

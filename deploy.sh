@@ -14,8 +14,8 @@ LOG_FILE="$LOG_DIR/server.log"
 VERSION=$(grep '^[[:space:]]*"version"' "$PROJECT_DIR/package.json" 2>/dev/null \
     | head -1 | sed 's/.*"\([^"]*\)".*/\1/' || echo "0.0.0")
 
-PORT=5173
-PROD_PORT=3000
+PORT=5174
+PROD_PORT=5174
 TAIL_LINES=50
 FOLLOW=false
 PRODUCTION=false
