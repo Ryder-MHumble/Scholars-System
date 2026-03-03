@@ -235,7 +235,7 @@ _start_serve() {
     rm -f "$PID_FILE"
 
     cd "$PROJECT_DIR"
-    nohup npx serve -s "$DIST_DIR" -p "$PROD_PORT" -H 0.0.0.0 >> "$LOG_FILE" 2>&1 &
+    nohup npx serve -s "$DIST_DIR" -l "tcp://0.0.0.0:$PROD_PORT" >> "$LOG_FILE" 2>&1 &
 
     echo $! > "$PID_FILE"
     sleep 2
