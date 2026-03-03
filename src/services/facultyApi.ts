@@ -201,6 +201,57 @@ export interface AchievementsPatch {
   updated_by?: string;
 }
 
+export interface StudentRecord {
+  id: string;
+  student_no: string;
+  name: string;
+  home_university: string;
+  degree_type: string;
+  enrollment_year: string;
+  expected_graduation_year: string;
+  status: string;
+  email: string;
+  phone: string;
+  notes: string;
+  added_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudentListResponse {
+  total: number;
+  faculty_url_hash: string;
+  items: StudentRecord[];
+}
+
+export interface StudentCreate {
+  name: string;
+  student_no?: string;
+  home_university?: string;
+  degree_type?: string;
+  enrollment_year?: string;
+  expected_graduation_year?: string;
+  status?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  added_by?: string;
+}
+
+export interface StudentPatch {
+  name?: string;
+  student_no?: string;
+  home_university?: string;
+  degree_type?: string;
+  enrollment_year?: string;
+  expected_graduation_year?: string;
+  status?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  updated_by?: string;
+}
+
 export async function fetchFacultyList(
   page: number = 1,
   pageSize: number = 20,
@@ -294,4 +345,44 @@ export async function patchFacultyAchievements(
   );
   if (!res.ok) throw new Error(`Failed to update achievements: ${res.status}`);
   return res.json();
+}
+
+export async function fetchStudents(urlHash: string): Promise<StudentListResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/students`);
+  if (!res.ok) throw new Error(`Failed to fetch students: ${res.status}`);
+  return res.json();
+}
+
+export async function createStudent(
+  urlHash: string,
+  data: StudentCreate,
+): Promise<StudentRecord> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/students`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to create student: ${res.status}`);
+  return res.json();
+}
+
+export async function patchStudent(
+  urlHash: string,
+  studentId: string,
+  data: StudentPatch,
+): Promise<StudentRecord> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/students/${studentId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to update student: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteStudent(urlHash: string, studentId: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/students/${studentId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to delete student: ${res.status}`);
 }
