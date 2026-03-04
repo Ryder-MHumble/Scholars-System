@@ -9,9 +9,11 @@ import {
   List,
   LayoutGrid,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import {
   fetchFacultyList,
+  deleteFaculty,
   type FacultyListResponse,
 } from "@/services/facultyApi";
 import { cn } from "@/utils/cn";
@@ -50,6 +52,7 @@ export default function ScholarListPage() {
   const [apiData, setApiData] = useState<FacultyListResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingHash, setDeletingHash] = useState<string | null>(null);
 
   /* Get dynamic universities and counts from API */
   const {
@@ -78,6 +81,7 @@ export default function ScholarListPage() {
     fetchFacultyList(page, PAGE_SIZE, {
       university: activeUni ?? undefined,
       department: activeDept ?? undefined,
+      search: query.trim() || undefined,
     })
       .then((res) => {
         setApiData(res);
@@ -87,7 +91,7 @@ export default function ScholarListPage() {
         setError(err.message ?? "加载失败");
         setIsLoading(false);
       });
-  }, [page, activeUni, activeDept]);
+  }, [page, activeUni, activeDept, query]);
 
   const handleSelectUni = (name: string | null) => {
     const newParams = new URLSearchParams(searchParams);
@@ -116,21 +120,41 @@ export default function ScholarListPage() {
     setSearchParams(newParams);
   };
 
-  /* Client-side filtering on top of API results */
-  const items = apiData?.items ?? [];
-  const filtered = useMemo(() => {
-    let result = items;
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      result = result.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          (s.name_en && s.name_en.toLowerCase().includes(q)) ||
-          s.research_areas.some((f) => f.toLowerCase().includes(q)),
-      );
+  const handleDeleteFaculty = async (urlHash: string, name: string) => {
+    if (!window.confirm(`确定要删除 ${name} 吗？此操作不可撤销。`)) {
+      return;
     }
-    return result;
-  }, [items, query]);
+
+    setDeletingHash(urlHash);
+    try {
+      await deleteFaculty(urlHash);
+      // Refresh the list after deletion
+      setIsLoading(true);
+      fetchFacultyList(1, PAGE_SIZE, {
+        university: activeUni ?? undefined,
+        department: activeDept ?? undefined,
+        search: query.trim() || undefined,
+      })
+        .then((res) => {
+          setApiData(res);
+          setPage(1);
+          setIsLoading(false);
+        })
+        .catch((err) => {
+          setError(err.message ?? "刷新失败");
+          setIsLoading(false);
+        });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "删除失败");
+      setDeletingHash(null);
+    } finally {
+      setDeletingHash(null);
+    }
+  };
+
+  /* Use API results directly (server-side search) */
+  const items = apiData?.items ?? [];
+  const filtered = items;
 
   // Update page in URL when it changes
   useEffect(() => {
@@ -510,14 +534,26 @@ export default function ScholarListPage() {
                                   </div>
                                 </td>
                                 <td className="px-5 py-3.5 text-right">
-                                  <Link
-                                    to={`/scholars/${s.url_hash}`}
-                                    state={{ from: location }}
-                                    className="inline-flex text-gray-400 hover:text-primary-600 transition-colors p-1"
-                                    title="查看详情"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </Link>
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Link
+                                      to={`/scholars/${s.url_hash}`}
+                                      state={{ from: location }}
+                                      className="inline-flex text-gray-400 hover:text-primary-600 transition-colors p-1"
+                                      title="查看详情"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </Link>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteFaculty(s.url_hash, s.name)
+                                      }
+                                      disabled={deletingHash === s.url_hash}
+                                      className="inline-flex text-gray-400 hover:text-red-600 transition-colors p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      title="删除学者"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </td>
                               </motion.tr>
                             ))}
@@ -550,6 +586,8 @@ export default function ScholarListPage() {
                           scholar={s}
                           index={i}
                           state={{ from: location }}
+                          onDelete={handleDeleteFaculty}
+                          isDeleting={deletingHash === s.url_hash}
                         />
                       ))}
                     </div>

@@ -263,6 +263,7 @@ export async function fetchFacultyList(
   });
   if (filters?.university) params.set("university", filters.university);
   if (filters?.department) params.set("department", filters.department);
+  if (filters?.search) params.set("keyword", filters.search);
 
   const res = await fetch(`${BASE_URL}/api/v1/faculty/?${params}`);
   if (!res.ok) throw new Error(`Failed to fetch faculty list: ${res.status}`);
@@ -396,6 +397,13 @@ export async function deleteStudent(
     },
   );
   if (!res.ok) throw new Error(`Failed to delete student: ${res.status}`);
+}
+
+export async function deleteFaculty(urlHash: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to delete faculty: ${res.status}`);
 }
 
 export interface FacultyStatsResponse {
