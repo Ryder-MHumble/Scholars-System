@@ -8,9 +8,6 @@ import {
   BookOpen,
   Award,
   BarChart2,
-  Plus,
-  X,
-  CheckCircle2,
   Handshake,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
@@ -20,39 +17,14 @@ import { Field } from "@/components/ui/Field";
 import { TextInput } from "@/components/ui/TextInput";
 import { TextareaInput } from "@/components/ui/TextareaInput";
 import { SelectInput } from "@/components/ui/SelectInput";
+import { TagInput } from "@/components/common/TagInput";
+import { SuccessOverlay } from "@/components/common/SuccessOverlay";
 import { useUniversityCounts } from "@/hooks/useUniversityCounts";
-
-const ALL_TITLES: AcademicTitle[] = [
-  "教授",
-  "副教授",
-  "助理教授",
-  "研究员",
-  "副研究员",
-  "助理研究员",
-  "讲师",
-  "博士后",
-];
-
-const ALL_HONORS: AcademicHonor[] = [
-  "中国科学院院士",
-  "中国工程院院士",
-  "国家杰出青年科学基金获得者",
-  "国家优秀青年科学基金获得者",
-  "长江学者特聘教授",
-  "长江学者青年学者",
-  "万人计划领军人才",
-  "IEEE Fellow",
-  "ACM Fellow",
-];
-
-const SCHOLAR_DIVISIONS = [
-  "AI核心和基础/AI安全",
-  "AI社会科学",
-  "AI+自然科学/生命科学",
-  "AI核心和基础/大模型",
-  "AI+工程技术",
-  "其他",
-] as const;
+import {
+  ALL_TITLES,
+  ALL_HONORS,
+  SCHOLAR_DIVISIONS,
+} from "@/constants/scholarForm";
 
 interface FormData {
   name: string;
@@ -98,109 +70,10 @@ const initialForm: FormData = {
   talentPlans: [],
 };
 
-/* ── Research fields tag input ── */
-function ResearchFieldInput({
-  fields,
-  onChange,
-}: {
-  fields: string[];
-  onChange: (v: string[]) => void;
-}) {
-  const [input, setInput] = useState("");
-
-  const add = () => {
-    const val = input.trim();
-    if (val && !fields.includes(val)) {
-      onChange([...fields, val]);
-    }
-    setInput("");
-  };
-
-  const remove = (f: string) => onChange(fields.filter((x) => x !== f));
-
-  return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-          placeholder="输入研究方向后按 Enter 或点击添加"
-          className="flex-1 px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow placeholder-gray-300"
-        />
-        <button
-          type="button"
-          onClick={add}
-          className="flex items-center gap-1.5 px-3 py-2.5 bg-primary-50 text-primary-700 border border-primary-200 rounded-lg text-sm font-medium hover:bg-primary-100 transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          添加
-        </button>
-      </div>
-      {fields.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {fields.map((f) => (
-            <span
-              key={f}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 border border-primary-200 rounded-full text-xs font-medium"
-            >
-              {f}
-              <button
-                type="button"
-                onClick={() => remove(f)}
-                className="hover:text-primary-900"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Submit success overlay ── */
-function SuccessOverlay({ onBack }: { onBack: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-    >
-      <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full mx-4 text-center">
-        <div className="flex justify-center mb-4">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-            <CheckCircle2 className="w-9 h-9 text-emerald-500" />
-          </div>
-        </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">添加成功</h2>
-        <p className="text-sm text-gray-500 mb-6">
-          学者信息已成功提交，等待后端服务同步。
-        </p>
-        <button
-          onClick={onBack}
-          className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-semibold transition-colors"
-        >
-          返回学者列表
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
-/* ── Main page ── */
 export default function AddScholarPage() {
   const navigate = useNavigate();
   const { universities: uniData, loading: uniLoading } = useUniversityCounts();
 
-  // Derive select-friendly options from the same hook used by the sidebar
   const universityOptions = useMemo(
     () =>
       uniData.map((uni) => ({
@@ -245,14 +118,15 @@ export default function AddScholarPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    // Static mock submit – no real API call
     console.log("New scholar data:", form);
     setSubmitted(true);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {submitted && <SuccessOverlay onBack={() => navigate("/scholars")} />}
+      {submitted && (
+        <SuccessOverlay onAction={() => navigate("/scholars")} />
+      )}
 
       {/* Header */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-30">
@@ -431,9 +305,10 @@ export default function AddScholarPage() {
 
           {/* 研究方向 */}
           <FormSection icon={<BookOpen className="w-4 h-4" />} title="研究方向">
-            <ResearchFieldInput
-              fields={form.researchFields}
+            <TagInput
+              tags={form.researchFields}
               onChange={(v) => set("researchFields", v)}
+              placeholder="输入研究方向后按 Enter 或点击添加"
             />
           </FormSection>
 
@@ -524,8 +399,8 @@ export default function AddScholarPage() {
                 </div>
               </Field>
               <Field label="人才计划" hint="输入计划名称后按 Enter 或点击添加">
-                <ResearchFieldInput
-                  fields={form.talentPlans}
+                <TagInput
+                  tags={form.talentPlans}
                   onChange={(v) => set("talentPlans", v)}
                 />
               </Field>

@@ -1,35 +1,25 @@
-/**
- * 动态更新卡片
- * 从 ScholarDetailPage.tsx:1798-1875 提取
- * 显示学者的最近动态更新，支持添加和删除
- */
 import { motion } from "framer-motion";
 import {
   ClipboardList,
+  ExternalLink,
   Plus,
   X,
-  ExternalLink,
 } from "lucide-react";
 import type { FacultyDetail } from "@/services/facultyApi";
 import { slideInUp, listItem } from "@/utils/animations";
+import { getUpdateTypeLabel } from "@/constants/updateTypes";
 
-interface RecentUpdatesCardProps {
+interface UpdatesCardProps {
   faculty: FacultyDetail;
-  setShowAddUpdate: (show: boolean) => void;
-  getUpdateTypeLabel: (updateType: string) => string;
+  onShowAddUpdate: () => void;
   onDeleteUpdate: (index: number) => Promise<void>;
 }
 
-export function RecentUpdatesCard({
+export function UpdatesCard({
   faculty,
-  setShowAddUpdate,
-  getUpdateTypeLabel,
+  onShowAddUpdate,
   onDeleteUpdate,
-}: RecentUpdatesCardProps) {
-  const handleDelete = async (i: number) => {
-    await onDeleteUpdate(i);
-  };
-
+}: UpdatesCardProps) {
   return (
     <motion.div
       variants={slideInUp}
@@ -42,7 +32,7 @@ export function RecentUpdatesCard({
           {faculty.recent_updates.length} 条
         </span>
         <button
-          onClick={() => setShowAddUpdate(true)}
+          onClick={onShowAddUpdate}
           className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 transition-colors px-2 py-1 rounded border border-primary-200 hover:bg-primary-50"
         >
           <Plus className="w-3 h-3" />
@@ -59,7 +49,8 @@ export function RecentUpdatesCard({
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-gray-900">
-                  {update.title || getUpdateTypeLabel(update.update_type ?? "general")}
+                  {update.title ||
+                    getUpdateTypeLabel(update.update_type ?? "general")}
                 </span>
                 <div className="flex items-center gap-2 text-xs text-gray-400">
                   {update.update_type && (
@@ -72,7 +63,7 @@ export function RecentUpdatesCard({
                   )}
                   {update.added_by?.startsWith("user:") && (
                     <button
-                      onClick={() => handleDelete(i)}
+                      onClick={() => onDeleteUpdate(i)}
                       className="ml-1 px-1.5 py-0.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                       title="删除"
                     >
@@ -82,7 +73,9 @@ export function RecentUpdatesCard({
                 </div>
               </div>
               {update.content && (
-                <p className="text-sm text-gray-600 leading-relaxed">{update.content}</p>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {update.content}
+                </p>
               )}
               <div className="flex items-center gap-3 mt-2">
                 {update.source_url && (
