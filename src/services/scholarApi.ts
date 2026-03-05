@@ -1,6 +1,6 @@
 const BASE_URL = import.meta.env.DEV
   ? ""
-  : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8002";
+  : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
 
 export interface ScholarListItem {
   url_hash: string;
@@ -404,6 +404,40 @@ export async function deleteScholar(urlHash: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`Failed to delete scholar: ${res.status}`);
+}
+
+export interface BatchScholarCreate {
+  name: string;
+  name_en?: string;
+  position?: string;
+  university?: string;
+  department?: string;
+  email?: string;
+  phone?: string;
+  profile_url?: string;
+  research_areas?: string[];
+  bio?: string;
+}
+
+export interface BatchScholarCreateResponse {
+  success: number;
+  failed: number;
+  errors: Array<{ row: number; error: string }>;
+}
+
+export async function batchCreateScholars(
+  scholars: BatchScholarCreate[],
+): Promise<BatchScholarCreateResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/batch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ scholars }),
+  });
+  if (!res.ok)
+    throw new Error(`Failed to batch create scholars: ${res.status}`);
+  return res.json();
 }
 
 export interface ScholarStatsResponse {

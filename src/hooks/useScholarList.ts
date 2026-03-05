@@ -138,6 +138,24 @@ export function useScholarList() {
     }
   };
 
+  const refreshList = () => {
+    setIsLoading(true);
+    setError(null);
+    fetchScholarList(page, PAGE_SIZE, {
+      university: activeUni ?? undefined,
+      department: activeDept ?? undefined,
+      search: query.trim() || undefined,
+    })
+      .then((res) => {
+        setApiData(res);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message ?? "加载失败");
+        setIsLoading(false);
+      });
+  };
+
   const items = apiData?.items ?? [];
 
   const filterChips: { label: string; onRemove: () => void }[] = [
@@ -182,6 +200,7 @@ export function useScholarList() {
     total: apiData?.total ?? 0,
     isLoading,
     error,
+    refreshList,
 
     // Delete
     deletingHash,
