@@ -1,10 +1,10 @@
 /**
  * 获取高校/院系学者数量的自定义 Hook
- * 使用 /api/v1/faculty/stats 真实API获取数据
+ * 使用 /api/v1/institutions/scholars/ 获取完整机构列表（含无数据院校）
  * 用于构建侧边栏树的动态计数
  */
 import { useEffect, useState } from "react";
-import { fetchFacultyStats } from "@/services/facultyApi";
+import { fetchAllInstitutions } from "@/services/institutionApi";
 
 export interface UniversityData {
   name: string;
@@ -20,38 +20,31 @@ export function useUniversityCounts() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadCounts = async () => {
+    const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const stats = await fetchFacultyStats();
+        const institutions = await fetchAllInstitutions();
 
-        // Build departments map: university -> { dept -> count }
-        const deptMap: Record<string, Record<string, number>> = {};
-        for (const item of stats.by_department) {
-          if (!deptMap[item.university]) deptMap[item.university] = {};
-          deptMap[item.university][item.department] = item.count;
-        }
-
-        // Build universities array and counts map
         const unis: UniversityData[] = [];
         const countsMap: Record<string, number> = {};
         let total = 0;
 
-        for (const item of stats.by_university) {
-          const departments = deptMap[item.university] ?? {};
+        for (const inst of institutions) {
+          const departments: Record<string, number> = {};
+          for (const dept of inst.departments) {
+            departments[dept.name] = dept.scholar_count;
+            countsMap[`${inst.name}::${dept.name}`] = dept.scholar_count;
+          }
+
           unis.push({
-            name: item.university,
-            count: item.count,
+            name: inst.name,
+            count: inst.scholar_count,
             departments,
           });
 
-          countsMap[item.university] = item.count;
-          total += item.count;
-
-          for (const [deptName, deptCount] of Object.entries(departments)) {
-            countsMap[`${item.university}::${deptName}`] = deptCount;
-          }
+          countsMap[inst.name] = inst.scholar_count;
+          total += inst.scholar_count;
         }
 
         setUniversities(unis);
@@ -60,9 +53,8 @@ export function useUniversityCounts() {
       } catch (err) {
         const errorMsg =
           err instanceof Error ? err.message : "Failed to load university data";
-        console.error("Failed to fetch faculty stats:", err);
+        console.error("Failed to fetch institutions:", err);
         setError(errorMsg);
-        // Fallback: set empty data, user can still see tree
         setTotalCount(0);
         setUniversities([]);
         setCounts({});
@@ -71,7 +63,7 @@ export function useUniversityCounts() {
       }
     };
 
-    loadCounts();
+    load();
   }, []);
 
   return { universities, counts, totalCount, loading, error };

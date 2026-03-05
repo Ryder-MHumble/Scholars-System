@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { GraduationCap, MapPin, Plus, Check, Edit3, Trash2, Loader2 } from "lucide-react";
+import {
+  GraduationCap,
+  MapPin,
+  Plus,
+  Check,
+  Edit3,
+  Trash2,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/utils/cn";
 import {
   fetchStudents,
@@ -10,7 +18,7 @@ import {
   type StudentRecord,
   type StudentCreate,
   type StudentPatch,
-} from "@/services/facultyApi";
+} from "@/services/scholarApi";
 
 interface Props {
   urlHash: string;
@@ -93,7 +101,9 @@ export function StatsSidebar({ urlHash }: Props) {
     setIsSaving(true);
     try {
       const updated = await patchStudent(urlHash, studentId, editForm);
-      setStudents((prev) => prev.map((s) => (s.id === studentId ? updated : s)));
+      setStudents((prev) =>
+        prev.map((s) => (s.id === studentId ? updated : s)),
+      );
       setEditingId(null);
       setEditForm({});
     } catch (e) {
@@ -152,7 +162,7 @@ export function StatsSidebar({ urlHash }: Props) {
           {!isEditMode ? (
             <button
               onClick={handleEnterEdit}
-              className="ml-1 flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 rounded-full transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 rounded-full transition-colors"
             >
               <Edit3 className="w-3 h-3" />
               编辑
@@ -160,7 +170,7 @@ export function StatsSidebar({ urlHash }: Props) {
           ) : (
             <button
               onClick={handleFinishEdit}
-              className="ml-1 px-2.5 py-1 text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-full transition-colors"
+              className="px-2.5 py-1 text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-full transition-colors"
             >
               完成
             </button>
@@ -196,7 +206,9 @@ export function StatsSidebar({ urlHash }: Props) {
                       <input
                         type="text"
                         value={editForm.name ?? ""}
-                        onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                        onChange={(e) =>
+                          setEditForm((p) => ({ ...p, name: e.target.value }))
+                        }
                         placeholder="姓名 *"
                         className="w-full text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                       />
@@ -204,7 +216,10 @@ export function StatsSidebar({ urlHash }: Props) {
                         <select
                           value={editForm.degree_type ?? ""}
                           onChange={(e) =>
-                            setEditForm((p) => ({ ...p, degree_type: e.target.value }))
+                            setEditForm((p) => ({
+                              ...p,
+                              degree_type: e.target.value,
+                            }))
                           }
                           className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                         >
@@ -218,7 +233,10 @@ export function StatsSidebar({ urlHash }: Props) {
                         <select
                           value={editForm.status ?? "在读"}
                           onChange={(e) =>
-                            setEditForm((p) => ({ ...p, status: e.target.value }))
+                            setEditForm((p) => ({
+                              ...p,
+                              status: e.target.value,
+                            }))
                           }
                           className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                         >
@@ -234,7 +252,10 @@ export function StatsSidebar({ urlHash }: Props) {
                           type="text"
                           value={editForm.enrollment_year ?? ""}
                           onChange={(e) =>
-                            setEditForm((p) => ({ ...p, enrollment_year: e.target.value }))
+                            setEditForm((p) => ({
+                              ...p,
+                              enrollment_year: e.target.value,
+                            }))
                           }
                           placeholder="入学年份"
                           className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
@@ -256,7 +277,10 @@ export function StatsSidebar({ urlHash }: Props) {
                         type="text"
                         value={editForm.home_university ?? ""}
                         onChange={(e) =>
-                          setEditForm((p) => ({ ...p, home_university: e.target.value }))
+                          setEditForm((p) => ({
+                            ...p,
+                            home_university: e.target.value,
+                          }))
                         }
                         placeholder="所属高校"
                         className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
@@ -266,7 +290,10 @@ export function StatsSidebar({ urlHash }: Props) {
                           type="text"
                           value={editForm.email ?? ""}
                           onChange={(e) =>
-                            setEditForm((p) => ({ ...p, email: e.target.value }))
+                            setEditForm((p) => ({
+                              ...p,
+                              email: e.target.value,
+                            }))
                           }
                           placeholder="邮箱"
                           className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
@@ -275,7 +302,10 @@ export function StatsSidebar({ urlHash }: Props) {
                           type="text"
                           value={editForm.phone ?? ""}
                           onChange={(e) =>
-                            setEditForm((p) => ({ ...p, phone: e.target.value }))
+                            setEditForm((p) => ({
+                              ...p,
+                              phone: e.target.value,
+                            }))
                           }
                           placeholder="电话"
                           className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
@@ -285,7 +315,10 @@ export function StatsSidebar({ urlHash }: Props) {
                         type="text"
                         value={editForm.student_no ?? ""}
                         onChange={(e) =>
-                          setEditForm((p) => ({ ...p, student_no: e.target.value }))
+                          setEditForm((p) => ({
+                            ...p,
+                            student_no: e.target.value,
+                          }))
                         }
                         placeholder="学号"
                         className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
@@ -322,7 +355,9 @@ export function StatsSidebar({ urlHash }: Props) {
                   ) : (
                     <>
                       <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                        <span className="text-sm font-medium text-gray-900">{student.name}</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {student.name}
+                        </span>
                         {student.degree_type && (
                           <span
                             className={cn(
@@ -338,16 +373,19 @@ export function StatsSidebar({ urlHash }: Props) {
                           <span
                             className={cn(
                               "text-[10px] px-1.5 py-0.5 rounded font-medium",
-                              statusColor[student.status] ?? "bg-gray-50 text-gray-500",
+                              statusColor[student.status] ??
+                                "bg-gray-50 text-gray-500",
                             )}
                           >
                             {student.status}
                           </span>
                         )}
                       </div>
-                      {(student.enrollment_year || student.expected_graduation_year) && (
+                      {(student.enrollment_year ||
+                        student.expected_graduation_year) && (
                         <div className="text-xs text-gray-500 mb-1">
-                          {student.enrollment_year && student.expected_graduation_year
+                          {student.enrollment_year &&
+                          student.expected_graduation_year
                             ? `${student.enrollment_year}–${student.expected_graduation_year}`
                             : student.enrollment_year
                               ? `${student.enrollment_year} 入学`
@@ -357,7 +395,9 @@ export function StatsSidebar({ urlHash }: Props) {
                       {student.home_university && (
                         <div className="flex items-center gap-1 text-xs text-gray-400">
                           <MapPin className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{student.home_university}</span>
+                          <span className="truncate">
+                            {student.home_university}
+                          </span>
                         </div>
                       )}
                     </>
@@ -393,14 +433,18 @@ export function StatsSidebar({ urlHash }: Props) {
               <input
                 type="text"
                 value={addForm.name}
-                onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) =>
+                  setAddForm((p) => ({ ...p, name: e.target.value }))
+                }
                 placeholder="姓名 *"
                 className="w-full text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
               />
               <div className="flex gap-1">
                 <select
                   value={addForm.degree_type ?? "博士"}
-                  onChange={(e) => setAddForm((p) => ({ ...p, degree_type: e.target.value }))}
+                  onChange={(e) =>
+                    setAddForm((p) => ({ ...p, degree_type: e.target.value }))
+                  }
                   className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                 >
                   <option value="">学位</option>
@@ -412,7 +456,9 @@ export function StatsSidebar({ urlHash }: Props) {
                 </select>
                 <select
                   value={addForm.status ?? "在读"}
-                  onChange={(e) => setAddForm((p) => ({ ...p, status: e.target.value }))}
+                  onChange={(e) =>
+                    setAddForm((p) => ({ ...p, status: e.target.value }))
+                  }
                   className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                 >
                   {STATUS_OPTIONS.map((s) => (
@@ -426,7 +472,12 @@ export function StatsSidebar({ urlHash }: Props) {
                 <input
                   type="text"
                   value={addForm.enrollment_year ?? ""}
-                  onChange={(e) => setAddForm((p) => ({ ...p, enrollment_year: e.target.value }))}
+                  onChange={(e) =>
+                    setAddForm((p) => ({
+                      ...p,
+                      enrollment_year: e.target.value,
+                    }))
+                  }
                   placeholder="入学年份"
                   className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                 />
@@ -434,7 +485,10 @@ export function StatsSidebar({ urlHash }: Props) {
                   type="text"
                   value={addForm.expected_graduation_year ?? ""}
                   onChange={(e) =>
-                    setAddForm((p) => ({ ...p, expected_graduation_year: e.target.value }))
+                    setAddForm((p) => ({
+                      ...p,
+                      expected_graduation_year: e.target.value,
+                    }))
                   }
                   placeholder="预计毕业"
                   className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
@@ -443,7 +497,9 @@ export function StatsSidebar({ urlHash }: Props) {
               <input
                 type="text"
                 value={addForm.home_university ?? ""}
-                onChange={(e) => setAddForm((p) => ({ ...p, home_university: e.target.value }))}
+                onChange={(e) =>
+                  setAddForm((p) => ({ ...p, home_university: e.target.value }))
+                }
                 placeholder="所属高校"
                 className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
               />
@@ -451,14 +507,18 @@ export function StatsSidebar({ urlHash }: Props) {
                 <input
                   type="text"
                   value={addForm.email ?? ""}
-                  onChange={(e) => setAddForm((p) => ({ ...p, email: e.target.value }))}
+                  onChange={(e) =>
+                    setAddForm((p) => ({ ...p, email: e.target.value }))
+                  }
                   placeholder="邮箱"
                   className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                 />
                 <input
                   type="text"
                   value={addForm.phone ?? ""}
-                  onChange={(e) => setAddForm((p) => ({ ...p, phone: e.target.value }))}
+                  onChange={(e) =>
+                    setAddForm((p) => ({ ...p, phone: e.target.value }))
+                  }
                   placeholder="电话"
                   className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                 />
@@ -466,13 +526,17 @@ export function StatsSidebar({ urlHash }: Props) {
               <input
                 type="text"
                 value={addForm.student_no ?? ""}
-                onChange={(e) => setAddForm((p) => ({ ...p, student_no: e.target.value }))}
+                onChange={(e) =>
+                  setAddForm((p) => ({ ...p, student_no: e.target.value }))
+                }
                 placeholder="学号"
                 className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
               />
               <textarea
                 value={addForm.notes ?? ""}
-                onChange={(e) => setAddForm((p) => ({ ...p, notes: e.target.value }))}
+                onChange={(e) =>
+                  setAddForm((p) => ({ ...p, notes: e.target.value }))
+                }
                 placeholder="备注"
                 rows={2}
                 className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-none"

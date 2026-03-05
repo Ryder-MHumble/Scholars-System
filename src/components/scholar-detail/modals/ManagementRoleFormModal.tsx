@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
-import type { ManagementRole } from "@/services/facultyApi";
+import type { ManagementRole } from "@/services/scholarApi";
 
 interface ManagementRoleFormModalProps {
   role?: ManagementRole;

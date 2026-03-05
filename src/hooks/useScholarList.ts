@@ -1,13 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  fetchFacultyList,
-  deleteFaculty,
-  type FacultyListResponse,
-} from "@/services/facultyApi";
-import {
-  useUniversityCounts,
-} from "@/hooks/useUniversityCounts";
+  fetchScholarList,
+  deleteScholar,
+  type ScholarListResponse,
+} from "@/services/scholarApi";
+import { useUniversityCounts } from "@/hooks/useUniversityCounts";
 import type { UniNode } from "@/components/common/UniversitySidebarTree";
 
 const PAGE_SIZE = 20;
@@ -23,7 +21,7 @@ export function useScholarList() {
   const [page, setPage] = useState(pageParam ? parseInt(pageParam, 10) : 1);
 
   /* API state */
-  const [apiData, setApiData] = useState<FacultyListResponse | null>(null);
+  const [apiData, setApiData] = useState<ScholarListResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingHash, setDeletingHash] = useState<string | null>(null);
@@ -53,7 +51,7 @@ export function useScholarList() {
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-    fetchFacultyList(page, PAGE_SIZE, {
+    fetchScholarList(page, PAGE_SIZE, {
       university: activeUni ?? undefined,
       department: activeDept ?? undefined,
       search: query.trim() || undefined,
@@ -110,16 +108,16 @@ export function useScholarList() {
     setSearchParams(new URLSearchParams());
   };
 
-  const handleDeleteFaculty = async (urlHash: string, name: string) => {
+  const handleDeleteScholar = async (urlHash: string, name: string) => {
     if (!window.confirm(`确定要删除 ${name} 吗？此操作不可撤销。`)) {
       return;
     }
 
     setDeletingHash(urlHash);
     try {
-      await deleteFaculty(urlHash);
+      await deleteScholar(urlHash);
       setIsLoading(true);
-      fetchFacultyList(1, PAGE_SIZE, {
+      fetchScholarList(1, PAGE_SIZE, {
         university: activeUni ?? undefined,
         department: activeDept ?? undefined,
         search: query.trim() || undefined,
@@ -187,6 +185,6 @@ export function useScholarList() {
 
     // Delete
     deletingHash,
-    handleDeleteFaculty,
+    handleDeleteScholar,
   };
 }

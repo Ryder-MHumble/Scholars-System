@@ -6,7 +6,7 @@ import type {
   PublicationRecord,
   PatentRecord,
   AwardRecord,
-} from "@/services/facultyApi";
+} from "@/services/scholarApi";
 
 interface EditAchievementsModalProps {
   publications: PublicationRecord[];

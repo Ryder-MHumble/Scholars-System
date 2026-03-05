@@ -1,22 +1,17 @@
 import { motion } from "framer-motion";
-import {
-  ClipboardList,
-  ExternalLink,
-  Plus,
-  X,
-} from "lucide-react";
-import type { FacultyDetail } from "@/services/facultyApi";
+import { ClipboardList, ExternalLink, Plus, X } from "lucide-react";
+import type { ScholarDetail } from "@/services/scholarApi";
 import { slideInUp, listItem } from "@/utils/animations";
 import { getUpdateTypeLabel } from "@/constants/updateTypes";
 
 interface UpdatesCardProps {
-  faculty: FacultyDetail;
+  scholar: ScholarDetail;
   onShowAddUpdate: () => void;
   onDeleteUpdate: (index: number) => Promise<void>;
 }
 
 export function UpdatesCard({
-  faculty,
+  scholar,
   onShowAddUpdate,
   onDeleteUpdate,
 }: UpdatesCardProps) {
@@ -29,7 +24,7 @@ export function UpdatesCard({
         <ClipboardList className="w-5 h-5 text-primary-600" />
         <h3 className="text-base font-semibold text-gray-900">动态更新</h3>
         <span className="ml-auto text-xs text-gray-400">
-          {faculty.recent_updates.length} 条
+          {scholar.recent_updates.length} 条
         </span>
         <button
           onClick={onShowAddUpdate}
@@ -39,9 +34,9 @@ export function UpdatesCard({
           添加备注
         </button>
       </div>
-      {faculty.recent_updates.length > 0 ? (
+      {scholar.recent_updates.length > 0 ? (
         <div className="space-y-3">
-          {faculty.recent_updates.map((update, i) => (
+          {scholar.recent_updates.map((update, i) => (
             <motion.div
               key={i}
               variants={listItem}

@@ -20,11 +20,11 @@ import {
   Check,
 } from "lucide-react";
 import type {
-  FacultyDetail,
-  FacultyDetailPatch,
+  ScholarDetail,
+  ScholarDetailPatch,
   EducationRecord,
   ManagementRole,
-} from "@/services/facultyApi";
+} from "@/services/scholarApi";
 import { ClickToEditField } from "@/components/scholar-detail/shared/ClickToEditField";
 import { SideLabel } from "@/components/scholar-detail/shared/SideLabel";
 import { ManagementRoleFormModal } from "@/components/scholar-detail/modals/ManagementRoleFormModal";
@@ -36,15 +36,15 @@ import { staggerContainer, slideInLeft } from "@/utils/animations";
 const BIO_LIMIT = 200;
 
 interface DetailLeftSidebarProps {
-  faculty: FacultyDetail;
-  onFieldSave: (patch: FacultyDetailPatch) => Promise<void>;
+  scholar: ScholarDetail;
+  onFieldSave: (patch: ScholarDetailPatch) => Promise<void>;
   onEducationSave: (records: EducationRecord[]) => Promise<void>;
   onManagementRolesSave: (records: ManagementRole[]) => Promise<void>;
   onManagementRolesInlineSave: (roles: ManagementRole[]) => Promise<void>;
 }
 
 export function DetailLeftSidebar({
-  faculty,
+  scholar,
   onFieldSave,
   onEducationSave,
   onManagementRolesSave,
@@ -76,7 +76,7 @@ export function DetailLeftSidebar({
 
   // Management roles handlers
   const handleEnterManagementRoleEdit = () => {
-    setEditedManagementRoles([...(faculty.joint_management_roles ?? [])]);
+    setEditedManagementRoles([...(scholar.joint_management_roles ?? [])]);
     setIsManagementRoleEditMode(true);
   };
 
@@ -113,19 +113,19 @@ export function DetailLeftSidebar({
     setEditedManagementRoles((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const bioText = faculty.bio ?? "";
+  const bioText = scholar.bio ?? "";
   const bioNeedsExpand = bioText.length > BIO_LIMIT;
 
   const eduItems =
-    faculty.education && faculty.education.length > 0
-      ? faculty.education
-      : faculty.phd_institution
+    scholar.education && scholar.education.length > 0
+      ? scholar.education
+      : scholar.phd_institution
         ? [
             {
               degree: "博士",
-              institution: faculty.phd_institution,
+              institution: scholar.phd_institution,
               major: "",
-              year: faculty.phd_year || "",
+              year: scholar.phd_year || "",
               end_year: "",
             },
           ]
@@ -152,7 +152,7 @@ export function DetailLeftSidebar({
       {/* Education Modal */}
       {showEducationModal && (
         <EditEducationModal
-          education={faculty.education ?? []}
+          education={scholar.education ?? []}
           onClose={() => setShowEducationModal(false)}
           onSubmit={async (records) => {
             await onEducationSave(records);
@@ -164,7 +164,7 @@ export function DetailLeftSidebar({
       {/* Management Roles Batch Modal */}
       {showManagementRolesModal && (
         <EditManagementRolesModal
-          roles={faculty.joint_management_roles ?? []}
+          roles={scholar.joint_management_roles ?? []}
           onClose={() => setShowManagementRolesModal(false)}
           onSubmit={async (records) => {
             await onManagementRolesSave(records);
@@ -184,9 +184,9 @@ export function DetailLeftSidebar({
           className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
         >
           {/* Profile Header */}
-          <div className="p-5">
-            <div className="flex items-start gap-4 mb-4">
-              <div className="relative flex-shrink-0 group">
+          <div className="p-6">
+            <div className="flex flex-col items-center text-center mb-5">
+              <div className="relative flex-shrink-0 group mb-4">
                 {isEditingPhoto ? (
                   <PhotoEditor
                     photoUrlInput={photoUrlInput}
@@ -202,55 +202,55 @@ export function DetailLeftSidebar({
                   />
                 ) : (
                   <>
-                    {faculty.photo_url ? (
+                    {scholar.photo_url ? (
                       <img
-                        src={faculty.photo_url}
-                        alt={faculty.name}
-                        className="w-[72px] h-[72px] rounded-xl object-cover border border-gray-200"
+                        src={scholar.photo_url}
+                        alt={scholar.name}
+                        className="w-24 h-24 rounded-2xl object-cover border border-gray-200 shadow-sm"
                       />
                     ) : (
-                      <div className="w-[72px] h-[72px] rounded-xl flex items-center justify-center text-2xl font-bold bg-primary-600 text-white">
-                        {getInitial(faculty.name)}
+                      <div className="w-24 h-24 rounded-2xl flex items-center justify-center text-3xl font-bold bg-primary-600 text-white shadow-sm">
+                        {getInitial(scholar.name)}
                       </div>
                     )}
                     <button
                       onClick={() => {
-                        setPhotoUrlInput(faculty.photo_url || "");
+                        setPhotoUrlInput(scholar.photo_url || "");
                         setIsEditingPhoto(true);
                       }}
-                      className="absolute inset-0 rounded-xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      className="absolute inset-0 rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                       title="修改头像"
                     >
-                      <Edit3 className="w-4 h-4 text-white" />
+                      <Edit3 className="w-5 h-5 text-white" />
                     </button>
                   </>
                 )}
               </div>
-              <div className="flex-1 min-w-0 space-y-1">
-                <h2 className="text-lg font-bold text-gray-900 leading-snug">
+              <div className="w-full space-y-1.5">
+                <h2 className="text-xl font-bold text-gray-900 leading-snug">
                   <ClickToEditField
-                    value={faculty.name}
+                    value={scholar.name}
                     onSave={async (val) => onFieldSave({ name: val })}
-                    className="text-lg font-bold text-gray-900"
+                    className="text-xl font-bold text-gray-900"
                   />
                 </h2>
                 <div className="text-sm text-gray-500">
                   <ClickToEditField
-                    value={faculty.name_en || ""}
+                    value={scholar.name_en || ""}
                     onSave={async (val) => onFieldSave({ name_en: val })}
                     placeholder="点击添加英文名"
                   />
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-base font-medium text-gray-700">
                   <ClickToEditField
-                    value={faculty.position || ""}
+                    value={scholar.position || ""}
                     onSave={async (val) => onFieldSave({ position: val })}
                     placeholder="点击添加职称"
                   />
                 </div>
-                <div className="text-xs text-gray-400">
+                <div className="text-sm text-gray-500">
                   <ClickToEditField
-                    value={faculty.department || ""}
+                    value={scholar.department || ""}
                     onSave={async (val) => onFieldSave({ department: val })}
                     placeholder="点击添加院系"
                   />
@@ -259,17 +259,17 @@ export function DetailLeftSidebar({
             </div>
 
             {/* University */}
-            {faculty.university && (
+            {scholar.university && (
               <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-3">
                 <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <span>{faculty.university}</span>
+                <span>{scholar.university}</span>
               </div>
             )}
 
             {/* Academic titles */}
-            {faculty.academic_titles.length > 0 && (
+            {scholar.academic_titles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-4">
-                {faculty.academic_titles.slice(0, 3).map((t) => (
+                {scholar.academic_titles.slice(0, 3).map((t) => (
                   <span
                     key={t}
                     className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-200"
@@ -280,7 +280,7 @@ export function DetailLeftSidebar({
                 ))}
               </div>
             )}
-            {faculty.is_academician && (
+            {scholar.is_academician && (
               <div className="flex flex-wrap gap-1.5 mb-4">
                 <span className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-red-50 text-red-700 rounded-full border border-red-200">
                   <Award className="w-3 h-3" />
@@ -294,12 +294,12 @@ export function DetailLeftSidebar({
               <div className="flex items-center gap-1">
                 <span>数据完整度</span>
                 <span className="font-medium text-gray-600">
-                  {faculty.data_completeness}%
+                  {scholar.data_completeness}%
                 </span>
               </div>
               <div className="text-gray-400">
-                {faculty.crawled_at
-                  ? `采集于 ${faculty.crawled_at.slice(0, 10)}`
+                {scholar.crawled_at
+                  ? `采集于 ${scholar.crawled_at.slice(0, 10)}`
                   : ""}
               </div>
             </div>
@@ -312,17 +312,17 @@ export function DetailLeftSidebar({
               <div className="flex items-center gap-2.5 text-sm">
                 <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <ClickToEditField
-                  value={faculty.email || ""}
+                  value={scholar.email || ""}
                   onSave={async (val) => onFieldSave({ email: val })}
                   placeholder="点击添加邮箱"
                   renderValue={
-                    faculty.email ? (
+                    scholar.email ? (
                       <a
-                        href={`mailto:${faculty.email}`}
+                        href={`mailto:${scholar.email}`}
                         className="hover:text-primary-600 truncate transition-colors text-gray-600"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {faculty.email}
+                        {scholar.email}
                       </a>
                     ) : undefined
                   }
@@ -331,30 +331,28 @@ export function DetailLeftSidebar({
               <div className="flex items-center gap-2.5 text-sm">
                 <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <ClickToEditField
-                  value={faculty.phone || ""}
+                  value={scholar.phone || ""}
                   onSave={async (val) => onFieldSave({ phone: val })}
                   placeholder="点击添加电话"
-                  className={
-                    !faculty.phone ? "text-gray-400" : "text-gray-600"
-                  }
+                  className={!scholar.phone ? "text-gray-400" : "text-gray-600"}
                 />
               </div>
               <div className="flex items-center gap-2.5 text-sm">
                 <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <ClickToEditField
-                  value={faculty.office || ""}
+                  value={scholar.office || ""}
                   onSave={async (val) => onFieldSave({ office: val })}
                   placeholder="点击添加办公室"
                   className={
-                    !faculty.office ? "text-gray-400" : "text-gray-600"
+                    !scholar.office ? "text-gray-400" : "text-gray-600"
                   }
                 />
               </div>
-              {faculty.profile_url && (
+              {scholar.profile_url && (
                 <div className="flex items-center gap-2.5 text-sm">
                   <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                   <a
-                    href={faculty.profile_url}
+                    href={scholar.profile_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-primary-600 flex items-center gap-1 transition-colors text-gray-600"
@@ -368,7 +366,7 @@ export function DetailLeftSidebar({
           </div>
 
           {/* Academic Links */}
-          <AcademicLinksSection faculty={faculty} onFieldSave={onFieldSave} />
+          <AcademicLinksSection faculty={scholar} onFieldSave={onFieldSave} />
 
           {/* Bio */}
           <div className="px-5 py-4 border-t border-gray-100">
@@ -428,9 +426,7 @@ export function DetailLeftSidebar({
               <div className="text-sm text-gray-600">
                 <ClickToEditField
                   value=""
-                  onSave={async (val) =>
-                    onFieldSave({ phd_institution: val })
-                  }
+                  onSave={async (val) => onFieldSave({ phd_institution: val })}
                   placeholder="点击添加博士培养院校"
                 />
               </div>
@@ -562,10 +558,10 @@ export function DetailLeftSidebar({
                   批量导入
                 </button>
               </div>
-            ) : faculty.joint_management_roles &&
-              faculty.joint_management_roles.length > 0 ? (
+            ) : scholar.joint_management_roles &&
+              scholar.joint_management_roles.length > 0 ? (
               <div className="space-y-4">
-                {faculty.joint_management_roles.map((role, i) => (
+                {scholar.joint_management_roles.map((role, i) => (
                   <div key={i} className="relative pl-5">
                     <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
                     <div className="space-y-0.5">
@@ -599,7 +595,7 @@ export function DetailLeftSidebar({
           <div className="px-5 py-4 border-t border-gray-100">
             <SideLabel icon={BookOpen} title="研究方向" />
             <ClickToEditField
-              value={(faculty.research_areas ?? []).join(", ")}
+              value={(scholar.research_areas ?? []).join(", ")}
               onSave={async (val) =>
                 onFieldSave({
                   research_areas: val
@@ -611,9 +607,9 @@ export function DetailLeftSidebar({
               multiline
               placeholder="点击添加研究方向（多个方向用逗号分隔）"
               renderValue={
-                faculty.research_areas && faculty.research_areas.length > 0 ? (
+                scholar.research_areas && scholar.research_areas.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {faculty.research_areas.slice(0, 10).map((area) => (
+                    {scholar.research_areas.slice(0, 10).map((area) => (
                       <span
                         key={area}
                         className="text-xs px-2 py-1 bg-primary-50 text-primary-700 rounded-full border border-primary-100"
@@ -688,17 +684,17 @@ function PhotoEditor({
 
 /* -- Academic links sub-component -- */
 function AcademicLinksSection({
-  faculty,
+  faculty: scholar,
   onFieldSave,
 }: {
-  faculty: FacultyDetail;
-  onFieldSave: (patch: FacultyDetailPatch) => Promise<void>;
+  faculty: ScholarDetail;
+  onFieldSave: (patch: ScholarDetailPatch) => Promise<void>;
 }) {
   if (
-    !faculty.google_scholar_url &&
-    !faculty.dblp_url &&
-    !faculty.lab_url &&
-    !faculty.orcid
+    !scholar.google_scholar_url &&
+    !scholar.dblp_url &&
+    !scholar.lab_url &&
+    !scholar.orcid
   ) {
     return null;
   }
@@ -706,13 +702,13 @@ function AcademicLinksSection({
   const links = [
     {
       label: "Google Scholar",
-      value: faculty.google_scholar_url,
+      value: scholar.google_scholar_url,
       field: "google_scholar_url" as const,
     },
-    { label: "DBLP", value: faculty.dblp_url, field: "dblp_url" as const },
+    { label: "DBLP", value: scholar.dblp_url, field: "dblp_url" as const },
     {
       label: "实验室网站",
-      value: faculty.lab_url,
+      value: scholar.lab_url,
       field: "lab_url" as const,
     },
   ];
@@ -728,9 +724,7 @@ function AcademicLinksSection({
                 <label className="text-gray-400 block mb-1">{link.label}</label>
                 <ClickToEditField
                   value={link.value}
-                  onSave={async (val) =>
-                    onFieldSave({ [link.field]: val })
-                  }
+                  onSave={async (val) => onFieldSave({ [link.field]: val })}
                   renderValue={
                     <a
                       href={link.value}
@@ -746,11 +740,11 @@ function AcademicLinksSection({
               </div>
             ),
         )}
-        {faculty.orcid && (
+        {scholar.orcid && (
           <div className="text-xs">
             <label className="text-gray-400 block mb-1">ORCID</label>
             <ClickToEditField
-              value={faculty.orcid}
+              value={scholar.orcid}
               onSave={async (val) => onFieldSave({ orcid: val })}
             />
           </div>

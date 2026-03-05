@@ -1,24 +1,24 @@
 import { useState, useEffect } from "react";
 import {
-  fetchFacultyDetail,
-  patchFacultyRelation,
-  patchFacultyDetail,
-  postFacultyUpdate,
-  deleteFacultyUpdate,
-  patchFacultyAchievements,
-  type FacultyDetail,
-  type FacultyDetailPatch,
-  type NewFacultyUpdate,
+  fetchScholarDetail,
+  patchScholarRelation,
+  patchScholarDetail,
+  postScholarUpdate,
+  deleteScholarUpdate,
+  patchScholarAchievements,
+  type ScholarDetail,
+  type ScholarDetailPatch,
+  type NewScholarUpdate,
   type PublicationRecord,
   type PatentRecord,
   type AwardRecord,
   type ExchangeRecord,
   type EducationRecord,
   type ManagementRole,
-} from "@/services/facultyApi";
+} from "@/services/scholarApi";
 
 export function useScholarDetail(scholarId: string | undefined) {
-  const [faculty, setFaculty] = useState<FacultyDetail | null>(null);
+  const [scholar, setScholar] = useState<ScholarDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editableAchievements, setEditableAchievements] = useState<{
@@ -31,9 +31,9 @@ export function useScholarDetail(scholarId: string | undefined) {
     if (!scholarId) return;
     setIsLoading(true);
     setError(null);
-    fetchFacultyDetail(scholarId)
+    fetchScholarDetail(scholarId)
       .then((data) => {
-        setFaculty(data);
+        setScholar(data);
         setEditableAchievements({
           publications: data.representative_publications ?? [],
           patents: data.patents ?? [],
@@ -48,28 +48,28 @@ export function useScholarDetail(scholarId: string | undefined) {
   }, [scholarId]);
 
   // -- Field save --
-  const handleFieldSave = async (patch: FacultyDetailPatch) => {
-    if (!faculty) return;
-    const updated = await patchFacultyDetail(faculty.url_hash, patch);
-    setFaculty(updated);
+  const handleFieldSave = async (patch: ScholarDetailPatch) => {
+    if (!scholar) return;
+    const updated = await patchScholarDetail(scholar.url_hash, patch);
+    setScholar(updated);
   };
 
   // -- Education save --
   const handleEducationSave = async (records: EducationRecord[]) => {
-    if (!faculty) return;
-    const updated = await patchFacultyDetail(faculty.url_hash, {
+    if (!scholar) return;
+    const updated = await patchScholarDetail(scholar.url_hash, {
       education: records,
     });
-    setFaculty(updated);
+    setScholar(updated);
   };
 
   // -- Management roles save (modal) --
   const handleManagementRolesSave = async (records: ManagementRole[]) => {
-    if (!faculty) return;
-    const updated = await patchFacultyRelation(faculty.url_hash, {
+    if (!scholar) return;
+    const updated = await patchScholarRelation(scholar.url_hash, {
       joint_management_roles: records,
     });
-    setFaculty(updated);
+    setScholar(updated);
   };
 
   // -- Relation toggle --
@@ -79,26 +79,26 @@ export function useScholarDetail(scholarId: string | undefined) {
       | "is_adjunct_supervisor"
       | "is_potential_recruit",
   ) => {
-    if (!faculty) return;
-    const updated = await patchFacultyRelation(faculty.url_hash, {
-      [field]: !faculty[field],
+    if (!scholar) return;
+    const updated = await patchScholarRelation(scholar.url_hash, {
+      [field]: !scholar[field],
     });
-    setFaculty(updated);
+    setScholar(updated);
   };
 
   // -- Add update --
-  const handleAddUpdate = async (data: NewFacultyUpdate) => {
-    if (!faculty) return;
-    const updated = await postFacultyUpdate(faculty.url_hash, data);
-    setFaculty(updated);
+  const handleAddUpdate = async (data: NewScholarUpdate) => {
+    if (!scholar) return;
+    const updated = await postScholarUpdate(scholar.url_hash, data);
+    setScholar(updated);
   };
 
   // -- Delete update --
   const handleDeleteUpdate = async (index: number) => {
-    if (!faculty) return;
+    if (!scholar) return;
     try {
-      const updated = await deleteFacultyUpdate(faculty.url_hash, index);
-      setFaculty(updated);
+      const updated = await deleteScholarUpdate(scholar.url_hash, index);
+      setScholar(updated);
     } catch (error) {
       console.error("Failed to delete update:", error);
     }
@@ -110,46 +110,46 @@ export function useScholarDetail(scholarId: string | undefined) {
     patents: PatentRecord[];
     awards: AwardRecord[];
   }) => {
-    if (!faculty) return;
-    const updated = await patchFacultyAchievements(faculty.url_hash, {
+    if (!scholar) return;
+    const updated = await patchScholarAchievements(scholar.url_hash, {
       representative_publications: data.publications,
       patents: data.patents,
       awards: data.awards,
     });
-    setFaculty(updated);
+    setScholar(updated);
     setEditableAchievements(data);
   };
 
   // -- Exchange records save --
   const handleSaveExchangeRecords = async (records: ExchangeRecord[]) => {
-    if (!faculty) return;
-    const updated = await patchFacultyRelation(faculty.url_hash, {
+    if (!scholar) return;
+    const updated = await patchScholarRelation(scholar.url_hash, {
       academic_exchange_records: records,
     });
-    setFaculty(updated);
+    setScholar(updated);
   };
 
   // -- Management roles inline save --
   const handleSaveManagementRolesInline = async (roles: ManagementRole[]) => {
-    if (!faculty) return;
-    const updated = await patchFacultyRelation(faculty.url_hash, {
+    if (!scholar) return;
+    const updated = await patchScholarRelation(scholar.url_hash, {
       joint_management_roles: roles,
     });
-    setFaculty(updated);
+    setScholar(updated);
   };
 
   // -- Relation notes save --
   const handleRelationNotesSave = async (val: string) => {
-    if (!faculty) return;
-    const updated = await patchFacultyRelation(faculty.url_hash, {
+    if (!scholar) return;
+    const updated = await patchScholarRelation(scholar.url_hash, {
       institute_relation_notes: val,
     });
-    setFaculty(updated);
+    setScholar(updated);
   };
 
   return {
-    faculty,
-    setFaculty,
+    scholar,
+    setScholar,
     isLoading,
     error,
     editableAchievements,

@@ -1,22 +1,16 @@
 import { motion } from "framer-motion";
-import {
-  BookOpen,
-  Award,
-  Trophy,
-  ExternalLink,
-  Edit3,
-} from "lucide-react";
-import type { FacultyDetail } from "@/services/facultyApi";
+import { BookOpen, Award, Trophy, ExternalLink, Edit3 } from "lucide-react";
+import type { ScholarDetail } from "@/services/scholarApi";
 import { cn } from "@/utils/cn";
 import { slideInUp } from "@/utils/animations";
 
 interface AchievementsDetailCardProps {
-  faculty: FacultyDetail;
+  scholar: ScholarDetail;
   onShowAchievementsModal: () => void;
 }
 
 export function AchievementsDetailCard({
-  faculty,
+  scholar,
   onShowAchievementsModal,
 }: AchievementsDetailCardProps) {
   return (
@@ -37,16 +31,16 @@ export function AchievementsDetailCard({
         </button>
       </div>
 
-      <PublicationsSection faculty={faculty} />
-      <PatentsSection faculty={faculty} />
-      <AwardsSection faculty={faculty} />
+      <PublicationsSection scholar={scholar} />
+      <PatentsSection scholar={scholar} />
+      <AwardsSection scholar={scholar} />
     </motion.div>
   );
 }
 
 /* -- Publications -- */
-function PublicationsSection({ faculty }: { faculty: FacultyDetail }) {
-  const pubs = faculty.representative_publications;
+function PublicationsSection({ scholar }: { scholar: ScholarDetail }) {
+  const pubs = scholar.representative_publications;
   return (
     <div className="mb-5">
       <div className="flex items-center gap-2 mb-3">
@@ -108,12 +102,12 @@ function PublicationsSection({ faculty }: { faculty: FacultyDetail }) {
               </div>
             ))}
           </div>
-          {faculty.publications_count > 0 && (
+          {scholar.publications_count > 0 && (
             <p className="text-xs text-gray-400 text-center mt-3 pt-3 border-t border-gray-100">
-              总计约 {faculty.publications_count} 篇，可前往{" "}
-              <ScholarLink url={faculty.dblp_url} label="DBLP" /> 或{" "}
+              总计约 {scholar.publications_count} 篇，可前往{" "}
+              <ScholarLink url={scholar.dblp_url} label="DBLP" /> 或{" "}
               <ScholarLink
-                url={faculty.google_scholar_url}
+                url={scholar.google_scholar_url}
                 label="Google Scholar"
               />{" "}
               查看全部
@@ -123,12 +117,11 @@ function PublicationsSection({ faculty }: { faculty: FacultyDetail }) {
       ) : (
         <p className="text-sm text-gray-400 text-center py-4">
           论文详情暂未收录
-          {(faculty.dblp_url || faculty.google_scholar_url) && (
+          {(scholar.dblp_url || scholar.google_scholar_url) && (
             <>
-              ，可前往{" "}
-              <ScholarLink url={faculty.dblp_url} label="DBLP" /> 或{" "}
+              ，可前往 <ScholarLink url={scholar.dblp_url} label="DBLP" /> 或{" "}
               <ScholarLink
-                url={faculty.google_scholar_url}
+                url={scholar.google_scholar_url}
                 label="Google Scholar"
               />{" "}
               查看
@@ -141,8 +134,8 @@ function PublicationsSection({ faculty }: { faculty: FacultyDetail }) {
 }
 
 /* -- Patents -- */
-function PatentsSection({ faculty }: { faculty: FacultyDetail }) {
-  const patents = faculty.patents;
+function PatentsSection({ scholar }: { scholar: ScholarDetail }) {
+  const patents = scholar.patents;
   return (
     <div className="pt-4 border-t border-gray-100 mb-5">
       <div className="flex items-center gap-2 mb-3">
@@ -211,8 +204,8 @@ function PatentsSection({ faculty }: { faculty: FacultyDetail }) {
 }
 
 /* -- Awards -- */
-function AwardsSection({ faculty }: { faculty: FacultyDetail }) {
-  const awards = faculty.awards;
+function AwardsSection({ scholar }: { scholar: ScholarDetail }) {
+  const awards = scholar.awards;
   return (
     <div className="pt-4 border-t border-gray-100">
       <div className="flex items-center gap-2 mb-3">

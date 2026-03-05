@@ -1,0 +1,56 @@
+import type { Project } from "@/types/project";
+
+export const SAMPLE_PROJECTS: Project[] = [
+  {
+    id: "proj_001",
+    title: "面向大规模知识图谱的智能问答系统研究",
+    pi: "张三",
+    piInstitution: "清华大学",
+    fundingAgency: "国家自然科学基金",
+    fundingAmount: 2800000,
+    startYear: 2023,
+    endYear: 2026,
+    status: "进行中",
+    category: "重点项目",
+    members: [
+      { name: "张三", role: "项目负责人", institution: "清华大学" },
+      { name: "李四", role: "主要参与者", institution: "北京大学" },
+      { name: "王五", role: "主要参与者", institution: "清华大学" },
+    ],
+    description: "本项目旨在研究面向大规模知识图谱的智能问答关键技术，包括知识表示、推理和问答生成等。",
+  },
+  {
+    id: "proj_002",
+    title: "深度学习在医学影像诊断中的应用研究",
+    pi: "李明",
+    piInstitution: "上海交通大学",
+    fundingAgency: "科技部重点研发计划",
+    fundingAmount: 5000000,
+    startYear: 2022,
+    endYear: 2025,
+    status: "进行中",
+    category: "重点研发计划",
+    members: [
+      { name: "李明", role: "项目负责人", institution: "上海交通大学" },
+      { name: "陈华", role: "主要参与者", institution: "复旦大学" },
+    ],
+    description: "研究深度学习技术在医学影像自动诊断中的应用，提高诊断准确率和效率。",
+  },
+  {
+    id: "proj_003",
+    title: "区块链技术在供应链金融中的应用",
+    pi: "王芳",
+    piInstitution: "浙江大学",
+    fundingAgency: "浙江省科技厅",
+    fundingAmount: 1500000,
+    startYear: 2021,
+    endYear: 2024,
+    status: "已完成",
+    category: "省级重点项目",
+    members: [
+      { name: "王芳", role: "项目负责人", institution: "浙江大学" },
+      { name: "赵六", role: "主要参与者", institution: "浙江大学" },
+    ],
+    description: "探索区块链技术在供应链金融领域的创新应用模式。",
+  },
+];

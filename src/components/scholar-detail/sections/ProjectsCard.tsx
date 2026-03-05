@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
 import { FileText } from "lucide-react";
-import type { FacultyDetail } from "@/services/facultyApi";
+import type { ScholarDetail } from "@/services/scholarApi";
 import { slideInUp } from "@/utils/animations";
 
 interface ProjectsCardProps {
-  projects: FacultyDetail["joint_research_projects"];
+  projects: ScholarDetail["joint_research_projects"];
 }
 
 export function ProjectsCard({ projects }: ProjectsCardProps) {

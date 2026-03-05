@@ -1,17 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import {
-  Handshake,
-  Calendar,
-  Edit3,
-  Check,
-  X,
-  Plus,
-} from "lucide-react";
-import type {
-  FacultyDetail,
-  ExchangeRecord,
-} from "@/services/facultyApi";
+import { Handshake, Calendar, Edit3, Check, X, Plus } from "lucide-react";
+import type { ScholarDetail, ExchangeRecord } from "@/services/scholarApi";
 import { ClickToEditField } from "@/components/scholar-detail/shared/ClickToEditField";
 import { ExchangeRecordFormModal } from "@/components/scholar-detail/modals/ExchangeRecordFormModal";
 import { cn } from "@/utils/cn";
@@ -19,7 +9,7 @@ import { slideInUp, listItem } from "@/utils/animations";
 import { EXCHANGE_TYPE_COLORS } from "@/constants/updateTypes";
 
 interface RelationCardProps {
-  faculty: FacultyDetail;
+  scholar: ScholarDetail;
   onRelationToggle: (
     field:
       | "is_advisor_committee"
@@ -37,7 +27,7 @@ const RELATION_BADGES = [
 ] as const;
 
 export function RelationCard({
-  faculty,
+  scholar,
   onRelationToggle,
   onRelationNotesSave,
   onSaveExchangeRecords,
@@ -53,7 +43,7 @@ export function RelationCard({
   );
 
   const handleEnterExchangeEdit = () => {
-    setEditedExchangeRecords([...(faculty.academic_exchange_records ?? [])]);
+    setEditedExchangeRecords([...(scholar.academic_exchange_records ?? [])]);
     setIsExchangeEditMode(true);
   };
 
@@ -91,8 +81,8 @@ export function RelationCard({
 
   const relationBadges = RELATION_BADGES.map((badge) => ({
     ...badge,
-    active: faculty[badge.field],
-    desc: faculty[badge.field]
+    active: scholar[badge.field],
+    desc: scholar[badge.field]
       ? badge.label === "潜在引进"
         ? "已标记"
         : badge.label === "顾问委员"
@@ -158,14 +148,14 @@ export function RelationCard({
               </button>
             ))}
           </div>
-          {faculty.institute_relation_notes ? (
+          {scholar.institute_relation_notes ? (
             <ClickToEditField
-              value={faculty.institute_relation_notes}
+              value={scholar.institute_relation_notes}
               onSave={onRelationNotesSave}
               multiline
               renderValue={
                 <p className="mt-1 text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
-                  {faculty.institute_relation_notes}
+                  {scholar.institute_relation_notes}
                 </p>
               }
             />
@@ -212,10 +202,10 @@ export function RelationCard({
               onDelete={handleDeleteExchangeRecord}
               onAdd={() => setShowExchangeRecordForm(true)}
             />
-          ) : faculty.academic_exchange_records &&
-            faculty.academic_exchange_records.length > 0 ? (
+          ) : scholar.academic_exchange_records &&
+            scholar.academic_exchange_records.length > 0 ? (
             <div className="space-y-3">
-              {faculty.academic_exchange_records.map((record, index) => (
+              {scholar.academic_exchange_records.map((record, index) => (
                 <motion.div
                   key={index}
                   variants={listItem}

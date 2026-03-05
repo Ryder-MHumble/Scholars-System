@@ -5,11 +5,11 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Building2, Award, Trash2 } from "lucide-react";
-import { type FacultyListItem } from "@/services/facultyApi";
+import { type ScholarListItem } from "@/services/scholarApi";
 import { getAvatarColor, getInitial } from "@/utils/avatar";
 
 interface ScholarCardProps {
-  scholar: FacultyListItem;
+  scholar: ScholarListItem;
   index?: number;
   state?: any;
   onDelete?: (urlHash: string, name: string) => void;

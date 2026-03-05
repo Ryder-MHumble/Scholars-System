@@ -1,7 +1,7 @@
 export type {
-  University,
-  Department,
-  InstitutionTreeNode,
+  InstitutionListItem,
+  InstitutionDetail,
+  InstitutionPatchRequest,
 } from "./institution";
 export type {
   Scholar,

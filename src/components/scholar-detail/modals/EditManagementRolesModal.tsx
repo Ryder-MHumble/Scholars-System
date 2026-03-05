@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Plus } from "lucide-react";
-import type { ManagementRole } from "@/services/facultyApi";
+import type { ManagementRole } from "@/services/scholarApi";
 
 interface EditManagementRolesModalProps {
   roles: ManagementRole[];
@@ -29,7 +29,11 @@ export function EditManagementRolesModal({
     setRecords((prev) => prev.filter((_, idx) => idx !== i));
   };
 
-  const updateRecord = (i: number, field: keyof ManagementRole, val: string) => {
+  const updateRecord = (
+    i: number,
+    field: keyof ManagementRole,
+    val: string,
+  ) => {
     setRecords((prev) => {
       const updated = [...prev];
       updated[i] = { ...updated[i], [field]: val };
@@ -117,7 +121,9 @@ export function EditManagementRolesModal({
               <div className="grid grid-cols-2 gap-2">
                 <input
                   value={rec.start_year?.toString() || ""}
-                  onChange={(e) => updateRecord(i, "start_year", e.target.value)}
+                  onChange={(e) =>
+                    updateRecord(i, "start_year", e.target.value)
+                  }
                   placeholder="开始年份"
                   className="text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                 />

@@ -1,8 +1,8 @@
 const BASE_URL = import.meta.env.DEV
   ? ""
-  : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
+  : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8002";
 
-export interface FacultyListItem {
+export interface ScholarListItem {
   url_hash: string;
   name: string;
   name_en: string;
@@ -24,7 +24,7 @@ export interface FacultyListItem {
   crawled_at: string;
 }
 
-export interface FacultyDetail extends FacultyListItem {
+export interface ScholarDetail extends ScholarListItem {
   gender: string;
   secondary_departments: string[];
   bio: string;
@@ -49,7 +49,7 @@ export interface FacultyDetail extends FacultyListItem {
   institute_relation_notes: string;
   relation_updated_by: string;
   relation_updated_at: string;
-  recent_updates: FacultyUpdate[];
+  recent_updates: ScholarUpdate[];
   representative_publications: PublicationRecord[];
   patents: PatentRecord[];
   awards: AwardRecord[];
@@ -96,7 +96,7 @@ export interface ExchangeRecord {
   organization?: string;
 }
 
-export interface FacultyUpdate {
+export interface ScholarUpdate {
   update_type?: string;
   title?: string;
   content?: string;
@@ -136,21 +136,21 @@ export interface AwardRecord {
   added_by?: string;
 }
 
-export interface FacultyListResponse {
+export interface ScholarListResponse {
   total: number;
   page: number;
   page_size: number;
   total_pages: number;
-  items: FacultyListItem[];
+  items: ScholarListItem[];
 }
 
-export interface FacultyListFilters {
+export interface ScholarListFilters {
   university?: string;
   department?: string;
   search?: string;
 }
 
-export interface NewFacultyUpdate {
+export interface NewScholarUpdate {
   update_type: string;
   title: string;
   content: string;
@@ -171,7 +171,7 @@ export interface RelationPatch {
   relation_updated_by?: string;
 }
 
-export interface FacultyDetailPatch {
+export interface ScholarDetailPatch {
   name?: string;
   name_en?: string;
   photo_url?: string;
@@ -220,7 +220,7 @@ export interface StudentRecord {
 
 export interface StudentListResponse {
   total: number;
-  faculty_url_hash: string;
+  scholar_url_hash: string;
   items: StudentRecord[];
 }
 
@@ -252,11 +252,11 @@ export interface StudentPatch {
   updated_by?: string;
 }
 
-export async function fetchFacultyList(
+export async function fetchScholarList(
   page: number = 1,
   pageSize: number = 20,
-  filters?: FacultyListFilters,
-): Promise<FacultyListResponse> {
+  filters?: ScholarListFilters,
+): Promise<ScholarListResponse> {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
@@ -265,24 +265,24 @@ export async function fetchFacultyList(
   if (filters?.department) params.set("department", filters.department);
   if (filters?.search) params.set("keyword", filters.search);
 
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/?${params}`);
-  if (!res.ok) throw new Error(`Failed to fetch faculty list: ${res.status}`);
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/?${params}`);
+  if (!res.ok) throw new Error(`Failed to fetch scholar list: ${res.status}`);
   return res.json();
 }
 
-export async function fetchFacultyDetail(
+export async function fetchScholarDetail(
   urlHash: string,
-): Promise<FacultyDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}`);
-  if (!res.ok) throw new Error(`Failed to fetch faculty detail: ${res.status}`);
+): Promise<ScholarDetail> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}`);
+  if (!res.ok) throw new Error(`Failed to fetch scholar detail: ${res.status}`);
   return res.json();
 }
 
-export async function patchFacultyRelation(
+export async function patchScholarRelation(
   urlHash: string,
   data: RelationPatch,
-): Promise<FacultyDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/relation`, {
+): Promise<ScholarDetail> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/relation`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -291,25 +291,25 @@ export async function patchFacultyRelation(
   return res.json();
 }
 
-export async function patchFacultyDetail(
+export async function patchScholarDetail(
   urlHash: string,
-  data: FacultyDetailPatch,
-): Promise<FacultyDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/basic`, {
+  data: ScholarDetailPatch,
+): Promise<ScholarDetail> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/basic`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   if (!res.ok)
-    throw new Error(`Failed to update faculty detail: ${res.status}`);
+    throw new Error(`Failed to update scholar detail: ${res.status}`);
   return res.json();
 }
 
-export async function postFacultyUpdate(
+export async function postScholarUpdate(
   urlHash: string,
-  data: NewFacultyUpdate,
-): Promise<FacultyDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/updates`, {
+  data: NewScholarUpdate,
+): Promise<ScholarDetail> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/updates`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -318,12 +318,12 @@ export async function postFacultyUpdate(
   return res.json();
 }
 
-export async function deleteFacultyUpdate(
+export async function deleteScholarUpdate(
   urlHash: string,
   updateIdx: number,
-): Promise<FacultyDetail> {
+): Promise<ScholarDetail> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/faculty/${urlHash}/updates/${updateIdx}`,
+    `${BASE_URL}/api/v1/scholars/${urlHash}/updates/${updateIdx}`,
     {
       method: "DELETE",
     },
@@ -332,12 +332,12 @@ export async function deleteFacultyUpdate(
   return res.json();
 }
 
-export async function patchFacultyAchievements(
+export async function patchScholarAchievements(
   urlHash: string,
   data: AchievementsPatch,
-): Promise<FacultyDetail> {
+): Promise<ScholarDetail> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/faculty/${urlHash}/achievements`,
+    `${BASE_URL}/api/v1/scholars/${urlHash}/achievements`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -351,7 +351,7 @@ export async function patchFacultyAchievements(
 export async function fetchStudents(
   urlHash: string,
 ): Promise<StudentListResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/students`);
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/students`);
   if (!res.ok) throw new Error(`Failed to fetch students: ${res.status}`);
   return res.json();
 }
@@ -360,7 +360,7 @@ export async function createStudent(
   urlHash: string,
   data: StudentCreate,
 ): Promise<StudentRecord> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}/students`, {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/students`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -375,7 +375,7 @@ export async function patchStudent(
   data: StudentPatch,
 ): Promise<StudentRecord> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/faculty/${urlHash}/students/${studentId}`,
+    `${BASE_URL}/api/v1/scholars/${urlHash}/students/${studentId}`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -391,7 +391,7 @@ export async function deleteStudent(
   studentId: string,
 ): Promise<void> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/faculty/${urlHash}/students/${studentId}`,
+    `${BASE_URL}/api/v1/scholars/${urlHash}/students/${studentId}`,
     {
       method: "DELETE",
     },
@@ -399,14 +399,14 @@ export async function deleteStudent(
   if (!res.ok) throw new Error(`Failed to delete student: ${res.status}`);
 }
 
-export async function deleteFaculty(urlHash: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/${urlHash}`, {
+export async function deleteScholar(urlHash: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}`, {
     method: "DELETE",
   });
-  if (!res.ok) throw new Error(`Failed to delete faculty: ${res.status}`);
+  if (!res.ok) throw new Error(`Failed to delete scholar: ${res.status}`);
 }
 
-export interface FacultyStatsResponse {
+export interface ScholarStatsResponse {
   by_university: Array<{ university: string; count: number }>;
   by_department: Array<{
     university: string;
@@ -415,24 +415,32 @@ export interface FacultyStatsResponse {
   }>;
 }
 
-export async function fetchFacultyStats(): Promise<FacultyStatsResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/stats`);
-  if (!res.ok) throw new Error(`Failed to fetch faculty stats: ${res.status}`);
+export async function fetchScholarStats(): Promise<ScholarStatsResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/stats`);
+  if (!res.ok) throw new Error(`Failed to fetch scholar stats: ${res.status}`);
   return res.json();
 }
 
-export interface FacultySource {
+export interface ScholarSource {
   id: string;
   name: string;
+  group: string;
+  university: string;
+  department: string;
+  is_enabled: boolean;
+  item_count: number;
+  last_crawl_at: string | null;
 }
 
-export interface FacultySourcesResponse {
-  sources: FacultySource[];
+export interface ScholarSourcesResponse {
+  total: number;
+  items: ScholarSource[];
+  sources: ScholarSource[]; // Alias for backward compatibility
 }
 
-export async function fetchFacultySources(): Promise<FacultySourcesResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/faculty/sources`);
+export async function fetchScholarSources(): Promise<ScholarSourcesResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/sources`);
   if (!res.ok)
-    throw new Error(`Failed to fetch faculty sources: ${res.status}`);
+    throw new Error(`Failed to fetch scholar sources: ${res.status}`);
   return res.json();
 }

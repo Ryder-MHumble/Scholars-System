@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Plus } from "lucide-react";
-import type { EducationRecord } from "@/services/facultyApi";
+import type { EducationRecord } from "@/services/scholarApi";
 
 interface EditEducationModalProps {
   education: EducationRecord[];

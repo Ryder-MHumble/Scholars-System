@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
-import type { NewFacultyUpdate } from "@/services/facultyApi";
+import type { NewScholarUpdate } from "@/services/scholarApi";
 
 interface AddUpdateModalProps {
   onClose: () => void;
-  onSubmit: (data: NewFacultyUpdate) => Promise<void>;
+  onSubmit: (data: NewScholarUpdate) => Promise<void>;
 }
 
 export function AddUpdateModal({ onClose, onSubmit }: AddUpdateModalProps) {
-  const [form, setForm] = useState<NewFacultyUpdate>({
+  const [form, setForm] = useState<NewScholarUpdate>({
     update_type: "general",
     title: "",
     content: "",
