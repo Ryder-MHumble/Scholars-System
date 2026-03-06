@@ -97,7 +97,15 @@ validate_npm() {
 }
 
 check_node_modules() {
-    [[ -d "$NODE_MODULES_DIR" && -f "$PROJECT_DIR/node_modules/.package-lock.json" ]]
+    # Check if node_modules exists and has critical packages
+    if [[ ! -d "$NODE_MODULES_DIR" ]]; then
+        return 1
+    fi
+    # Verify xlsx module exists (critical for build)
+    if [[ ! -d "$NODE_MODULES_DIR/xlsx" ]]; then
+        return 1
+    fi
+    return 0
 }
 
 install_deps() {
