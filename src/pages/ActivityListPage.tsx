@@ -341,7 +341,7 @@ export default function ActivityListPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">两院活动</h2>
+            <h2 className="text-2xl font-bold text-gray-900">学术活动</h2>
             <p className="text-sm text-gray-500 mt-0.5">
               共{" "}
               <span className="font-semibold text-gray-700">

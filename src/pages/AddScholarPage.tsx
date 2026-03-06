@@ -24,6 +24,8 @@ import { TextInput } from "@/components/ui/TextInput";
 import { TextareaInput } from "@/components/ui/TextareaInput";
 import { SelectInput } from "@/components/ui/SelectInput";
 import { ComboboxInput } from "@/components/ui/ComboboxInput";
+import { GroupedComboboxInput } from "@/components/ui/GroupedComboboxInput";
+import { groupUniversitiesByTypeAndRegion } from "@/utils/institutionClassifier";
 import { TagInput } from "@/components/common/TagInput";
 import { SuccessOverlay } from "@/components/common/SuccessOverlay";
 import { WebScrapingPanel } from "@/components/scholar/WebScrapingPanel";
@@ -96,6 +98,11 @@ export default function AddScholarPage() {
         name: uni.name,
         departments: uni.departments.map((d) => d.name),
       })),
+    [uniData],
+  );
+
+  const groupedUniversities = useMemo(
+    () => groupUniversitiesByTypeAndRegion(uniData),
     [uniData],
   );
 
@@ -411,13 +418,13 @@ export default function AddScholarPage() {
                   />
                 </Field>
                 <Field label="所属院校" required>
-                  <ComboboxInput
+                  <GroupedComboboxInput
                     value={form.universityId}
                     onChange={(v) => {
                       set("universityId", v);
                       set("departmentId", "");
                     }}
-                    options={universityOptions.map((u) => u.name)}
+                    groups={groupedUniversities}
                     placeholder={
                       uniLoading ? "院校加载中..." : "搜索并选择院校"
                     }

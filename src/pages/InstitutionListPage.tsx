@@ -197,92 +197,69 @@ export default function InstitutionListPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50">
-      {/* ── Hero header ── */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 md:px-10 pt-8 pb-6">
-        <motion.div
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {/* Title row */}
-          <div className="flex items-end justify-between gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-2.5 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
-                  <Building2 className="w-4 h-4 text-blue-400" />
-                </div>
-                <span className="text-blue-400 text-xs font-semibold tracking-widest uppercase">
-                  Institution Database
-                </span>
-              </div>
-              <h1 className="text-4xl font-black text-white tracking-tight">
-                机构库
-              </h1>
-              <div className="flex items-center gap-4 mt-2">
-                <p className="text-slate-400 text-sm">
-                  收录{" "}
-                  <span className="font-bold text-white text-base">
-                    {pagination.total}
-                  </span>{" "}
-                  所高校及科研机构
-                  {error && (
-                    <span className="text-red-400 ml-2 text-xs">({error})</span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 shrink-0">
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg"
-              >
-                <Plus className="w-4 h-4" />
-                添加机构
-              </button>
-              {pagination.total_pages > 1 && (
-                <span className="text-xs text-slate-500 bg-slate-800 px-3.5 py-1.5 rounded-full border border-slate-700">
-                  第 {pagination.page} / {pagination.total_pages} 页
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Search bar */}
-          <div className="relative max-w-2xl">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索机构名称或英文名..."
-              className="w-full pl-11 pr-10 py-3 bg-white/10 border border-white/10 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:bg-white/15 transition-all"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-              >
-                <X className="w-3 h-3 text-slate-300" />
-              </button>
-            )}
-          </div>
-
-          {searchQuery && (
-            <p className="text-xs text-slate-400 mt-2.5">
-              找到{" "}
-              <span className="font-semibold text-white">
-                {filtered.length}
+    <div className="h-full overflow-y-auto bg-gray-50">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className="p-6 md:p-8"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">机构库</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              收录{" "}
+              <span className="font-semibold text-gray-700">
+                {pagination.total}
               </span>{" "}
-              条结果
+              所高校及科研机构
+              {error && <span className="text-red-500 ml-2">({error})</span>}
             </p>
-          )}
-        </motion.div>
-      </div>
+          </div>
 
-      {/* ── Content ── */}
-      <div className="px-6 md:px-10 py-8">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              添加机构
+            </button>
+          </div>
+        </div>
+
+        {/* Search bar */}
+        <div className="relative max-w-2xl mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="搜索机构名称或英文名..."
+            className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <X className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+          )}
+        </div>
+
+        {searchQuery && (
+          <p className="text-sm text-gray-500 mb-4">
+            找到{" "}
+            <span className="font-semibold text-gray-700">
+              {filtered.length}
+            </span>{" "}
+            条结果
+          </p>
+        )}
+
+        {/* Content */}
         {filtered.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filtered.map((institution, index) => (
@@ -371,7 +348,7 @@ export default function InstitutionListPage() {
             </button>
           </motion.div>
         )}
-      </div>
+      </motion.div>
 
       {/* Create Modal with Mode Selection */}
       <AnimatePresence>

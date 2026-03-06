@@ -39,7 +39,7 @@ const tabs: Tab[] = [
   },
   {
     id: "activities",
-    label: "两院活动",
+    label: "学术活动",
     icon: <Calendar className="w-4 h-4" />,
   },
   {
@@ -80,14 +80,18 @@ export default function HomePage() {
       <aside className="w-56 bg-white border-r border-gray-100 flex flex-col shrink-0 overflow-hidden">
         {/* Header */}
         <div className="px-5 pt-6 pb-5 shrink-0 border-b border-gray-100">
-          <h1 className="text-base font-bold text-gray-900 leading-snug">学者知识图谱</h1>
-          <p className="text-xs text-gray-400 mt-0.5">管理系统</p>
+          <h1 className="text-base font-bold text-gray-900 leading-snug">
+            学者知识图谱
+          </h1>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Scholar Knowledge Graph
+          </p>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto custom-scrollbar py-3 px-3 space-y-0.5">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2 px-2">
-            数据模块
+            核心数据库
           </p>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
