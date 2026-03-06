@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
-import type { ExchangeRecord } from "@/services/scholarApi";
 
 interface ExchangeRecordFormModalProps {
-  record?: ExchangeRecord;
+  record?: string;
   onClose: () => void;
-  onSubmit: (record: ExchangeRecord) => void;
+  onSubmit: (record: string) => void;
 }
 
 export function ExchangeRecordFormModal({
@@ -14,17 +13,11 @@ export function ExchangeRecordFormModal({
   onClose,
   onSubmit,
 }: ExchangeRecordFormModalProps) {
-  const [form, setForm] = useState<ExchangeRecord>({
-    type: record?.type ?? "",
-    date: record?.date ?? "",
-    title: record?.title ?? "",
-    organization: record?.organization ?? "",
-    description: record?.description ?? "",
-  });
+  const [value, setValue] = useState(record ?? "");
 
   const handleSubmit = () => {
-    if (!form.title?.trim()) return;
-    onSubmit(form);
+    if (!value.trim()) return;
+    onSubmit(value.trim());
     onClose();
   };
 
@@ -47,77 +40,22 @@ export function ExchangeRecordFormModal({
           <h3 className="text-base font-semibold text-gray-900">
             {record ? "编辑交往记录" : "添加交往记录"}
           </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">
-              类型
-            </label>
-            <input
-              type="text"
-              value={form.type ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-              placeholder="如：学术交流、人才称号、任职履新…"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">
-              标题 *
-            </label>
-            <input
-              value={form.title ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, title: e.target.value }))
-              }
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
-              placeholder="请输入标题"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">
-              机构
-            </label>
-            <input
-              value={form.organization ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, organization: e.target.value }))
-              }
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
-              placeholder="请输入相关机构"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">
-              日期
-            </label>
-            <input
-              type="date"
-              value={form.date ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">
-              描述
-            </label>
-            <textarea
-              value={form.description ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, description: e.target.value }))
-              }
-              rows={3}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-none"
-              placeholder="请输入详细描述"
-            />
-          </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">
+            记录内容 *
+          </label>
+          <textarea
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            rows={4}
+            placeholder="请输入交往记录（如：2024年XAI讲坛讲座、联合研讨会等）"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-none"
+          />
         </div>
         <div className="flex gap-2 mt-4">
           <button
@@ -128,7 +66,7 @@ export function ExchangeRecordFormModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!form.title?.trim()}
+            disabled={!value.trim()}
             className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors disabled:opacity-50"
           >
             确定

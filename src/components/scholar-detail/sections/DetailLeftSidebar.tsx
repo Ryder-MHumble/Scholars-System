@@ -23,7 +23,6 @@ import type {
   ScholarDetail,
   ScholarDetailPatch,
   EducationRecord,
-  ManagementRole,
 } from "@/services/scholarApi";
 import { ClickToEditField } from "@/components/scholar-detail/shared/ClickToEditField";
 import { SideLabel } from "@/components/scholar-detail/shared/SideLabel";
@@ -39,9 +38,8 @@ interface DetailLeftSidebarProps {
   scholar: ScholarDetail;
   onFieldSave: (patch: ScholarDetailPatch) => Promise<void>;
   onEducationSave: (records: EducationRecord[]) => Promise<void>;
-  onManagementRolesSave: (records: ManagementRole[]) => Promise<void>;
-  onManagementRolesInlineSave: (roles: ManagementRole[]) => Promise<void>;
-  onUniversityChange?: (university: string) => void;
+  onManagementRolesSave: (records: string[]) => Promise<void>;
+  onManagementRolesInlineSave: (roles: string[]) => Promise<void>;
 }
 
 export function DetailLeftSidebar({
@@ -50,7 +48,6 @@ export function DetailLeftSidebar({
   onEducationSave,
   onManagementRolesSave,
   onManagementRolesInlineSave,
-  onUniversityChange,
 }: DetailLeftSidebarProps) {
   const [bioExpanded, setBioExpanded] = useState(false);
 
@@ -68,9 +65,9 @@ export function DetailLeftSidebar({
   // Management roles inline editing
   const [isManagementRoleEditMode, setIsManagementRoleEditMode] =
     useState(false);
-  const [editedManagementRoles, setEditedManagementRoles] = useState<
-    ManagementRole[]
-  >([]);
+  const [editedManagementRoles, setEditedManagementRoles] = useState<string[]>(
+    [],
+  );
   const [showManagementRoleForm, setShowManagementRoleForm] = useState(false);
   const [editingManagementRoleIdx, setEditingManagementRoleIdx] = useState<
     number | null
@@ -97,7 +94,7 @@ export function DetailLeftSidebar({
     setEditingManagementRoleIdx(null);
   };
 
-  const handleManagementRoleSubmit = (role: ManagementRole) => {
+  const handleManagementRoleSubmit = (role: string) => {
     if (editingManagementRoleIdx !== null) {
       setEditedManagementRoles((prev) => {
         const updated = [...prev];
@@ -187,8 +184,9 @@ export function DetailLeftSidebar({
         >
           {/* Profile Header */}
           <div className="p-6">
-            <div className="flex flex-col items-center text-center mb-5">
-              <div className="relative flex-shrink-0 group mb-4">
+            <div className="flex items-center gap-4 mb-5">
+              {/* Avatar */}
+              <div className="relative flex-shrink-0 group">
                 {isEditingPhoto ? (
                   <PhotoEditor
                     photoUrlInput={photoUrlInput}
@@ -208,10 +206,10 @@ export function DetailLeftSidebar({
                       <img
                         src={scholar.photo_url}
                         alt={scholar.name}
-                        className="w-24 h-24 rounded-2xl object-cover border border-gray-200 shadow-sm"
+                        className="w-[120px] h-[120px] rounded-2xl object-cover border border-gray-200 shadow-sm"
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-2xl flex items-center justify-center text-3xl font-bold bg-primary-600 text-white shadow-sm">
+                      <div className="w-[120px] h-[120px] rounded-2xl flex items-center justify-center text-4xl font-bold bg-primary-600 text-white shadow-sm">
                         {getInitial(scholar.name)}
                       </div>
                     )}
@@ -228,59 +226,55 @@ export function DetailLeftSidebar({
                   </>
                 )}
               </div>
-              <div className="w-full space-y-1.5">
-                <h2 className="text-xl font-bold text-gray-900 leading-snug">
+
+              {/* Info — name / name_en / university / department / position */}
+              <div className="flex-1 min-w-0 space-y-1">
+                <h2 className="text-lg font-bold text-gray-900 leading-snug truncate">
                   <ClickToEditField
                     value={scholar.name}
                     onSave={async (val) => onFieldSave({ name: val })}
-                    className="text-xl font-bold text-gray-900"
+                    className="text-lg font-bold text-gray-900"
                   />
                 </h2>
-                <div className="text-sm text-gray-500">
+                <div className="text-xs text-gray-400">
                   <ClickToEditField
                     value={scholar.name_en || ""}
                     onSave={async (val) => onFieldSave({ name_en: val })}
                     placeholder="点击添加英文名"
                   />
                 </div>
-                <div className="text-base font-medium text-gray-700">
+                <div className="flex items-center gap-1 text-sm text-gray-600">
+                  <Building2 className="w-3 h-3 text-gray-400 shrink-0" />
                   <ClickToEditField
-                    value={scholar.position || ""}
-                    onSave={async (val) => onFieldSave({ position: val })}
-                    placeholder="点击添加职称"
+                    value={scholar.university || ""}
+                    onSave={async (val) => onFieldSave({ university: val })}
+                    placeholder="点击添加院校"
+                    className={
+                      !scholar.university ? "text-gray-400" : "text-gray-600"
+                    }
                   />
                 </div>
-                <div className="text-sm text-gray-500">
+                <div className="text-xs text-gray-500">
                   <ClickToEditField
                     value={scholar.department || ""}
                     onSave={async (val) => onFieldSave({ department: val })}
                     placeholder="点击添加院系"
+                    className={
+                      !scholar.department ? "text-gray-400" : "text-gray-500"
+                    }
+                  />
+                </div>
+                <div className="text-sm font-medium text-gray-700">
+                  <ClickToEditField
+                    value={scholar.position || ""}
+                    onSave={async (val) => onFieldSave({ position: val })}
+                    placeholder="点击添加职称"
+                    className={
+                      !scholar.position ? "text-gray-400" : "text-gray-700"
+                    }
                   />
                 </div>
               </div>
-            </div>
-
-            {/* University */}
-            <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-3">
-              <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              {onUniversityChange ? (
-                <ClickToEditField
-                  value={scholar.university || ""}
-                  onSave={async (val) => onUniversityChange(val)}
-                  placeholder="点击添加院校"
-                  className={
-                    !scholar.university ? "text-gray-400" : "text-gray-600"
-                  }
-                />
-              ) : (
-                <span
-                  className={
-                    !scholar.university ? "text-gray-400" : "text-gray-600"
-                  }
-                >
-                  {scholar.university || ""}
-                </span>
-              )}
             </div>
 
             {/* Academic titles */}
@@ -305,21 +299,6 @@ export function DetailLeftSidebar({
                 </span>
               </div>
             )}
-
-            {/* Data completeness */}
-            <div className="flex items-center justify-between text-xs text-gray-400 pt-3 border-t border-gray-100">
-              <div className="flex items-center gap-1">
-                <span>数据完整度</span>
-                <span className="font-medium text-gray-600">
-                  {scholar.data_completeness}%
-                </span>
-              </div>
-              <div className="text-gray-400">
-                {scholar.crawled_at
-                  ? `采集于 ${scholar.crawled_at.slice(0, 10)}`
-                  : ""}
-              </div>
-            </div>
           </div>
 
           {/* Contact */}
@@ -365,20 +344,28 @@ export function DetailLeftSidebar({
                   }
                 />
               </div>
-              {scholar.profile_url && (
-                <div className="flex items-center gap-2.5 text-sm">
-                  <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                  <a
-                    href={scholar.profile_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-primary-600 flex items-center gap-1 transition-colors text-gray-600"
-                  >
-                    个人主页
-                    <ExternalLink className="w-3 h-3 shrink-0" />
-                  </a>
-                </div>
-              )}
+              <div className="flex items-center gap-2.5 text-sm">
+                <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <ClickToEditField
+                  value={scholar.profile_url || ""}
+                  onSave={async (val) => onFieldSave({ profile_url: val })}
+                  placeholder="点击添加个人主页"
+                  renderValue={
+                    scholar.profile_url ? (
+                      <a
+                        href={scholar.profile_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-primary-600 flex items-center gap-1 transition-colors text-gray-600"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        个人主页
+                        <ExternalLink className="w-3 h-3 shrink-0" />
+                      </a>
+                    ) : undefined
+                  }
+                />
+              </div>
             </div>
           </div>
 
@@ -521,25 +508,11 @@ export function DetailLeftSidebar({
                 {editedManagementRoles.map((role, i) => (
                   <div
                     key={i}
-                    className="flex items-start gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100"
+                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100"
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-800">
-                        {role.role?.toString() || "职务"}
-                      </div>
-                      {role.organization && (
-                        <div className="text-xs text-gray-500">
-                          {role.organization.toString()}
-                        </div>
-                      )}
-                      {(role.start_year || role.end_year) && (
-                        <div className="text-xs text-gray-400">
-                          {role.end_year
-                            ? `${role.start_year}–${role.end_year}`
-                            : `${role.start_year}–至今`}
-                        </div>
-                      )}
-                    </div>
+                    <p className="flex-1 text-sm text-gray-800 min-w-0 truncate">
+                      {role}
+                    </p>
                     <div className="flex gap-1 shrink-0">
                       <button
                         onClick={() => {
@@ -577,29 +550,11 @@ export function DetailLeftSidebar({
               </div>
             ) : scholar.joint_management_roles &&
               scholar.joint_management_roles.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {scholar.joint_management_roles.map((role, i) => (
                   <div key={i} className="relative pl-5">
                     <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
-                    <div className="space-y-0.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm font-semibold text-gray-800">
-                          {role.role?.toString() || "职务"}
-                        </span>
-                        {(role.start_year || role.end_year) && (
-                          <span className="text-xs text-gray-400 whitespace-nowrap">
-                            {role.end_year
-                              ? `${role.start_year}–${role.end_year}`
-                              : `${role.start_year}–至今`}
-                          </span>
-                        )}
-                      </div>
-                      {role.organization && (
-                        <div className="text-sm text-gray-600">
-                          {role.organization.toString()}
-                        </div>
-                      )}
-                    </div>
+                    <p className="text-sm text-gray-700">{role}</p>
                   </div>
                 ))}
               </div>
@@ -658,18 +613,18 @@ function PhotoEditor({
   onCancel: () => void;
 }) {
   return (
-    <div className="w-[72px] flex flex-col gap-1">
+    <div className="w-[120px] flex flex-col gap-1">
       {photoUrlInput ? (
         <img
           src={photoUrlInput}
           alt="预览"
-          className="w-[72px] h-[72px] rounded-xl object-cover border border-primary-300"
+          className="w-[120px] h-[120px] rounded-2xl object-cover border border-primary-300"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = "none";
           }}
         />
       ) : (
-        <div className="w-[72px] h-[72px] rounded-xl flex items-center justify-center text-xs text-gray-400 bg-gray-100 border border-dashed border-gray-300">
+        <div className="w-[120px] h-[120px] rounded-2xl flex items-center justify-center text-xs text-gray-400 bg-gray-100 border border-dashed border-gray-300">
           预览
         </div>
       )}

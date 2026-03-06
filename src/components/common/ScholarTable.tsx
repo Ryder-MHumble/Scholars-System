@@ -23,15 +23,30 @@ function RelationBadges({ s }: { s: ScholarListItem }) {
 
   const badges: { label: string; cls: string }[] = [];
   if (isCAS)
-    badges.push({ label: "中科院院士", cls: "bg-red-50 text-red-600 border-red-200" });
+    badges.push({
+      label: "中科院院士",
+      cls: "bg-red-50 text-red-600 border-red-200",
+    });
   if (isCAE)
-    badges.push({ label: "工程院院士", cls: "bg-orange-50 text-orange-600 border-orange-200" });
+    badges.push({
+      label: "工程院院士",
+      cls: "bg-orange-50 text-orange-600 border-orange-200",
+    });
+  if (s.adjunct_supervisor?.status)
+    badges.push({
+      label: "共建导师",
+      cls: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    });
   if (s.is_advisor_committee)
-    badges.push({ label: "学术委员会", cls: "bg-blue-50 text-blue-600 border-blue-200" });
-  if (s.is_adjunct_supervisor)
-    badges.push({ label: "兼职导师", cls: "bg-violet-50 text-violet-600 border-violet-200" });
+    badges.push({
+      label: "学术委员会",
+      cls: "bg-blue-50 text-blue-600 border-blue-200",
+    });
   if (s.is_potential_recruit)
-    badges.push({ label: "潜在引进", cls: "bg-emerald-50 text-emerald-600 border-emerald-200" });
+    badges.push({
+      label: "潜在引进",
+      cls: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    });
 
   if (badges.length === 0)
     return <span className="text-xs text-gray-300">—</span>;
@@ -88,7 +103,11 @@ export function ScholarTable({
                 key={s.url_hash}
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.018, duration: 0.22, ease: "easeOut" }}
+                transition={{
+                  delay: i * 0.018,
+                  duration: 0.22,
+                  ease: "easeOut",
+                }}
                 className="group relative border-b border-gray-50 last:border-b-0 hover:bg-primary-50/40 transition-colors duration-150"
               >
                 {/* 头像 + 姓名 — 左边 accent 线 */}

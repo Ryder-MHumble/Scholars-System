@@ -24,6 +24,7 @@ import type { InstitutionListItem } from "@/types/institution";
 type CreateMode = "institution" | "department";
 
 interface InstitutionForm {
+  id: string;
   name: string;
   category: string;
   priority: string;
@@ -49,6 +50,7 @@ export default function InstitutionListPage() {
   const [loadingAllInst, setLoadingAllInst] = useState(false);
 
   const [institutionForm, setInstitutionForm] = useState<InstitutionForm>({
+    id: "",
     name: "",
     category: "",
     priority: "",
@@ -93,15 +95,22 @@ export default function InstitutionListPage() {
     try {
       if (createMode === "institution") {
         // 场景1 + 场景3：新增高校（可选择性地添加院系）
+        if (!institutionForm.id.trim()) {
+          setCreateError("机构ID不能为空");
+          setIsCreating(false);
+          return;
+        }
         if (!institutionForm.name.trim()) {
           setCreateError("机构名称不能为空");
           setIsCreating(false);
           return;
         }
 
+        const instId = institutionForm.id.trim();
         const cleanData: InstitutionCreateRequest = {
+          id: instId,
           name: institutionForm.name.trim(),
-          type: "university", // API 场景1，3 - 高校类型
+          type: "university",
         };
 
         if (institutionForm.category?.trim()) {
@@ -111,12 +120,16 @@ export default function InstitutionListPage() {
           cleanData.priority = institutionForm.priority.trim();
         }
 
-        // 场景3：如果输入了院系名称，则同时创建
+        // 场景3：如果输入了院系名称，则同时创建（自动生成院系ID）
         const depts = institutionForm.departments
           .map((d) => d.trim())
           .filter((d) => d.length > 0);
         if (depts.length > 0) {
-          cleanData.departments = depts.map((name) => ({ name }));
+          const ts = Date.now();
+          cleanData.departments = depts.map((name, i) => ({
+            id: `${instId}_dept_${ts}_${i}`,
+            name,
+          }));
         }
 
         await createInstitution(cleanData);
@@ -137,12 +150,13 @@ export default function InstitutionListPage() {
           return;
         }
 
-        // API 场景2 - 创建院系（需要指定parent_id）
-        // 实际上应该为每个院系创建一个记录
-        for (const deptName of depts) {
+        // API 场景2 - 逐个创建院系，自动生成ID
+        const ts = Date.now();
+        for (let i = 0; i < depts.length; i++) {
           const cleanData: InstitutionCreateRequest = {
-            name: deptName,
-            type: "department", // API 场景2 - 院系类型
+            id: `${departmentForm.parentInstitutionId}_dept_${ts}_${i}`,
+            name: depts[i],
+            type: "department",
             parent_id: departmentForm.parentInstitutionId,
           };
           await createInstitution(cleanData);
@@ -151,6 +165,7 @@ export default function InstitutionListPage() {
 
       setIsCreateModalOpen(false);
       setInstitutionForm({
+        id: "",
         name: "",
         category: "",
         priority: "",
@@ -426,11 +441,30 @@ export default function InstitutionListPage() {
                             name: e.target.value,
                           }))
                         }
-                        placeholder="例如：中央民族大学"
+                        placeholder="例如：北京大学"
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all"
                       />
-                      <p className="text-xs text-slate-500 mt-2">
-                        💡 创建一个新的高校。ID 由系统自动生成。
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        机构 ID <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={institutionForm.id}
+                        onChange={(e) =>
+                          setInstitutionForm((f) => ({
+                            ...f,
+                            id: e.target.value.trim(),
+                          }))
+                        }
+                        placeholder="例如：minzu、central-univ"
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all font-mono"
+                      />
+                      <p className="text-xs text-slate-500 mt-1.5">
+                        用于系统内部唯一标识，建议使用英文或拼音（如
+                        minzu、beida）
                       </p>
                     </div>
 
@@ -629,7 +663,7 @@ export default function InstitutionListPage() {
                       <ul className="text-xs text-blue-800 space-y-1">
                         <li>• 每个院系将独立创建（type = department）</li>
                         <li>• 所有院系都关联到选中的高校</li>
-                        <li>• ID 由系统自动生成</li>
+                        <li>• 院系 ID 自动生成（基于高校 ID + 时间戳）</li>
                       </ul>
                     </div>
                   </>

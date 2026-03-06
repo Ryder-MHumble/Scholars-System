@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Plus } from "lucide-react";
-import type { ManagementRole } from "@/services/scholarApi";
 import { parseManagementRolesFromText } from "@/utils/textParsers";
 
 interface EditManagementRolesModalProps {
-  roles: ManagementRole[];
+  roles: string[];
   onClose: () => void;
-  onSubmit: (records: ManagementRole[]) => void;
+  onSubmit: (records: string[]) => void;
 }
 
 export function EditManagementRolesModal({
@@ -15,32 +14,21 @@ export function EditManagementRolesModal({
   onClose,
   onSubmit,
 }: EditManagementRolesModalProps) {
-  const [records, setRecords] = useState<ManagementRole[]>(roles);
+  const [records, setRecords] = useState<string[]>(roles);
   const [batchMode, setBatchMode] = useState(false);
   const [batchText, setBatchText] = useState("");
 
-  const addRecord = () => {
-    setRecords((prev) => [
-      ...prev,
-      { role: "", organization: "", start_year: "", end_year: "" },
-    ]);
-  };
+  const addRecord = () => setRecords((prev) => [...prev, ""]);
 
-  const removeRecord = (i: number) => {
+  const removeRecord = (i: number) =>
     setRecords((prev) => prev.filter((_, idx) => idx !== i));
-  };
 
-  const updateRecord = (
-    i: number,
-    field: keyof ManagementRole,
-    val: string,
-  ) => {
+  const updateRecord = (i: number, val: string) =>
     setRecords((prev) => {
       const updated = [...prev];
-      updated[i] = { ...updated[i], [field]: val };
+      updated[i] = val;
       return updated;
     });
-  };
 
   const applyBatch = () => {
     const newRecs = parseManagementRolesFromText(batchText);
@@ -68,88 +56,39 @@ export function EditManagementRolesModal({
           <h3 className="text-base font-semibold text-gray-900">
             编辑任职经历
           </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="space-y-3 mb-4">
+        <div className="space-y-2 mb-4">
           {records.map((rec, i) => (
-            <div
-              key={i}
-              className="p-3 border border-gray-200 rounded-lg space-y-2"
-            >
-              <div className="flex justify-between items-start">
-                <span className="text-xs font-medium text-gray-500">
-                  职务 {i + 1}
-                </span>
-                <button
-                  onClick={() => removeRecord(i)}
-                  className="text-red-600 hover:text-red-700 text-xs"
-                >
-                  删除
-                </button>
-              </div>
+            <div key={i} className="flex items-center gap-2">
               <input
-                value={rec.role?.toString() || ""}
-                onChange={(e) => updateRecord(i, "role", e.target.value)}
-                placeholder="职务名称"
-                className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                value={rec}
+                onChange={(e) => updateRecord(i, e.target.value)}
+                placeholder="职务描述，如：顾问委员会委员"
+                className="flex-1 text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-400"
               />
-              <input
-                value={rec.organization?.toString() || ""}
-                onChange={(e) =>
-                  updateRecord(i, "organization", e.target.value)
-                }
-                placeholder="所属机构"
-                className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  value={rec.start_year?.toString() || ""}
-                  onChange={(e) =>
-                    updateRecord(i, "start_year", e.target.value)
-                  }
-                  placeholder="开始年份"
-                  className="text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  value={rec.end_year?.toString() || ""}
-                  onChange={(e) => updateRecord(i, "end_year", e.target.value)}
-                  placeholder="结束年份"
-                  className="text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-              </div>
+              <button
+                onClick={() => removeRecord(i)}
+                className="text-red-500 hover:text-red-600 shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           ))}
 
           {batchMode ? (
             <div className="p-3 border border-blue-200 rounded-lg bg-blue-50/30 space-y-2">
-              <div className="text-xs text-gray-600 space-y-1">
-                <p className="font-medium">
-                  支持直接粘贴简历中的任职经历，自动识别以下格式：
-                </p>
-                <p className="text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded leading-relaxed text-[11px]">
-                  2015/01 to 2020/12 IEEE Technical Committee Member
-                  <br />
-                  2018 - present Bonn University Visiting Professor
-                </p>
-                <p className="text-gray-400">
-                  也支持：职务 | 机构 | 开始年份 | 结束年份（旧格式）
-                </p>
-              </div>
+              <p className="text-xs text-gray-600">每行一条任职经历记录</p>
               <textarea
                 value={batchText}
                 onChange={(e) => setBatchText(e.target.value)}
                 autoFocus
                 rows={6}
-                placeholder={
-                  "2015/01 to 2020/12  IEEE  Technical Committee Member\n2018 - present  Bonn University  Visiting Professor"
-                }
-                className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono resize-none"
+                placeholder={"顾问委员会委员\n教学委员会委员\n学位委员会委员"}
+                className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none"
               />
               <div className="flex gap-2">
                 <button
@@ -198,7 +137,7 @@ export function EditManagementRolesModal({
             取消
           </button>
           <button
-            onClick={() => onSubmit(records)}
+            onClick={() => onSubmit(records.filter(Boolean))}
             className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors"
           >
             保存

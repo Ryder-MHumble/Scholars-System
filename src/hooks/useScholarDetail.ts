@@ -12,9 +12,7 @@ import {
   type PublicationRecord,
   type PatentRecord,
   type AwardRecord,
-  type ExchangeRecord,
   type EducationRecord,
-  type ManagementRole,
 } from "@/services/scholarApi";
 
 export function useScholarDetail(scholarId: string | undefined) {
@@ -64,7 +62,7 @@ export function useScholarDetail(scholarId: string | undefined) {
   };
 
   // -- Management roles save (modal) --
-  const handleManagementRolesSave = async (records: ManagementRole[]) => {
+  const handleManagementRolesSave = async (records: string[]) => {
     if (!scholar) return;
     const updated = await patchScholarRelation(scholar.url_hash, {
       joint_management_roles: records,
@@ -74,10 +72,7 @@ export function useScholarDetail(scholarId: string | undefined) {
 
   // -- Relation toggle --
   const handleRelationToggle = async (
-    field:
-      | "is_advisor_committee"
-      | "is_adjunct_supervisor"
-      | "is_potential_recruit",
+    field: "is_advisor_committee" | "is_potential_recruit",
   ) => {
     if (!scholar) return;
     const updated = await patchScholarRelation(scholar.url_hash, {
@@ -121,7 +116,7 @@ export function useScholarDetail(scholarId: string | undefined) {
   };
 
   // -- Exchange records save --
-  const handleSaveExchangeRecords = async (records: ExchangeRecord[]) => {
+  const handleSaveExchangeRecords = async (records: string[]) => {
     if (!scholar) return;
     const updated = await patchScholarRelation(scholar.url_hash, {
       academic_exchange_records: records,
@@ -130,7 +125,7 @@ export function useScholarDetail(scholarId: string | undefined) {
   };
 
   // -- Management roles inline save --
-  const handleSaveManagementRolesInline = async (roles: ManagementRole[]) => {
+  const handleSaveManagementRolesInline = async (roles: string[]) => {
     if (!scholar) return;
     const updated = await patchScholarRelation(scholar.url_hash, {
       joint_management_roles: roles,

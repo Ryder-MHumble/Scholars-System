@@ -2,6 +2,14 @@ const BASE_URL = import.meta.env.DEV
   ? ""
   : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
 
+export interface AdjunctSupervisorInfo {
+  status: string;
+  type: string;
+  agreement_type: string;
+  agreement_period: string;
+  recommender: string;
+}
+
 export interface ScholarListItem {
   url_hash: string;
   name: string;
@@ -15,17 +23,17 @@ export interface ScholarListItem {
   research_areas: string[];
   email: string;
   profile_url: string;
-  source_id: string;
-  group: string;
-  data_completeness: number;
   is_potential_recruit: boolean;
   is_advisor_committee: boolean;
-  is_adjunct_supervisor: boolean;
-  crawled_at: string;
+  adjunct_supervisor: AdjunctSupervisorInfo;
 }
 
 export interface ScholarDetail extends ScholarListItem {
+  url: string;
+  content: string;
+  tags: string[];
   gender: string;
+  keywords: string[];
   secondary_departments: string[];
   bio: string;
   bio_en: string;
@@ -42,10 +50,11 @@ export interface ScholarDetail extends ScholarListItem {
   h_index: number;
   citations_count: number;
   metrics_updated_at: string;
-  supervised_students: SupervisedStudent[];
-  joint_research_projects: JointProject[];
-  joint_management_roles: ManagementRole[];
-  academic_exchange_records: ExchangeRecord[];
+  supervised_students: string[];
+  supervised_students_count: number;
+  joint_research_projects: string[];
+  joint_management_roles: string[];
+  academic_exchange_records: string[];
   institute_relation_notes: string;
   relation_updated_by: string;
   relation_updated_at: string;
@@ -53,10 +62,6 @@ export interface ScholarDetail extends ScholarListItem {
   representative_publications: PublicationRecord[];
   patents: PatentRecord[];
   awards: AwardRecord[];
-  source_url: string;
-  first_seen_at: string;
-  last_seen_at: string;
-  is_active: boolean;
 }
 
 export interface EducationRecord {
@@ -148,6 +153,7 @@ export interface ScholarListFilters {
   university?: string;
   department?: string;
   search?: string;
+  is_adjunct_supervisor?: boolean;
 }
 
 export interface NewScholarUpdate {
@@ -161,13 +167,13 @@ export interface NewScholarUpdate {
 
 export interface RelationPatch {
   is_advisor_committee?: boolean;
-  is_adjunct_supervisor?: boolean;
+  adjunct_supervisor?: AdjunctSupervisorInfo;
   is_potential_recruit?: boolean;
   institute_relation_notes?: string;
-  supervised_students?: SupervisedStudent[];
+  supervised_students?: string[];
   joint_research_projects?: string[];
-  joint_management_roles?: ManagementRole[];
-  academic_exchange_records?: ExchangeRecord[];
+  joint_management_roles?: string[];
+  academic_exchange_records?: string[];
   relation_updated_by?: string;
 }
 
@@ -175,14 +181,16 @@ export interface ScholarDetailPatch {
   name?: string;
   name_en?: string;
   photo_url?: string;
-  bio?: string;
-  bio_en?: string;
-  position?: string;
+  university?: string;
   department?: string;
   secondary_departments?: string[];
+  position?: string;
+  bio?: string;
+  bio_en?: string;
   email?: string;
   phone?: string;
   office?: string;
+  profile_url?: string;
   lab_url?: string;
   google_scholar_url?: string;
   dblp_url?: string;
@@ -264,6 +272,8 @@ export async function fetchScholarList(
   if (filters?.university) params.set("university", filters.university);
   if (filters?.department) params.set("department", filters.department);
   if (filters?.search) params.set("keyword", filters.search);
+  if (filters?.is_adjunct_supervisor)
+    params.set("is_adjunct_supervisor", "true");
 
   const res = await fetch(`${BASE_URL}/api/v1/scholars/?${params}`);
   if (!res.ok) throw new Error(`Failed to fetch scholar list: ${res.status}`);
@@ -484,40 +494,22 @@ export async function batchCreateScholars(
 }
 
 export interface ScholarStatsResponse {
+  total: number;
+  academicians: number;
+  potential_recruits: number;
+  advisor_committee: number;
+  adjunct_supervisors: number;
   by_university: Array<{ university: string; count: number }>;
   by_department: Array<{
     university: string;
     department: string;
     count: number;
   }>;
+  by_position: Array<{ position: string; count: number }>;
 }
 
 export async function fetchScholarStats(): Promise<ScholarStatsResponse> {
   const res = await fetch(`${BASE_URL}/api/v1/scholars/stats`);
   if (!res.ok) throw new Error(`Failed to fetch scholar stats: ${res.status}`);
-  return res.json();
-}
-
-export interface ScholarSource {
-  id: string;
-  name: string;
-  group: string;
-  university: string;
-  department: string;
-  is_enabled: boolean;
-  item_count: number;
-  last_crawl_at: string | null;
-}
-
-export interface ScholarSourcesResponse {
-  total: number;
-  items: ScholarSource[];
-  sources: ScholarSource[]; // Alias for backward compatibility
-}
-
-export async function fetchScholarSources(): Promise<ScholarSourcesResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/sources`);
-  if (!res.ok)
-    throw new Error(`Failed to fetch scholar sources: ${res.status}`);
   return res.json();
 }

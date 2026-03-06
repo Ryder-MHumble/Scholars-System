@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   AlertCircle,
   FileSpreadsheet,
+  Handshake,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -42,6 +43,8 @@ export default function ScholarListPage() {
     filterChips,
     hasAnyFilter,
     clearAll,
+    isJointMentor,
+    handleToggleJointMentor,
     items,
     page,
     setPage,
@@ -148,6 +151,21 @@ export default function ScholarListPage() {
                   className="pl-9 pr-4 py-2 text-sm bg-white border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all duration-150 placeholder-gray-400 shadow-sm"
                 />
               </div>
+
+              {/* Joint mentor quick filter */}
+              <button
+                onClick={handleToggleJointMentor}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 shadow-sm border",
+                  isJointMentor
+                    ? "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
+                    : "bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700",
+                )}
+                title="筛选共建导师"
+              >
+                <Handshake className="w-4 h-4" />
+                共建导师
+              </button>
 
               {/* Segmented view toggle */}
               <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">

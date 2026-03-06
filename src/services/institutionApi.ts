@@ -5,6 +5,7 @@ import type {
 } from "@/types/institution";
 
 export interface InstitutionCreateRequest {
+  id: string;
   name: string;
   type?: string;
   category?: string;
@@ -37,6 +38,7 @@ export interface InstitutionCreateRequest {
   visit_exchanges?: string[];
   cooperation_focus?: string[];
   departments?: Array<{
+    id: string;
     name: string;
   }>;
 }

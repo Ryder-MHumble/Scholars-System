@@ -1,15 +1,18 @@
 /**
  * 获取高校/院系学者数量的自定义 Hook
- * 使用 /api/v1/institutions/scholars/ 获取完整机构列表（含无数据院校）
- * 用于构建侧边栏树的动态计数
+ * 使用 /api/v1/institutions/scholars 获取完整的机构列表及学者数量
+ * 用于构建院校选择器和侧边栏树的动态计数
  */
 import { useEffect, useState } from "react";
 import { fetchAllInstitutions } from "@/services/institutionApi";
+import type { InstitutionDepartmentListItem } from "@/types/institution";
 
 export interface UniversityData {
+  id: string;
   name: string;
   count: number;
-  departments: Record<string, number>;
+  scholarCount: number;
+  departments: InstitutionDepartmentListItem[];
 }
 
 export function useUniversityCounts() {
@@ -31,21 +34,25 @@ export function useUniversityCounts() {
         let total = 0;
 
         for (const inst of institutions) {
-          const departments: Record<string, number> = {};
-          for (const dept of inst.departments) {
-            departments[dept.name] = dept.scholar_count;
-            countsMap[`${inst.name}::${dept.name}`] = dept.scholar_count;
-          }
-
-          unis.push({
+          const uniData: UniversityData = {
+            id: inst.id,
             name: inst.name,
-            count: inst.scholar_count,
-            departments,
-          });
-
+            count: inst.departments.length,
+            scholarCount: inst.scholar_count,
+            departments: inst.departments,
+          };
+          unis.push(uniData);
           countsMap[inst.name] = inst.scholar_count;
           total += inst.scholar_count;
+
+          // Add department counts
+          for (const dept of inst.departments) {
+            countsMap[`${inst.name}::${dept.name}`] = dept.scholar_count;
+          }
         }
+
+        // Sort by scholar count descending
+        unis.sort((a, b) => b.scholarCount - a.scholarCount);
 
         setUniversities(unis);
         setCounts(countsMap);

@@ -1,28 +1,40 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Handshake, Calendar, Edit3, Check, X, Plus } from "lucide-react";
-import type { ScholarDetail, ExchangeRecord } from "@/services/scholarApi";
+import {
+  Handshake,
+  Calendar,
+  Edit3,
+  Check,
+  X,
+  Plus,
+  FileText,
+} from "lucide-react";
+import type { ScholarDetail } from "@/services/scholarApi";
 import { ClickToEditField } from "@/components/scholar-detail/shared/ClickToEditField";
 import { ExchangeRecordFormModal } from "@/components/scholar-detail/modals/ExchangeRecordFormModal";
 import { cn } from "@/utils/cn";
-import { slideInUp, listItem } from "@/utils/animations";
-import { EXCHANGE_TYPE_COLORS } from "@/constants/updateTypes";
+import { slideInUp } from "@/utils/animations";
+
+const AGREEMENT_STATUS_STYLES: Record<string, string> = {
+  已签署: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  流程中: "bg-amber-50 text-amber-700 border-amber-200",
+  待签署: "bg-amber-50 text-amber-700 border-amber-200",
+  签署中: "bg-blue-50 text-blue-700 border-blue-200",
+  已过期: "bg-gray-100 text-gray-500 border-gray-200",
+  已终止: "bg-red-50 text-red-600 border-red-200",
+};
 
 interface RelationCardProps {
   scholar: ScholarDetail;
   onRelationToggle: (
-    field:
-      | "is_advisor_committee"
-      | "is_adjunct_supervisor"
-      | "is_potential_recruit",
+    field: "is_advisor_committee" | "is_potential_recruit",
   ) => Promise<void>;
   onRelationNotesSave: (val: string) => Promise<void>;
-  onSaveExchangeRecords: (records: ExchangeRecord[]) => Promise<void>;
+  onSaveExchangeRecords: (records: string[]) => Promise<void>;
 }
 
 const RELATION_BADGES = [
   { label: "顾问委员", field: "is_advisor_committee" as const },
-  { label: "兼职导师", field: "is_adjunct_supervisor" as const },
   { label: "潜在引进", field: "is_potential_recruit" as const },
 ] as const;
 
@@ -34,9 +46,9 @@ export function RelationCard({
 }: RelationCardProps) {
   // Exchange records editing state
   const [isExchangeEditMode, setIsExchangeEditMode] = useState(false);
-  const [editedExchangeRecords, setEditedExchangeRecords] = useState<
-    ExchangeRecord[]
-  >([]);
+  const [editedExchangeRecords, setEditedExchangeRecords] = useState<string[]>(
+    [],
+  );
   const [showExchangeRecordForm, setShowExchangeRecordForm] = useState(false);
   const [editingExchangeIdx, setEditingExchangeIdx] = useState<number | null>(
     null,
@@ -62,7 +74,7 @@ export function RelationCard({
     setEditingExchangeIdx(null);
   };
 
-  const handleExchangeRecordSubmit = (record: ExchangeRecord) => {
+  const handleExchangeRecordSubmit = (record: string) => {
     if (editingExchangeIdx !== null) {
       setEditedExchangeRecords((prev) => {
         const updated = [...prev];
@@ -85,11 +97,12 @@ export function RelationCard({
     desc: scholar[badge.field]
       ? badge.label === "潜在引进"
         ? "已标记"
-        : badge.label === "顾问委员"
-          ? "顾问委员会"
-          : "联合培养"
+        : "顾问委员会"
       : "",
   }));
+
+  const adjSup = scholar.adjunct_supervisor;
+  const hasAdjunct = Boolean(adjSup?.status);
 
   return (
     <>
@@ -147,6 +160,16 @@ export function RelationCard({
                 )}
               </button>
             ))}
+            {/* Adjunct supervisor badge (read-only display) */}
+            {hasAdjunct && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm bg-indigo-50 border-indigo-200 text-indigo-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                <span className="font-medium">共建导师</span>
+                {adjSup?.status && (
+                  <span className="text-xs text-indigo-500">{adjSup.status}</span>
+                )}
+              </span>
+            )}
           </div>
           {scholar.institute_relation_notes ? (
             <ClickToEditField
@@ -160,6 +183,95 @@ export function RelationCard({
               }
             />
           ) : null}
+        </div>
+
+        {/* Adjunct Supervisor Details */}
+        <div className="mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              共建导师协议
+            </p>
+            {hasAdjunct && (
+              <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                共建导师
+              </span>
+            )}
+          </div>
+
+          {hasAdjunct && adjSup ? (
+            <div className="rounded-lg border border-gray-100 overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/80 border-b border-gray-100">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                      类型
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                      协议类型
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                      状态
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                      协议期限
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="hover:bg-primary-50/20 transition-colors duration-100">
+                    <td className="px-3 py-2.5">
+                      <span className="text-sm text-gray-700 font-medium">
+                        {adjSup.type || "—"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="text-sm text-gray-600">
+                        {adjSup.agreement_type || "—"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {adjSup.status ? (
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border",
+                            AGREEMENT_STATUS_STYLES[adjSup.status] ??
+                              "bg-gray-100 text-gray-600 border-gray-200",
+                          )}
+                        >
+                          {adjSup.status}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {adjSup.agreement_period ? (
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {adjSup.agreement_period}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              {adjSup.recommender && (
+                <div className="px-3 py-2 bg-gray-50/50 border-t border-gray-100">
+                  <p className="text-xs text-gray-500">
+                    <span className="font-medium text-gray-400">推荐主体：</span>
+                    {adjSup.recommender}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-100">
+              <FileText className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+              <p className="text-xs text-gray-400">暂无共建导师协议记录</p>
+            </div>
+          )}
         </div>
 
         {/* Exchange Records */}
@@ -204,36 +316,14 @@ export function RelationCard({
             />
           ) : scholar.academic_exchange_records &&
             scholar.academic_exchange_records.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {scholar.academic_exchange_records.map((record, index) => (
                 <motion.div
                   key={index}
-                  variants={listItem}
-                  className="p-4 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all duration-200"
+                  className="p-3 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all duration-200"
                 >
-                  <div className="flex items-start gap-3 flex-wrap mb-2">
-                    {record.type && (
-                      <span
-                        className={cn(
-                          "text-xs px-2.5 py-1 rounded-full font-semibold whitespace-nowrap",
-                          EXCHANGE_TYPE_COLORS[record.type] ??
-                            "bg-gray-100 text-gray-600",
-                        )}
-                      >
-                        {record.type}
-                      </span>
-                    )}
-                    {record.date && (
-                      <span className="text-xs text-gray-500 flex items-center gap-1 whitespace-nowrap">
-                        <Calendar className="w-3 h-3" />
-                        {record.date}
-                      </span>
-                    )}
-                  </div>
                   <p className="text-sm text-gray-700 leading-relaxed">
-                    {[record.title, record.organization, record.description]
-                      .filter(Boolean)
-                      .join(" · ")}
+                    {record}
                   </p>
                 </motion.div>
               ))}
@@ -256,7 +346,7 @@ function ExchangeEditList({
   onDelete,
   onAdd,
 }: {
-  records: ExchangeRecord[];
+  records: string[];
   onEdit: (idx: number) => void;
   onDelete: (idx: number) => void;
   onAdd: () => void;
@@ -271,27 +361,9 @@ function ExchangeEditList({
           key={index}
           className="p-3 rounded-lg border border-gray-100 bg-gray-50/50 flex items-start gap-2"
         >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              {record.type && (
-                <span
-                  className={cn(
-                    "text-xs px-2 py-0.5 rounded-full font-semibold",
-                    EXCHANGE_TYPE_COLORS[record.type] ??
-                      "bg-gray-100 text-gray-600",
-                  )}
-                >
-                  {record.type}
-                </span>
-              )}
-              {record.date && (
-                <span className="text-xs text-gray-400">{record.date}</span>
-              )}
-            </div>
-            <p className="text-sm text-gray-700 truncate">
-              {[record.title, record.organization].filter(Boolean).join(" · ")}
-            </p>
-          </div>
+          <p className="flex-1 text-sm text-gray-700 min-w-0 break-words">
+            {record}
+          </p>
           <div className="flex gap-1 shrink-0">
             <button
               onClick={() => onEdit(index)}

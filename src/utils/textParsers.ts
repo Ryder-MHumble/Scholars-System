@@ -1,8 +1,4 @@
-import type {
-  PublicationRecord,
-  EducationRecord,
-  ManagementRole,
-} from "@/services/scholarApi";
+import type { PublicationRecord, EducationRecord } from "@/services/scholarApi";
 
 // ─── Publication Parser ──────────────────────────────────────────────────────
 //
@@ -33,10 +29,7 @@ export function parsePublicationsFromText(text: string): PublicationRecord[] {
       const qEnd = qStart + titleMatch[0].length;
 
       // Authors = text before the opening quote (minus trailing comma/space)
-      const authors = raw
-        .slice(0, qStart)
-        .replace(/,\s*$/, "")
-        .trim();
+      const authors = raw.slice(0, qStart).replace(/,\s*$/, "").trim();
 
       // Venue = text after closing quote, before "(year)"
       let venue = raw.slice(qEnd);
@@ -44,7 +37,10 @@ export function parsePublicationsFromText(text: string): PublicationRecord[] {
         const yIdx = venue.lastIndexOf(`(${year})`);
         if (yIdx >= 0) venue = venue.slice(0, yIdx);
       }
-      venue = venue.replace(/^[,.\s]+/, "").replace(/[,.\s]+$/, "").trim();
+      venue = venue
+        .replace(/^[,.\s]+/, "")
+        .replace(/[,.\s]+$/, "")
+        .trim();
 
       return {
         title,
@@ -176,10 +172,15 @@ export function parseEducationFromText(text: string): EducationRecord[] {
 
       if (degreePos >= 0) {
         // Text before degree keyword → institution
-        institution = remaining.slice(0, degreePos).replace(/[,\s]+$/, "").trim();
+        institution = remaining
+          .slice(0, degreePos)
+          .replace(/[,\s]+$/, "")
+          .trim();
         // Text after degree keyword: look for "in/of <major>"
         const afterDegree = remaining.slice(degreePos + degreeLen).trim();
-        const inMatch = afterDegree.match(/^[\s,]*(?:in|of|and|degree\s+in)\s+(.+)/i);
+        const inMatch = afterDegree.match(
+          /^[\s,]*(?:in|of|and|degree\s+in)\s+(.+)/i,
+        );
         if (inMatch) {
           major = inMatch[1].replace(/[,.\s]+$/, "").trim();
         } else if (afterDegree && !institution) {
@@ -212,87 +213,11 @@ export function parseEducationFromText(text: string): EducationRecord[] {
 
 // ─── Management Role Parser ──────────────────────────────────────────────────
 //
-// Supports:
-//   1. "2015/01 to 2020/12  IEEE  Technical Committee Member"
-//   2. "2015 - 2020  Visiting Professor, Bonn University"
-//   3. Role | Organization | StartYear | EndYear    — pipe fallback
+// Parses each non-empty line as a plain string role entry.
 //
-//   Multi-line entries are auto-merged (same logic as education).
-//
-export function parseManagementRolesFromText(text: string): ManagementRole[] {
-  const DATE_RANGE_RE =
-    /(\d{4}(?:\/\d{2})?)\s*(?:to|[-–至])\s*(\d{4}(?:\/\d{2})?|present|now|至今)/i;
-
-  const lines = text
+export function parseManagementRolesFromText(text: string): string[] {
+  return text
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-
-  const chunks: string[] = [];
-  let cur = "";
-  for (const line of lines) {
-    const beginsNewEntry = /^\d{4}/.test(line) || line.includes("|");
-    if (beginsNewEntry && cur) {
-      chunks.push(cur);
-      cur = line;
-    } else {
-      cur = cur ? `${cur} ${line}` : line;
-    }
-  }
-  if (cur) chunks.push(cur);
-
-  return chunks
-    .map((chunk): ManagementRole => {
-      // Pipe fallback
-      if (chunk.includes("|")) {
-        const p = chunk.split("|").map((s) => s.trim());
-        return {
-          role: p[0] ?? "",
-          organization: p[1] ?? "",
-          start_year: p[2] ?? "",
-          end_year: p[3] ?? "",
-        };
-      }
-
-      let remaining = chunk;
-      let start_year = "";
-      let end_year = "";
-
-      const rangeMatch = remaining.match(DATE_RANGE_RE);
-      if (rangeMatch) {
-        start_year = rangeMatch[1].split("/")[0];
-        const rawEnd = rangeMatch[2].toLowerCase();
-        end_year =
-          rawEnd === "present" || rawEnd === "now" || rawEnd === "至今"
-            ? "至今"
-            : rangeMatch[2].split("/")[0];
-        remaining = remaining.replace(rangeMatch[0], " ").trim();
-      }
-
-      // Split remaining by 2+ spaces — common field separator in CV text
-      const parts = remaining
-        .split(/\s{2,}/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      let organization = "";
-      let role = "";
-
-      if (parts.length >= 2) {
-        // Heuristic: first part = organization, rest = role
-        organization = parts[0];
-        role = parts.slice(1).join(" ");
-      } else if (parts.length === 1) {
-        const commaIdx = parts[0].indexOf(",");
-        if (commaIdx > 0) {
-          role = parts[0].slice(0, commaIdx).trim();
-          organization = parts[0].slice(commaIdx + 1).trim();
-        } else {
-          role = parts[0];
-        }
-      }
-
-      return { role, organization, start_year, end_year };
-    })
-    .filter((r) => r.role || r.organization || r.start_year);
 }

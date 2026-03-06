@@ -94,7 +94,7 @@ export default function AddScholarPage() {
     () =>
       uniData.map((uni) => ({
         name: uni.name,
-        departments: Object.keys(uni.departments),
+        departments: uni.departments.map((d) => d.name),
       })),
     [uniData],
   );
@@ -410,23 +410,6 @@ export default function AddScholarPage() {
                     placeholder="e.g. Zhang San"
                   />
                 </Field>
-                <Field label="职称" required>
-                  <SelectInput
-                    value={form.title}
-                    onChange={(v) => set("title", v as AcademicTitle)}
-                    placeholder="请选择职称"
-                    error={errors.title}
-                  >
-                    {ALL_TITLES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </SelectInput>
-                  {errors.title && (
-                    <p className="mt-1 text-xs text-red-500">请选择职称</p>
-                  )}
-                </Field>
                 <Field label="所属院校" required>
                   <ComboboxInput
                     value={form.universityId}
@@ -458,6 +441,23 @@ export default function AddScholarPage() {
                   />
                   {errors.departmentId && (
                     <p className="mt-1 text-xs text-red-500">请选择所属院系</p>
+                  )}
+                </Field>
+                <Field label="职称" required>
+                  <SelectInput
+                    value={form.title}
+                    onChange={(v) => set("title", v as AcademicTitle)}
+                    placeholder="请选择职称"
+                    error={errors.title}
+                  >
+                    {ALL_TITLES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </SelectInput>
+                  {errors.title && (
+                    <p className="mt-1 text-xs text-red-500">请选择职称</p>
                   )}
                 </Field>
               </div>

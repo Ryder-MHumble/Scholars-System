@@ -16,6 +16,7 @@ export function useScholarList() {
   const activeUni = searchParams.get("university");
   const activeDept = searchParams.get("department");
   const pageParam = searchParams.get("page");
+  const isJointMentor = searchParams.get("is_adjunct_supervisor") === "true";
 
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(pageParam ? parseInt(pageParam, 10) : 1);
@@ -38,11 +39,11 @@ export function useScholarList() {
     () =>
       universities.map((uni) => ({
         name: uni.name,
-        departments: Object.entries(uni.departments).map(([name, count]) => ({
-          name,
-          count,
+        departments: uni.departments.map((dept) => ({
+          name: dept.name,
+          count: dept.scholar_count,
         })),
-        count: uni.count,
+        count: uni.scholarCount,
       })),
     [universities],
   );
@@ -55,6 +56,7 @@ export function useScholarList() {
       university: activeUni ?? undefined,
       department: activeDept ?? undefined,
       search: query.trim() || undefined,
+      is_adjunct_supervisor: isJointMentor || undefined,
     })
       .then((res) => {
         setApiData(res);
@@ -64,7 +66,7 @@ export function useScholarList() {
         setError(err.message ?? "加载失败");
         setIsLoading(false);
       });
-  }, [page, activeUni, activeDept, query]);
+  }, [page, activeUni, activeDept, query, isJointMentor]);
 
   /* Sync page to URL */
   useEffect(() => {
@@ -103,6 +105,17 @@ export function useScholarList() {
     setSearchParams(newParams);
   };
 
+  const handleToggleJointMentor = () => {
+    const newParams = new URLSearchParams(searchParams);
+    if (isJointMentor) {
+      newParams.delete("is_adjunct_supervisor");
+    } else {
+      newParams.set("is_adjunct_supervisor", "true");
+    }
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
   const clearAll = () => {
     setQuery("");
     setSearchParams(new URLSearchParams());
@@ -121,6 +134,7 @@ export function useScholarList() {
         university: activeUni ?? undefined,
         department: activeDept ?? undefined,
         search: query.trim() || undefined,
+        is_adjunct_supervisor: isJointMentor || undefined,
       })
         .then((res) => {
           setApiData(res);
@@ -145,6 +159,7 @@ export function useScholarList() {
       university: activeUni ?? undefined,
       department: activeDept ?? undefined,
       search: query.trim() || undefined,
+      is_adjunct_supervisor: isJointMentor || undefined,
     })
       .then((res) => {
         setApiData(res);
@@ -170,6 +185,9 @@ export function useScholarList() {
           },
         ]
       : []),
+    ...(isJointMentor
+      ? [{ label: "共建导师", onRemove: handleToggleJointMentor }]
+      : []),
   ].filter((c) => c.label);
 
   const hasAnyFilter = filterChips.length > 0 || !!query;
@@ -191,6 +209,8 @@ export function useScholarList() {
     filterChips,
     hasAnyFilter,
     clearAll,
+    isJointMentor,
+    handleToggleJointMentor,
 
     // Data & pagination
     items,

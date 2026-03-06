@@ -274,13 +274,6 @@ export default function AddScholarDetailPage() {
                 onEducationSave={handleEducationSave}
                 onManagementRolesSave={handleManagementRolesSave}
                 onManagementRolesInlineSave={handleManagementRolesInlineSave}
-                onUniversityChange={(university) => {
-                  setScholar((prev) => ({
-                    ...prev,
-                    university,
-                    department: "",
-                  }));
-                }}
               />
             </motion.div>
 
