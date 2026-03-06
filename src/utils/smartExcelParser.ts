@@ -315,7 +315,7 @@ export async function smartParseExcel<T>(
         const parsedData: T[] = [];
         const errors: Array<{ row: number; error: string }> = [];
 
-        rows.forEach((row, index) => {
+        rows.forEach((row, index: number) => {
           const rowNumber = index + 2;
           const item: Record<string, unknown> = {};
 
