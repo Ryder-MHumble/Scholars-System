@@ -41,6 +41,7 @@ interface DetailLeftSidebarProps {
   onEducationSave: (records: EducationRecord[]) => Promise<void>;
   onManagementRolesSave: (records: ManagementRole[]) => Promise<void>;
   onManagementRolesInlineSave: (roles: ManagementRole[]) => Promise<void>;
+  onUniversityChange?: (university: string) => void;
 }
 
 export function DetailLeftSidebar({
@@ -49,6 +50,7 @@ export function DetailLeftSidebar({
   onEducationSave,
   onManagementRolesSave,
   onManagementRolesInlineSave,
+  onUniversityChange,
 }: DetailLeftSidebarProps) {
   const [bioExpanded, setBioExpanded] = useState(false);
 
@@ -259,12 +261,27 @@ export function DetailLeftSidebar({
             </div>
 
             {/* University */}
-            {scholar.university && (
-              <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-3">
-                <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <span>{scholar.university}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-3">
+              <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              {onUniversityChange ? (
+                <ClickToEditField
+                  value={scholar.university || ""}
+                  onSave={async (val) => onUniversityChange(val)}
+                  placeholder="点击添加院校"
+                  className={
+                    !scholar.university ? "text-gray-400" : "text-gray-600"
+                  }
+                />
+              ) : (
+                <span
+                  className={
+                    !scholar.university ? "text-gray-400" : "text-gray-600"
+                  }
+                >
+                  {scholar.university || ""}
+                </span>
+              )}
+            </div>
 
             {/* Academic titles */}
             {scholar.academic_titles.length > 0 && (

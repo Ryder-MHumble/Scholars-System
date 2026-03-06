@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Plus } from "lucide-react";
 import type { ManagementRole } from "@/services/scholarApi";
+import { parseManagementRolesFromText } from "@/utils/textParsers";
 
 interface EditManagementRolesModalProps {
   roles: ManagementRole[];
@@ -42,19 +43,7 @@ export function EditManagementRolesModal({
   };
 
   const applyBatch = () => {
-    const newRecs = batchText
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const p = line.split("|").map((s) => s.trim());
-        return {
-          role: p[0] || "",
-          organization: p[1] || "",
-          start_year: p[2] || "",
-          end_year: p[3] || "",
-        } as ManagementRole;
-      });
+    const newRecs = parseManagementRolesFromText(batchText);
     setRecords((prev) => [...prev, ...newRecs]);
     setBatchMode(false);
     setBatchText("");
@@ -139,21 +128,26 @@ export function EditManagementRolesModal({
 
           {batchMode ? (
             <div className="p-3 border border-blue-200 rounded-lg bg-blue-50/30 space-y-2">
-              <p className="text-xs text-gray-500">
-                每行一条，字段用{" "}
-                <code className="bg-gray-100 px-1 rounded font-mono">|</code>{" "}
-                分隔：
-                <code className="bg-gray-100 px-1 rounded font-mono text-xs">
-                  职务 | 机构 | 开始年份 | 结束年份
-                </code>
-              </p>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p className="font-medium">
+                  支持直接粘贴简历中的任职经历，自动识别以下格式：
+                </p>
+                <p className="text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded leading-relaxed text-[11px]">
+                  2015/01 to 2020/12 IEEE Technical Committee Member
+                  <br />
+                  2018 - present Bonn University Visiting Professor
+                </p>
+                <p className="text-gray-400">
+                  也支持：职务 | 机构 | 开始年份 | 结束年份（旧格式）
+                </p>
+              </div>
               <textarea
                 value={batchText}
                 onChange={(e) => setBatchText(e.target.value)}
                 autoFocus
-                rows={5}
+                rows={6}
                 placeholder={
-                  "顾问委员会委员 | IEEE | 2020 | 2024\n兼职教授 | 清华大学 | 2018 | 2022"
+                  "2015/01 to 2020/12  IEEE  Technical Committee Member\n2018 - present  Bonn University  Visiting Professor"
                 }
                 className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono resize-none"
               />
@@ -162,8 +156,7 @@ export function EditManagementRolesModal({
                   onClick={applyBatch}
                   className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
                 >
-                  确认导入 (
-                  {batchText.split("\n").filter((l) => l.trim()).length} 条)
+                  确认导入 ({parseManagementRolesFromText(batchText).length} 条)
                 </button>
                 <button
                   onClick={() => {

@@ -406,6 +406,35 @@ export async function deleteScholar(urlHash: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete scholar: ${res.status}`);
 }
 
+export interface ScholarCreate {
+  name: string;
+  name_en?: string;
+  gender?: string;
+  photo_url?: string;
+  university?: string;
+  department?: string;
+  secondary_departments?: string[];
+  position?: string;
+  academic_titles?: string[];
+  is_academician?: boolean;
+  research_areas?: string[];
+  keywords?: string[];
+  bio?: string;
+  bio_en?: string;
+  email?: string;
+  phone?: string;
+  office?: string;
+  profile_url?: string;
+  lab_url?: string;
+  google_scholar_url?: string;
+  dblp_url?: string;
+  orcid?: string;
+  phd_institution?: string;
+  phd_year?: string;
+  education?: EducationRecord[];
+  added_by?: string;
+}
+
 export interface BatchScholarCreate {
   name: string;
   name_en?: string;
@@ -423,6 +452,20 @@ export interface BatchScholarCreateResponse {
   success: number;
   failed: number;
   errors: Array<{ row: number; error: string }>;
+}
+
+export async function createScholar(
+  data: ScholarCreate,
+): Promise<ScholarDetail> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to create scholar: ${res.status}`);
+  return res.json();
 }
 
 export async function batchCreateScholars(

@@ -232,44 +232,44 @@ export function InstitutionCard({ institution, index }: InstitutionCardProps) {
 
       <div className="p-5">
         {/* Header: logo + name */}
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-3.5">
           <UniversityLogo name={institution.name} id={institution.id} />
 
-          <div className="flex-1 min-w-0 pt-0.5">
-            <h3 className="text-[15px] font-bold text-slate-900 leading-snug group-hover:text-blue-700 transition-colors line-clamp-2">
+          <div className="flex-1 min-w-0 pt-1">
+            <h3 className="text-sm font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
               {institution.name}
             </h3>
             {institution.org_name && (
-              <p className="text-[11px] text-slate-400 mt-0.5 truncate font-medium">
+              <p className="text-[10px] text-slate-400 mt-1 truncate font-medium">
                 {institution.org_name}
               </p>
             )}
           </div>
 
-          <div className="shrink-0 mt-0.5 w-6 h-6 rounded-full bg-slate-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
-            <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-500 transition-colors" />
+          <div className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-slate-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
+            <ArrowUpRight className="w-3 h-3 text-slate-300 group-hover:text-blue-500 transition-colors" />
           </div>
         </div>
 
-        {/* Scholar count */}
-        <div className="mt-4 flex items-center gap-3">
+        {/* Scholar count + departments */}
+        <div className="mt-3.5 flex items-baseline justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
-              <Users className="w-3.5 h-3.5 text-blue-500" />
+            <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+              <Users className="w-3 h-3 text-blue-500" />
             </div>
-            <div>
-              <span className="text-2xl font-black text-slate-800 leading-none">
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-slate-800 leading-none">
                 {institution.scholar_count}
               </span>
-              <span className="text-xs text-slate-400 ml-1 font-medium">
-                位学者
+              <span className="text-[10px] text-slate-400 font-medium">
+                学者
               </span>
             </div>
           </div>
 
           {institution.departments.length > 0 && (
-            <span className="ml-auto text-[11px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded-full">
-              {institution.departments.length} 个院系
+            <span className="text-[9px] text-slate-500 font-semibold bg-slate-50 px-2 py-0.5 rounded-full whitespace-nowrap">
+              {institution.departments.length} 院系
             </span>
           )}
         </div>

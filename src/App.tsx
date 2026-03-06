@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import HomePage from "./pages/HomePage";
 import ScholarDetailPage from "./pages/ScholarDetailPage";
-import AddScholarPage from "./pages/AddScholarPage";
+import AddScholarDetailPage from "./pages/AddScholarDetailPage";
 import InstitutionDetailPage from "./pages/InstitutionDetailPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
@@ -18,7 +18,7 @@ export default function App() {
               path="scholars"
               element={<Navigate to="/?tab=scholars" replace />}
             />
-            <Route path="scholars/add" element={<AddScholarPage />} />
+            <Route path="scholars/add" element={<AddScholarDetailPage />} />
             <Route path="scholars/:scholarId" element={<ScholarDetailPage />} />
             <Route
               path="institutions/:id"

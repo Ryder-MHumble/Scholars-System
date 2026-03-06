@@ -151,6 +151,12 @@ do_git_pull() {
 # ── Build ─────────────────────────────────────────────────────
 do_build() {
     cd "$PROJECT_DIR"
+
+    # Clean old dist to avoid cache issues
+    if [[ -d "$DIST_DIR" ]]; then
+        rm -rf "$DIST_DIR"
+    fi
+
     printf " ${C}⚙${NC}  Building production bundle..."
     if npm run build 2>&1 | tail -1 &
     then

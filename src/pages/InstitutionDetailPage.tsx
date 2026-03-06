@@ -15,7 +15,6 @@ import {
   Check,
   AlertTriangle,
   ChevronDown,
-  ChevronUp,
   BookOpen,
   FlaskConical,
   UserCog,
@@ -190,7 +189,7 @@ function UniversityLogo({ name, id }: { name: string; id: string }) {
 
   if (logoSrc && !imgFailed) {
     return (
-      <div className="w-20 h-20 rounded-2xl bg-white border-2 border-slate-100 shadow-lg flex items-center justify-center overflow-hidden shrink-0 p-2">
+      <div className="w-24 h-24 rounded-3xl bg-white border-2 border-slate-100 shadow-xl flex items-center justify-center overflow-hidden shrink-0 p-2.5">
         <img
           src={logoSrc}
           alt={`${name} logo`}
@@ -203,9 +202,9 @@ function UniversityLogo({ name, id }: { name: string; id: string }) {
 
   return (
     <div
-      className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0 shadow-lg`}
+      className={`w-24 h-24 rounded-3xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0 shadow-xl`}
     >
-      <span className="text-white text-2xl font-black leading-none">
+      <span className="text-white text-4xl font-black leading-none">
         {initial}
       </span>
     </div>
@@ -216,7 +215,7 @@ function UniversityLogo({ name, id }: { name: string; id: string }) {
 
 function CategoryBadge({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100/80 text-blue-700 border border-blue-200/50">
       {label}
     </span>
   );
@@ -224,7 +223,7 @@ function CategoryBadge({ label }: { label: string }) {
 
 function PriorityBadge({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100/80 text-amber-700 border border-amber-200/50">
       ★ {label}
     </span>
   );
@@ -232,7 +231,7 @@ function PriorityBadge({ label }: { label: string }) {
 
 function Tag({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-medium text-slate-700 transition-colors">
+    <span className="inline-flex px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-medium text-slate-700 transition-all hover:shadow-sm">
       {children}
     </span>
   );
@@ -281,21 +280,26 @@ function StatCard({
 }) {
   const s = STAT_STYLES[styleIdx % STAT_STYLES.length];
   return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col gap-3">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: styleIdx * 0.05 }}
+      className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200 transition-all p-5 flex flex-col gap-3.5"
+    >
       <div
-        className={`w-9 h-9 ${s.iconBg} rounded-xl flex items-center justify-center shrink-0`}
+        className={`w-10 h-10 ${s.iconBg} rounded-xl flex items-center justify-center shrink-0`}
       >
-        <Icon className={`w-4.5 h-4.5 ${s.iconColor}`} />
+        <Icon className={`w-5 h-5 ${s.iconColor}`} />
       </div>
       <div>
         <p
-          className={`text-2xl font-black ${value != null ? s.numColor : "text-slate-300"} leading-none`}
+          className={`text-3xl font-black ${value != null ? s.numColor : "text-slate-300"} leading-none`}
         >
           {value ?? "—"}
         </p>
-        <p className="text-xs text-slate-500 font-medium mt-1">{label}</p>
+        <p className="text-xs text-slate-500 font-semibold mt-2">{label}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -330,29 +334,35 @@ function Section({
   const s = SECTION_STYLES[styleIdx % SECTION_STYLES.length];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200 transition-all overflow-hidden"
+    >
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50/70 transition-colors"
+        className="w-full flex items-center justify-between px-6 py-4.5 hover:bg-slate-50/50 transition-colors group"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3.5">
           <div
-            className={`w-8 h-8 ${s.iconBg} rounded-lg flex items-center justify-center shrink-0`}
+            className={`w-9 h-9 ${s.iconBg} rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}
           >
-            <Icon className={`w-4 h-4 ${s.iconColor}`} />
+            <Icon className={`w-4.5 h-4.5 ${s.iconColor}`} />
           </div>
           <span className="text-sm font-bold text-slate-800">{title}</span>
           {count != null && count > 0 && (
-            <span className="px-2 py-0.5 bg-slate-100 rounded-full text-xs font-semibold text-slate-500">
+            <span className="px-2.5 py-0.5 bg-slate-100 rounded-full text-xs font-semibold text-slate-600">
               {count}
             </span>
           )}
         </div>
-        {open ? (
-          <ChevronUp className="w-4 h-4 text-slate-400" />
-        ) : (
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
           <ChevronDown className="w-4 h-4 text-slate-400" />
-        )}
+        </motion.div>
       </button>
 
       <AnimatePresence initial={false}>
@@ -365,13 +375,13 @@ function Section({
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="px-5 pb-5 border-t border-slate-50 pt-4">
+            <div className="px-6 pb-5 border-t border-slate-50 pt-5">
               {children}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
 
@@ -425,30 +435,33 @@ function PersonList({
   if (!items.length)
     return <p className="text-sm text-slate-400 italic">暂无数据</p>;
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {items.map((person, i) => (
-        <div
+        <motion.div
           key={i}
-          className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, delay: i * 0.05 }}
+          className="flex items-start gap-3.5 p-4 bg-slate-50 rounded-xl hover:bg-slate-100 hover:shadow-sm transition-all group"
         >
           <PersonAvatar name={person.name} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-800 whitespace-pre-line leading-snug">
+            <p className="text-sm font-semibold text-slate-800 whitespace-pre-line leading-snug group-hover:text-slate-900">
               {person.name}
             </p>
             {person.title && (
-              <p className="text-xs text-slate-500 mt-0.5">{person.title}</p>
+              <p className="text-xs text-slate-500 mt-1">{person.title}</p>
             )}
             {person.department && (
               <p className="text-xs text-slate-500">{person.department}</p>
             )}
             {person.research_area && (
-              <p className="text-xs text-blue-600 font-medium mt-0.5">
+              <p className="text-xs text-blue-600 font-medium mt-1.5 bg-blue-50 px-2 py-1 rounded inline-block">
                 {person.research_area}
               </p>
             )}
           </div>
-        </div>
+        </motion.div>
       ))}
     </div>
   );
@@ -859,16 +872,16 @@ export default function InstitutionDetailPage() {
           </div>
 
           {/* Institution identity */}
-          <div className="py-6 flex items-start justify-between gap-6">
-            <div className="flex items-center gap-5">
+          <div className="py-7 flex items-start justify-between gap-6">
+            <div className="flex items-center gap-6 flex-1 min-w-0">
               <UniversityLogo name={institution.name} id={institution.id} />
-              <div>
-                <h1 className="text-2xl font-black text-white tracking-tight">
+              <div className="flex-1 min-w-0 pt-1">
+                <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
                   {institution.name}
                 </h1>
-                <div className="flex flex-wrap items-center gap-2 mt-2">
+                <div className="flex flex-wrap items-center gap-2.5 mt-3">
                   {institution.org_name && (
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-slate-300 font-medium">
                       {institution.org_name}
                     </span>
                   )}
@@ -883,19 +896,19 @@ export default function InstitutionDetailPage() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2.5 shrink-0">
               <button
                 onClick={() => setEditOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-white bg-white/10 hover:bg-white/20 rounded-xl border border-white/10 transition-all"
+                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-white bg-white/10 hover:bg-white/20 rounded-xl border border-white/10 transition-all"
               >
-                <Edit2 className="w-3.5 h-3.5" />
+                <Edit2 className="w-4 h-4" />
                 编辑
               </button>
               <button
                 onClick={() => setDeleteOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-xl border border-red-500/20 transition-all"
+                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-xl border border-red-500/20 transition-all"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
                 删除
               </button>
             </div>
@@ -904,9 +917,9 @@ export default function InstitutionDetailPage() {
       </div>
 
       {/* ── Content ── */}
-      <div className="max-w-6xl mx-auto px-6 md:px-8 py-7 space-y-4">
+      <div className="max-w-6xl mx-auto px-6 md:px-8 py-8 space-y-5">
         {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
           <StatCard
             label="学者总数"
             value={institution.scholar_count}
@@ -1016,48 +1029,72 @@ export default function InstitutionDetailPage() {
           {institution.departments.length === 0 ? (
             <p className="text-sm text-slate-400 italic">暂无院系数据</p>
           ) : (
-            <div className="space-y-2.5">
-              {institution.departments.map((dept) => (
-                <div
-                  key={dept.id}
-                  className="flex items-start justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"
-                >
-                  <div className="flex-1 min-w-0 mr-4">
-                    <p className="text-sm font-bold text-slate-800">
-                      {dept.name}
-                    </p>
-                    {dept.org_name && dept.org_name !== dept.name && (
-                      <p className="text-xs text-slate-400 mt-0.5 truncate">
-                        {dept.org_name}
-                      </p>
-                    )}
-                    {dept.sources.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {dept.sources.map((src) => (
-                          <span
-                            key={src.source_id}
-                            className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                              src.is_enabled
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-slate-100 text-slate-500"
-                            }`}
-                          >
-                            {src.source_name}
-                            {src.scholar_count > 0 &&
-                              ` · ${src.scholar_count}人`}
-                          </span>
-                        ))}
+            <div className="space-y-3">
+              {(() => {
+                const maxCount = Math.max(
+                  ...institution.departments.map((d) => d.scholar_count),
+                  1,
+                );
+                return institution.departments.map((dept) => (
+                  <motion.div
+                    key={dept.id}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-all hover:shadow-sm"
+                  >
+                    {/* Left accent bar */}
+                    <div className="w-1 h-auto min-h-[60px] rounded-full bg-gradient-to-b from-blue-500 to-blue-300 flex-shrink-0 mt-1" />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2 mb-2">
+                        <p className="text-sm font-bold text-slate-800">
+                          {dept.name}
+                        </p>
+                        <p className="text-xl font-black text-blue-600 flex-shrink-0">
+                          {dept.scholar_count}
+                        </p>
                       </div>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xl font-black text-blue-600">
-                      {dept.scholar_count}
-                    </p>
-                    <p className="text-xs text-slate-400">学者</p>
-                  </div>
-                </div>
-              ))}
+
+                      {dept.org_name && dept.org_name !== dept.name && (
+                        <p className="text-xs text-slate-400 mb-2 truncate">
+                          {dept.org_name}
+                        </p>
+                      )}
+
+                      {/* Progress bar */}
+                      <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2.5">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${(dept.scholar_count / maxCount) * 100}%`,
+                          }}
+                        />
+                      </div>
+
+                      {/* Data sources */}
+                      {dept.sources.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {dept.sources.map((src) => (
+                            <span
+                              key={src.source_id}
+                              className={`text-[10px] px-2 py-1 rounded-full font-medium ${
+                                src.is_enabled
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-slate-100 text-slate-500"
+                              }`}
+                            >
+                              {src.source_name}
+                              {src.scholar_count > 0 &&
+                                ` · ${src.scholar_count}`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ));
+              })()}
             </div>
           )}
         </Section>
@@ -1166,20 +1203,25 @@ export default function InstitutionDetailPage() {
         )}
 
         {/* View all scholars */}
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+          className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl shadow-lg p-6"
+        >
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
-                <FlaskConical className="w-4.5 h-4.5 text-blue-600" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <FlaskConical className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-800">学者数据库</p>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-base font-bold text-white">学者数据库</p>
+                <p className="text-sm text-blue-100 mt-0.5">
                   该机构收录{" "}
-                  <span className="font-bold text-blue-600">
+                  <span className="font-bold text-white">
                     {institution.scholar_count}
                   </span>{" "}
-                  位学者
+                  位学者的详细信息
                 </p>
               </div>
             </div>
@@ -1189,13 +1231,13 @@ export default function InstitutionDetailPage() {
                   `/?tab=scholars&university=${encodeURIComponent(institution.name)}`,
                 )
               }
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+              className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-blue-50 text-blue-600 font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl flex-shrink-0"
             >
-              <Users className="w-4 h-4" />
-              查看全部学者
+              <Users className="w-5 h-5" />
+              查看全部
             </button>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Modals */}

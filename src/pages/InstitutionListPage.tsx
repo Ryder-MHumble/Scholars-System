@@ -1,26 +1,173 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Building2,
   ChevronLeft,
   ChevronRight,
   X,
+  Plus,
+  Check,
+  AlertTriangle,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useInstitutions } from "@/hooks/useInstitutions";
 import { InstitutionCard } from "@/components/institution/InstitutionCard";
+import { ComboboxInput } from "@/components/ui/ComboboxInput";
+import {
+  createInstitution,
+  fetchAllInstitutions,
+  type InstitutionCreateRequest,
+} from "@/services/institutionApi";
+import type { InstitutionListItem } from "@/types/institution";
+
+type CreateMode = "institution" | "department";
+
+interface InstitutionForm {
+  name: string;
+  category: string;
+  priority: string;
+  departments: string[];
+}
+
+interface DepartmentForm {
+  parentInstitutionId: string;
+  departments: string[];
+}
 
 export default function InstitutionListPage() {
   const { institutions, pagination, loading, error, loadPage } =
     useInstitutions(20);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<CreateMode>("institution");
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [allInstitutions, setAllInstitutions] = useState<InstitutionListItem[]>(
+    [],
+  );
+  const [loadingAllInst, setLoadingAllInst] = useState(false);
+
+  const [institutionForm, setInstitutionForm] = useState<InstitutionForm>({
+    name: "",
+    category: "",
+    priority: "",
+    departments: [],
+  });
+
+  const [departmentForm, setDepartmentForm] = useState<DepartmentForm>({
+    parentInstitutionId: "",
+    departments: [""],
+  });
+
+  // Load all institutions when switching to department mode
+  useEffect(() => {
+    if (
+      createMode === "department" &&
+      allInstitutions.length === 0 &&
+      !loadingAllInst
+    ) {
+      setLoadingAllInst(true);
+      fetchAllInstitutions()
+        .then(setAllInstitutions)
+        .catch(console.error)
+        .finally(() => setLoadingAllInst(false));
+    }
+  }, [createMode, allInstitutions.length, loadingAllInst]);
+
+  // Get selected institution name for display
+  const selectedInstitutionName =
+    allInstitutions.find((i) => i.id === departmentForm.parentInstitutionId)
+      ?.name || "";
 
   const filtered = institutions.filter(
     (inst) =>
       inst.name.includes(searchQuery) ||
       inst.org_name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+
+  const handleCreateInstitution = async () => {
+    setIsCreating(true);
+    setCreateError(null);
+
+    try {
+      if (createMode === "institution") {
+        // 场景1 + 场景3：新增高校（可选择性地添加院系）
+        if (!institutionForm.name.trim()) {
+          setCreateError("机构名称不能为空");
+          setIsCreating(false);
+          return;
+        }
+
+        const cleanData: InstitutionCreateRequest = {
+          name: institutionForm.name.trim(),
+          type: "university", // API 场景1，3 - 高校类型
+        };
+
+        if (institutionForm.category?.trim()) {
+          cleanData.category = institutionForm.category.trim();
+        }
+        if (institutionForm.priority?.trim()) {
+          cleanData.priority = institutionForm.priority.trim();
+        }
+
+        // 场景3：如果输入了院系名称，则同时创建
+        const depts = institutionForm.departments
+          .map((d) => d.trim())
+          .filter((d) => d.length > 0);
+        if (depts.length > 0) {
+          cleanData.departments = depts.map((name) => ({ name }));
+        }
+
+        await createInstitution(cleanData);
+      } else {
+        // 场景2：新增院系到现有高校
+        if (!departmentForm.parentInstitutionId) {
+          setCreateError("请选择所属机构");
+          setIsCreating(false);
+          return;
+        }
+
+        const depts = departmentForm.departments
+          .map((d) => d.trim())
+          .filter((d) => d.length > 0);
+        if (depts.length === 0) {
+          setCreateError("请输入至少一个院系名称");
+          setIsCreating(false);
+          return;
+        }
+
+        // API 场景2 - 创建院系（需要指定parent_id）
+        // 实际上应该为每个院系创建一个记录
+        for (const deptName of depts) {
+          const cleanData: InstitutionCreateRequest = {
+            name: deptName,
+            type: "department", // API 场景2 - 院系类型
+            parent_id: departmentForm.parentInstitutionId,
+          };
+          await createInstitution(cleanData);
+        }
+      }
+
+      setIsCreateModalOpen(false);
+      setInstitutionForm({
+        name: "",
+        category: "",
+        priority: "",
+        departments: [],
+      });
+      setDepartmentForm({
+        parentInstitutionId: "",
+        departments: [""],
+      });
+      // Reload the list
+      loadPage(1);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "创建失败，请重试");
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   useEffect(() => {
     setSearchQuery("");
@@ -54,28 +201,37 @@ export default function InstitutionListPage() {
                   Institution Database
                 </span>
               </div>
-              <h1 className="text-3xl font-black text-white tracking-tight">
+              <h1 className="text-4xl font-black text-white tracking-tight">
                 机构库
               </h1>
-              <p className="text-slate-400 text-sm mt-1.5">
-                收录{" "}
-                <span className="font-bold text-white text-base">
-                  {pagination.total}
-                </span>{" "}
-                所高校及科研机构
-                {error && (
-                  <span className="text-red-400 ml-2 text-xs">({error})</span>
-                )}
-              </p>
+              <div className="flex items-center gap-4 mt-2">
+                <p className="text-slate-400 text-sm">
+                  收录{" "}
+                  <span className="font-bold text-white text-base">
+                    {pagination.total}
+                  </span>{" "}
+                  所高校及科研机构
+                  {error && (
+                    <span className="text-red-400 ml-2 text-xs">({error})</span>
+                  )}
+                </p>
+              </div>
             </div>
 
-            {pagination.total_pages > 1 && (
-              <div className="shrink-0 pb-1">
-                <span className="text-xs text-slate-500 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg"
+              >
+                <Plus className="w-4 h-4" />
+                添加机构
+              </button>
+              {pagination.total_pages > 1 && (
+                <span className="text-xs text-slate-500 bg-slate-800 px-3.5 py-1.5 rounded-full border border-slate-700">
                   第 {pagination.page} / {pagination.total_pages} 页
                 </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Search bar */}
@@ -101,7 +257,9 @@ export default function InstitutionListPage() {
           {searchQuery && (
             <p className="text-xs text-slate-400 mt-2.5">
               找到{" "}
-              <span className="font-semibold text-white">{filtered.length}</span>{" "}
+              <span className="font-semibold text-white">
+                {filtered.length}
+              </span>{" "}
               条结果
             </p>
           )}
@@ -109,9 +267,9 @@ export default function InstitutionListPage() {
       </div>
 
       {/* ── Content ── */}
-      <div className="px-6 md:px-10 py-7">
+      <div className="px-6 md:px-10 py-8">
         {filtered.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filtered.map((institution, index) => (
               <InstitutionCard
                 key={institution.id}
@@ -199,6 +357,317 @@ export default function InstitutionListPage() {
           </motion.div>
         )}
       </div>
+
+      {/* Create Modal with Mode Selection */}
+      <AnimatePresence>
+        {isCreateModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ duration: 0.18 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white">
+                <h2 className="text-lg font-bold text-slate-900">
+                  添加机构或院系
+                </h2>
+                <button
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+
+              {/* Mode Selector */}
+              <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setCreateMode("institution")}
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                      createMode === "institution"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    新增高校
+                  </button>
+                  <button
+                    onClick={() => setCreateMode("department")}
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                      createMode === "department"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    新增院系
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-4">
+                {createMode === "institution" ? (
+                  <>
+                    {/* New Institution Form */}
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        高校名称 <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={institutionForm.name}
+                        onChange={(e) =>
+                          setInstitutionForm((f) => ({
+                            ...f,
+                            name: e.target.value,
+                          }))
+                        }
+                        placeholder="例如：中央民族大学"
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all"
+                      />
+                      <p className="text-xs text-slate-500 mt-2">
+                        💡 创建一个新的高校。ID 由系统自动生成。
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        分类
+                      </label>
+                      <input
+                        type="text"
+                        value={institutionForm.category}
+                        onChange={(e) =>
+                          setInstitutionForm((f) => ({
+                            ...f,
+                            category: e.target.value,
+                          }))
+                        }
+                        placeholder="例如：京外C9、985、211"
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        优先级
+                      </label>
+                      <input
+                        type="text"
+                        value={institutionForm.priority}
+                        onChange={(e) =>
+                          setInstitutionForm((f) => ({
+                            ...f,
+                            priority: e.target.value,
+                          }))
+                        }
+                        placeholder="例如：A"
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-semibold text-slate-700">
+                          所辖院系（可选）
+                        </label>
+                        <button
+                          onClick={() =>
+                            setInstitutionForm((f) => ({
+                              ...f,
+                              departments: [...f.departments, ""],
+                            }))
+                          }
+                          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          + 添加院系
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {institutionForm.departments.map((dept, idx) => (
+                          <div key={idx} className="flex gap-2">
+                            <input
+                              type="text"
+                              value={dept}
+                              onChange={(e) => {
+                                const newDepts = [
+                                  ...institutionForm.departments,
+                                ];
+                                newDepts[idx] = e.target.value;
+                                setInstitutionForm((f) => ({
+                                  ...f,
+                                  departments: newDepts,
+                                }));
+                              }}
+                              placeholder={`例如：计算机学院`}
+                              className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all"
+                            />
+                            {institutionForm.departments.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  setInstitutionForm((f) => ({
+                                    ...f,
+                                    departments: f.departments.filter(
+                                      (_, i) => i !== idx,
+                                    ),
+                                  }));
+                                }}
+                                className="px-2.5 py-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 mt-3">
+                        <p className="text-xs text-amber-900 font-medium mb-1">
+                          ℹ️ 一次性创建
+                        </p>
+                        <p className="text-xs text-amber-800">
+                          高校和所有院系将在一个请求中创建。跳过此步骤以仅创建高校。
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* New Department Form */}
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        选择所属高校 <span className="text-red-500">*</span>
+                      </label>
+                      <ComboboxInput
+                        value={selectedInstitutionName}
+                        onChange={(value) => {
+                          const inst = allInstitutions.find(
+                            (i) => i.name === value,
+                          );
+                          setDepartmentForm((f) => ({
+                            ...f,
+                            parentInstitutionId: inst?.id || "",
+                          }));
+                        }}
+                        options={allInstitutions.map((inst) => inst.name)}
+                        placeholder={
+                          loadingAllInst ? "加载中..." : "搜索或选择高校..."
+                        }
+                        disabled={loadingAllInst}
+                        clearable
+                        error={createError?.includes("所属机构") || undefined}
+                      />
+                      <p className="text-xs text-slate-500 mt-2">
+                        🔍 输入高校名称快速查找。只能为现有高校添加院系。
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-semibold text-slate-700">
+                          院系名称 <span className="text-red-500">*</span>
+                        </label>
+                        <button
+                          onClick={() =>
+                            setDepartmentForm((f) => ({
+                              ...f,
+                              departments: [...f.departments, ""],
+                            }))
+                          }
+                          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          + 添加院系
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {departmentForm.departments.map((dept, idx) => (
+                          <div key={idx} className="flex gap-2">
+                            <input
+                              type="text"
+                              value={dept}
+                              onChange={(e) => {
+                                const newDepts = [
+                                  ...departmentForm.departments,
+                                ];
+                                newDepts[idx] = e.target.value;
+                                setDepartmentForm((f) => ({
+                                  ...f,
+                                  departments: newDepts,
+                                }));
+                              }}
+                              placeholder={`例如：计算机学院`}
+                              className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all"
+                            />
+                            {departmentForm.departments.length > 1 && (
+                              <button
+                                onClick={() => {
+                                  setDepartmentForm((f) => ({
+                                    ...f,
+                                    departments: f.departments.filter(
+                                      (_, i) => i !== idx,
+                                    ),
+                                  }));
+                                }}
+                                className="px-2.5 py-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                      <p className="text-xs text-blue-900 font-medium mb-1">
+                        📝 创建方式说明
+                      </p>
+                      <ul className="text-xs text-blue-800 space-y-1">
+                        <li>• 每个院系将独立创建（type = department）</li>
+                        <li>• 所有院系都关联到选中的高校</li>
+                        <li>• ID 由系统自动生成</li>
+                      </ul>
+                    </div>
+                  </>
+                )}
+
+                {createError && (
+                  <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    {createError}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 sticky bottom-0 bg-white">
+                <button
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleCreateInstitution}
+                  disabled={isCreating}
+                  className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 shadow-sm"
+                >
+                  {isCreating ? (
+                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  {isCreating ? "创建中..." : "创建"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -23,6 +23,7 @@ import { Field } from "@/components/ui/Field";
 import { TextInput } from "@/components/ui/TextInput";
 import { TextareaInput } from "@/components/ui/TextareaInput";
 import { SelectInput } from "@/components/ui/SelectInput";
+import { ComboboxInput } from "@/components/ui/ComboboxInput";
 import { TagInput } from "@/components/common/TagInput";
 import { SuccessOverlay } from "@/components/common/SuccessOverlay";
 import { WebScrapingPanel } from "@/components/scholar/WebScrapingPanel";
@@ -37,6 +38,7 @@ import {
   ALL_HONORS,
   SCHOLAR_DIVISIONS,
 } from "@/constants/scholarForm";
+import { createScholar } from "@/services/scholarApi";
 
 interface FormData {
   name: string;
@@ -103,6 +105,8 @@ export default function AddScholarPage() {
     Partial<Record<keyof FormData, boolean>>
   >({});
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Excel import state
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -138,11 +142,39 @@ export default function AddScholarPage() {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    console.log("New scholar data:", form);
-    setSubmitted(true);
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      await createScholar({
+        name: form.name,
+        name_en: form.nameEn || undefined,
+        position: form.title,
+        university: form.universityId,
+        department: form.departmentId,
+        email: form.email || undefined,
+        phone: form.phone || undefined,
+        profile_url: form.homepage || undefined,
+        dblp_url: form.dblp || undefined,
+        google_scholar_url: form.googleScholar || undefined,
+        research_areas:
+          form.researchFields.length > 0 ? form.researchFields : undefined,
+        bio: form.bio || undefined,
+        added_by: "user",
+      });
+
+      setSubmitted(true);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to create scholar",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Excel import handlers
@@ -200,38 +232,43 @@ export default function AddScholarPage() {
   const handleExcelImport = () => {
     if (!excelParseResult || excelParseResult.data.length === 0) return;
 
-    const row = excelParseResult.data[0] as Record<string, string>;
+    const row = excelParseResult.data[0] as Record<string, unknown>;
 
     // Map parsed data to form fields
     const mappedForm: FormData = {
       ...form,
-      name: (row.name || row.姓名 || "").trim(),
-      nameEn: (row.nameEn || row.name_en || row.英文名 || "").trim(),
-      title: (row.title || row.position || row.职称 || "") as AcademicTitle,
-      universityId: (
-        row.university ||
-        row.institution ||
-        row.院校 ||
-        ""
+      name: String(row.name || row.姓名 || "").trim(),
+      nameEn: String(row.nameEn || row.name_en || row.英文名 || "").trim(),
+      title: String(
+        row.title || row.position || row.职称 || "",
+      ) as AcademicTitle,
+      universityId: String(
+        row.university || row.institution || row.院校 || "",
       ).trim(),
-      departmentId: (row.department || row.院系 || "").trim(),
-      email: (row.email || row.邮箱 || "").trim(),
-      phone: (row.phone || row.电话 || "").trim(),
-      homepage: (row.homepage || row.profile_url || row.主页 || "").trim(),
-      researchFields: (
-        row.researchFields ||
-        row.research_areas ||
-        row.研究方向 ||
-        ""
+      departmentId: String(row.department || row.院系 || "").trim(),
+      email: String(row.email || row.邮箱 || "").trim(),
+      phone: String(row.phone || row.电话 || "").trim(),
+      homepage: String(
+        row.homepage || row.profile_url || row.主页 || "",
+      ).trim(),
+      googleScholar: String(
+        row.google_scholar || row.googleScholar || row.谷歌学术 || "",
+      ).trim(),
+      dblp: String(row.dblp || row.dblp_url || "").trim(),
+      researchFields: String(
+        row.researchFields || row.research_areas || row.研究方向 || "",
       )
-        .toString()
         .split(/[,，、;；]/)
         .map((s: string) => s.trim())
         .filter(Boolean),
-      bio: (row.bio || row.简介 || "").trim(),
-      hIndex: (row.hIndex || row.h_index || "").toString(),
-      citationCount: (row.citationCount || row.citation_count || "").toString(),
-      paperCount: (row.paperCount || row.paper_count || "").toString(),
+      bio: String(row.bio || row.简介 || "").trim(),
+      hIndex: String(row.hIndex || row.h_index || ""),
+      citationCount: String(row.citationCount || row.citation_count || ""),
+      paperCount: String(row.paperCount || row.paper_count || ""),
+      scholarDivision: "",
+      mentorType: "",
+      talentPlans: [],
+      honors: [],
     };
 
     setForm(mappedForm);
@@ -278,16 +315,25 @@ export default function AddScholarPage() {
               <button
                 type="button"
                 onClick={() => setForm(initialForm)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={isSubmitting}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 重置
               </button>
               <button
                 form="add-scholar-form"
                 type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
+                disabled={isSubmitting}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                保存学者
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    保存中...
+                  </>
+                ) : (
+                  "保存学者"
+                )}
               </button>
             </div>
           )}
@@ -328,6 +374,15 @@ export default function AddScholarPage() {
           onSubmit={handleSubmit}
           className="max-w-5xl mx-auto px-6 py-8 space-y-5"
         >
+          {submitError && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-900">创建学者失败</p>
+                <p className="text-sm text-red-700 mt-1">{submitError}</p>
+              </div>
+            </div>
+          )}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -373,46 +428,34 @@ export default function AddScholarPage() {
                   )}
                 </Field>
                 <Field label="所属院校" required>
-                  <SelectInput
+                  <ComboboxInput
                     value={form.universityId}
                     onChange={(v) => {
                       set("universityId", v);
                       set("departmentId", "");
                     }}
-                    placeholder={uniLoading ? "院校加载中..." : "请选择院校"}
+                    options={universityOptions.map((u) => u.name)}
+                    placeholder={
+                      uniLoading ? "院校加载中..." : "搜索并选择院校"
+                    }
                     error={errors.universityId}
                     disabled={uniLoading}
-                  >
-                    {universityOptions.map((u) => (
-                      <option key={u.name} value={u.name}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </SelectInput>
+                  />
                   {errors.universityId && (
                     <p className="mt-1 text-xs text-red-500">请选择所属院校</p>
                   )}
                 </Field>
                 <Field label="所属院系" required>
-                  <SelectInput
+                  <ComboboxInput
                     value={form.departmentId}
                     onChange={(v) => set("departmentId", v)}
+                    options={selectedUni?.departments || []}
                     placeholder={
-                      form.universityId ? "请选择院系" : "请先选择院校"
+                      form.universityId ? "搜索并选择院系" : "请先选择院校"
                     }
                     error={errors.departmentId}
                     disabled={!form.universityId || uniLoading}
-                  >
-                    {selectedUni && selectedUni.departments.length > 0
-                      ? selectedUni.departments.map((dept) => (
-                          <option key={dept} value={dept}>
-                            {dept}
-                          </option>
-                        ))
-                      : form.universityId && (
-                          <option disabled>无可用院系</option>
-                        )}
-                  </SelectInput>
+                  />
                   {errors.departmentId && (
                     <p className="mt-1 text-xs text-red-500">请选择所属院系</p>
                   )}
@@ -616,15 +659,24 @@ export default function AddScholarPage() {
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 取消
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-colors shadow-sm"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                保存学者
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    保存中...
+                  </>
+                ) : (
+                  "保存学者"
+                )}
               </button>
             </div>
           </motion.div>

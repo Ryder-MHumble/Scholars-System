@@ -7,6 +7,7 @@ import type {
   PatentRecord,
   AwardRecord,
 } from "@/services/scholarApi";
+import { parsePublicationsFromText } from "@/utils/textParsers";
 
 interface EditAchievementsModalProps {
   publications: PublicationRecord[];
@@ -40,23 +41,7 @@ export function EditAchievementsModal({
   const [batchText, setBatchText] = useState("");
 
   const applyBatchPublications = () => {
-    const newItems = batchText
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const p = line.split("|").map((s) => s.trim());
-        return {
-          title: p[0] || "",
-          venue: p[1] || "",
-          year: p[2] || "",
-          authors: p[3] || "",
-          url: p[4] || "",
-          citation_count: 0,
-          is_corresponding: false,
-          added_by: "user",
-        } as PublicationRecord;
-      });
+    const newItems = parsePublicationsFromText(batchText);
     setEditedPublications((prev) => [...prev, ...newItems]);
     setBatchMode(null);
     setBatchText("");
@@ -354,23 +339,26 @@ export function EditAchievementsModal({
             ))}
             {batchMode === "publications" ? (
               <div className="p-3 border border-blue-200 rounded-lg bg-blue-50/30 space-y-2">
-                <p className="text-xs text-gray-500">
-                  每行一条，字段用{" "}
-                  <code className="bg-gray-100 px-1 rounded font-mono">|</code>{" "}
-                  分隔：
-                  <code className="bg-gray-100 px-1 rounded font-mono text-xs">
-                    标题 | 会议/期刊 | 年份 | 作者
-                  </code>
-                  （仅标题也可）
-                </p>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <p className="font-medium">
+                    支持直接粘贴文献列表，自动识别以下格式：
+                  </p>
+                  <p className="text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded leading-relaxed">
+                    [1] B. Haghighat and A. Klemm, &quot;Topological Strings on
+                    K3,&quot; JHEP 1001 (2010)
+                    <br />
+                    [2] Authors, &quot;Title,&quot; Venue, Vol (Year)
+                  </p>
+                  <p className="text-gray-400">
+                    也支持：标题 | 期刊 | 年份 | 作者（旧格式）
+                  </p>
+                </div>
                 <textarea
                   value={batchText}
                   onChange={(e) => setBatchText(e.target.value)}
                   autoFocus
-                  rows={5}
-                  placeholder={
-                    "Deep Learning for NLP | NeurIPS | 2022 | 张三, 李四\n另一篇论文标题 | ICML | 2021\n仅标题也行"
-                  }
+                  rows={6}
+                  placeholder={`[1] B. Haghighat and A. Klemm, "Topological Strings on Grassmannian Calabi-Yau manifolds," JHEP 0901, 029 (2009)\n[2] B. Haghighat, A. Klemm and M. Rauch, "Integrability of the holomorphic anomaly equation," JHEP 0810, 097 (2008)`}
                   className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono resize-none"
                 />
                 <div className="flex gap-2">
@@ -378,8 +366,7 @@ export function EditAchievementsModal({
                     onClick={applyBatchPublications}
                     className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
                   >
-                    确认导入 (
-                    {batchText.split("\n").filter((l) => l.trim()).length} 条)
+                    确认导入 ({parsePublicationsFromText(batchText).length} 条)
                   </button>
                   <button
                     onClick={() => {

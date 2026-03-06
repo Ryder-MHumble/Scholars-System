@@ -7,7 +7,7 @@ import type { ScholarDetail } from "@/services/scholarApi";
  */
 export function generateScholarTemplate(
   scholar?: ScholarDetail,
-  templateType: "basic" | "education" | "achievements" | "all" = "all"
+  templateType: "basic" | "education" | "achievements" | "all" = "all",
 ): File {
   const workbook = XLSX.utils.book_new();
 
@@ -17,6 +17,7 @@ export function generateScholarTemplate(
         姓名: scholar?.name || "",
         英文名: scholar?.name_en || "",
         职称: scholar?.position || "",
+        院校: scholar?.university || "",
         院系: scholar?.department || "",
         邮箱: scholar?.email || "",
         电话: scholar?.phone || "",
@@ -31,6 +32,7 @@ export function generateScholarTemplate(
       { wch: 12 },
       { wch: 15 },
       { wch: 12 },
+      { wch: 15 },
       { wch: 12 },
       { wch: 20 },
       { wch: 15 },
@@ -71,11 +73,7 @@ export function generateScholarTemplate(
       { wch: 10 },
     ];
 
-    XLSX.utils.book_append_sheet(
-      workbook,
-      educationSheet,
-      "教育经历"
-    );
+    XLSX.utils.book_append_sheet(workbook, educationSheet, "教育经历");
   }
 
   if (templateType === "achievements" || templateType === "all") {
@@ -88,7 +86,7 @@ export function generateScholarTemplate(
         作者: pub.authors || "",
         论文链接: pub.url || "",
         引用数: pub.citation_count || "",
-      })
+      }),
     );
 
     if (publicationsData.length === 0) {
@@ -112,11 +110,7 @@ export function generateScholarTemplate(
       { wch: 8 },
     ];
 
-    XLSX.utils.book_append_sheet(
-      workbook,
-      publicationsSheet,
-      "论文"
-    );
+    XLSX.utils.book_append_sheet(workbook, publicationsSheet, "论文");
 
     // Patents
     const patentsData = (scholar?.patents || []).map((patent) => ({
@@ -188,12 +182,10 @@ export function generateScholarTemplate(
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 
-  const scholarName = scholar?.name || "学者";
-  return new File(
-    [blob],
-    `${scholarName}_数据模板_${new Date().toISOString().split("T")[0]}.xlsx`,
-    { type: blob.type }
-  );
+  const timestamp = new Date().toISOString().split("T")[0];
+  return new File([blob], `学者导入模板_${timestamp}.xlsx`, {
+    type: blob.type,
+  });
 }
 
 /**
@@ -201,7 +193,7 @@ export function generateScholarTemplate(
  */
 export function downloadScholarTemplate(
   scholar?: ScholarDetail,
-  templateType: "basic" | "education" | "achievements" | "all" = "all"
+  templateType: "basic" | "education" | "achievements" | "all" = "all",
 ): void {
   const file = generateScholarTemplate(scholar, templateType);
   const url = URL.createObjectURL(file);

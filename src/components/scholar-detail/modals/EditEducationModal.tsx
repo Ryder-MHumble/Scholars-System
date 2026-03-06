@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Plus } from "lucide-react";
 import type { EducationRecord } from "@/services/scholarApi";
+import { parseEducationFromText } from "@/utils/textParsers";
 
 interface EditEducationModalProps {
   education: EducationRecord[];
@@ -42,20 +43,7 @@ export function EditEducationModal({
   };
 
   const applyBatch = () => {
-    const newRecs = batchText
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const p = line.split("|").map((s) => s.trim());
-        return {
-          degree: p[0] || "",
-          institution: p[1] || "",
-          major: p[2] || "",
-          year: p[3] || "",
-          end_year: p[4] || "",
-        } as EducationRecord;
-      });
+    const newRecs = parseEducationFromText(batchText);
     setRecords((prev) => [...prev, ...newRecs]);
     setBatchMode(false);
     setBatchText("");
@@ -142,21 +130,27 @@ export function EditEducationModal({
 
           {batchMode ? (
             <div className="p-3 border border-blue-200 rounded-lg bg-blue-50/30 space-y-2">
-              <p className="text-xs text-gray-500">
-                每行一条，字段用{" "}
-                <code className="bg-gray-100 px-1 rounded font-mono">|</code>{" "}
-                分隔：
-                <code className="bg-gray-100 px-1 rounded font-mono text-xs">
-                  学位 | 学校 | 专业 | 入学年份 | 毕业年份
-                </code>
-              </p>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p className="font-medium">
+                  支持直接粘贴简历中的教育经历，自动识别以下格式：
+                </p>
+                <p className="text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded leading-relaxed text-[11px]">
+                  2006/11 to 2009/10 Bonn University PhD in Mathematical Physics
+                  <br />
+                  2001/10 to 2006/10 Bonn University Bachelor and Master in
+                  Physics
+                </p>
+                <p className="text-gray-400">
+                  也支持：学位 | 学校 | 专业 | 入学年份 | 毕业年份（旧格式）
+                </p>
+              </div>
               <textarea
                 value={batchText}
                 onChange={(e) => setBatchText(e.target.value)}
                 autoFocus
-                rows={5}
+                rows={6}
                 placeholder={
-                  "博士 | 清华大学 | 计算机科学与技术 | 2015 | 2020\n硕士 | 北京大学 | 人工智能 | 2013 | 2015"
+                  "2006/11 to 2009/10  Bonn University  PhD in\nMathematical Physics\n2001/10 to 2006/10  Bonn University  Bachelor and\nMaster degree in Physics"
                 }
                 className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono resize-none"
               />
@@ -165,8 +159,7 @@ export function EditEducationModal({
                   onClick={applyBatch}
                   className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
                 >
-                  确认导入 (
-                  {batchText.split("\n").filter((l) => l.trim()).length} 条)
+                  确认导入 ({parseEducationFromText(batchText).length} 条)
                 </button>
                 <button
                   onClick={() => {

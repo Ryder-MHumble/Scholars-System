@@ -4,6 +4,43 @@ import type {
   InstitutionPatchRequest,
 } from "@/types/institution";
 
+export interface InstitutionCreateRequest {
+  name: string;
+  type?: string;
+  category?: string;
+  priority?: string;
+  parent_id?: string;
+  student_count_24?: number;
+  student_count_25?: number;
+  mentor_count?: number;
+  resident_leaders?: string[];
+  degree_committee?: string[];
+  teaching_committee?: string[];
+  university_leaders?: Array<{
+    name: string;
+    title?: string | null;
+    department?: string | null;
+    research_area?: string | null;
+  }>;
+  notable_scholars?: Array<{
+    name: string;
+    title?: string | null;
+    department?: string | null;
+    research_area?: string | null;
+  }>;
+  key_departments?: string[];
+  joint_labs?: string[];
+  training_cooperation?: string[];
+  academic_cooperation?: string[];
+  talent_dual_appointment?: string[];
+  recruitment_events?: string[];
+  visit_exchanges?: string[];
+  cooperation_focus?: string[];
+  departments?: Array<{
+    name: string;
+  }>;
+}
+
 const BASE_URL = import.meta.env.DEV
   ? ""
   : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
@@ -51,6 +88,34 @@ export async function patchInstitution(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`机构更新失败: ${res.status}`);
+  return res.json();
+}
+
+export async function createInstitution(
+  data: InstitutionCreateRequest,
+): Promise<InstitutionDetail> {
+  const res = await fetch(`${BASE_URL}/api/v1/institutions/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    let detail = `${res.status}`;
+    try {
+      const body = await res.json();
+      if (body.detail) {
+        detail =
+          typeof body.detail === "string"
+            ? body.detail
+            : JSON.stringify(body.detail);
+      } else if (body.message) {
+        detail = body.message;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(`机构创建失败: ${detail}`);
+  }
   return res.json();
 }
 
