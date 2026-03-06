@@ -184,7 +184,7 @@ export function UniversitySidebarTree({
             isAllActive ? "text-white/80" : "text-gray-400",
           )}
         />
-        <span className="flex-1 text-left truncate text-sm">全部院校</span>
+        <span className="flex-1 text-left truncate text-sm">全部</span>
         <span
           className={cn(
             "text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-md transition-colors duration-150 tabular-nums",
