@@ -290,7 +290,9 @@ export async function smartParseExcel<T>(
               confidence: match.confidence,
               sampleValues: rows
                 .slice(0, 3)
-                .map((row) => String(row[header] || "")),
+                .map((row: Record<string, unknown>) =>
+                  String(row[header] || ""),
+                ),
             });
             columnMap[header] = match.key;
             totalConfidence += match.confidence;
@@ -302,7 +304,9 @@ export async function smartParseExcel<T>(
               confidence: 0.3,
               sampleValues: rows
                 .slice(0, 3)
-                .map((row) => String(row[header] || "")),
+                .map((row: Record<string, unknown>) =>
+                  String(row[header] || ""),
+                ),
             });
             columnMap[header] = header;
             totalConfidence += 0.3;
