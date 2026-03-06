@@ -48,7 +48,17 @@ const IMPORT_TYPES: {
     value: "basic",
     label: "基本信息",
     desc: "姓名、邮箱、职称、院校等",
-    fields: ["姓名", "英文名", "职称", "院校", "院系", "邮箱", "电话", "主页", "研究方向"],
+    fields: [
+      "姓名",
+      "英文名",
+      "职称",
+      "院校",
+      "院系",
+      "邮箱",
+      "电话",
+      "主页",
+      "研究方向",
+    ],
   },
   {
     value: "education",
@@ -115,17 +125,6 @@ function StepIndicator({ current }: { current: ModalStep }) {
   );
 }
 
-// Extract a field value from a parsed row
-function getField(row: Record<string, unknown>, ...keys: string[]): string {
-  for (const key of keys) {
-    const val = row[key];
-    if (val !== undefined && val !== null && String(val).trim() !== "") {
-      return String(val).trim();
-    }
-  }
-  return "";
-}
-
 export function ScholarImportModal({
   isOpen,
   onClose,
@@ -142,8 +141,9 @@ export function ScholarImportModal({
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] =
-    useState<ScholarImportResult | null>(null);
+  const [importResult, setImportResult] = useState<ScholarImportResult | null>(
+    null,
+  );
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -209,7 +209,10 @@ export function ScholarImportModal({
         importedData.education = parseResult.data as Record<string, string>[];
       }
       if (selectedType === "all" || selectedType === "achievements") {
-        importedData.publications = parseResult.data as Record<string, string>[];
+        importedData.publications = parseResult.data as Record<
+          string,
+          string
+        >[];
         importedData.patents = parseResult.data as Record<string, string>[];
         importedData.awards = parseResult.data as Record<string, string>[];
       }
@@ -287,7 +290,9 @@ export function ScholarImportModal({
                 <Sparkles className="w-5 h-5 text-primary-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900">导入学者数据</h2>
+                <h2 className="text-lg font-bold text-gray-900">
+                  导入学者数据
+                </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   当前学者：{scholarName}
                 </p>
@@ -323,7 +328,10 @@ export function ScholarImportModal({
                       "建议在导入前先导出当前数据进行备份",
                       "若只需更新部分字段，请选择对应的导入类型（避免选「全部数据」）",
                     ].map((text, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-red-700">
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-xs text-red-700"
+                      >
                         <span className="flex-shrink-0 mt-0.5">•</span>
                         <span>{text}</span>
                       </li>
@@ -396,7 +404,10 @@ export function ScholarImportModal({
                       "上传文件，系统自动识别并解析",
                       "在第三步核对内容后确认导入",
                     ].map((text, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-blue-700">
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-xs text-blue-700"
+                      >
                         <span className="w-4 h-4 rounded-full bg-blue-200 text-blue-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
                           {i + 1}
                         </span>
@@ -435,7 +446,9 @@ export function ScholarImportModal({
                   <FileSpreadsheet className="w-4 h-4 text-primary-500 flex-shrink-0" />
                   <span className="text-xs text-primary-700">
                     当前导入类型：
-                    <span className="font-semibold">{selectedTypeInfo.label}</span>
+                    <span className="font-semibold">
+                      {selectedTypeInfo.label}
+                    </span>
                     （{selectedTypeInfo.desc}）
                   </span>
                 </div>
@@ -566,15 +579,21 @@ export function ScholarImportModal({
                                 </span>
                               </div>
                               <ul className="space-y-1">
-                                {parseResult.errors.slice(0, 3).map((err, i) => (
-                                  <li key={i} className="text-xs text-red-700">
-                                    {err.row > 0 ? `第 ${err.row} 行：` : ""}
-                                    {err.error}
-                                  </li>
-                                ))}
+                                {parseResult.errors
+                                  .slice(0, 3)
+                                  .map((err, i) => (
+                                    <li
+                                      key={i}
+                                      className="text-xs text-red-700"
+                                    >
+                                      {err.row > 0 ? `第 ${err.row} 行：` : ""}
+                                      {err.error}
+                                    </li>
+                                  ))}
                                 {parseResult.errors.length > 3 && (
                                   <li className="text-xs text-red-500">
-                                    ...还有 {parseResult.errors.length - 3} 个问题
+                                    ...还有 {parseResult.errors.length - 3}{" "}
+                                    个问题
                                   </li>
                                 )}
                               </ul>
@@ -658,9 +677,12 @@ export function ScholarImportModal({
                     <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                       <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                       <div className="text-xs text-amber-700">
-                        <span className="font-semibold">确认前请仔细核对：</span>
+                        <span className="font-semibold">
+                          确认前请仔细核对：
+                        </span>
                         导入「{selectedTypeInfo.label}」后，
-                        {scholarName} 的对应数据将被以下内容完全替换，此操作不可撤销。
+                        {scholarName}{" "}
+                        的对应数据将被以下内容完全替换，此操作不可撤销。
                       </div>
                     </div>
 
@@ -671,7 +693,8 @@ export function ScholarImportModal({
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-800">
-                          {selectedTypeInfo.label} · {parseResult.data.length} 行数据
+                          {selectedTypeInfo.label} · {parseResult.data.length}{" "}
+                          行数据
                         </p>
                         <p className="text-xs text-gray-500">
                           识别质量：{confidenceLabel} ({confidencePct}%) ·{" "}
@@ -692,9 +715,13 @@ export function ScholarImportModal({
                               key={i}
                               className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-md border border-gray-200"
                             >
-                              <span className="font-medium">{col.excelHeader}</span>
+                              <span className="font-medium">
+                                {col.excelHeader}
+                              </span>
                               <span className="text-gray-400">→</span>
-                              <span className="text-primary-600">{col.mappedKey}</span>
+                              <span className="text-primary-600">
+                                {col.mappedKey}
+                              </span>
                             </span>
                           ))}
                         </div>
@@ -718,7 +745,10 @@ export function ScholarImportModal({
                                   #
                                 </th>
                                 {Object.keys(
-                                  parseResult.data[0] as Record<string, unknown>,
+                                  parseResult.data[0] as Record<
+                                    string,
+                                    unknown
+                                  >,
                                 )
                                   .slice(0, 6)
                                   .map((col) => (
@@ -732,43 +762,38 @@ export function ScholarImportModal({
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                              {parseResult.data
-                                .slice(0, 10)
-                                .map((row, idx) => {
-                                  const r = row as Record<string, unknown>;
-                                  const cols = Object.keys(r).slice(0, 6);
-                                  return (
-                                    <tr
-                                      key={idx}
-                                      className="hover:bg-blue-50/30"
-                                    >
-                                      <td className="px-3 py-2 text-center text-gray-400">
-                                        {idx + 1}
-                                      </td>
-                                      {cols.map((col) => (
-                                        <td
-                                          key={col}
-                                          className="px-3 py-2 text-gray-700 max-w-[140px]"
+                              {parseResult.data.slice(0, 10).map((row, idx) => {
+                                const r = row as Record<string, unknown>;
+                                const cols = Object.keys(r).slice(0, 6);
+                                return (
+                                  <tr key={idx} className="hover:bg-blue-50/30">
+                                    <td className="px-3 py-2 text-center text-gray-400">
+                                      {idx + 1}
+                                    </td>
+                                    {cols.map((col) => (
+                                      <td
+                                        key={col}
+                                        className="px-3 py-2 text-gray-700 max-w-[140px]"
+                                      >
+                                        <span
+                                          className="block truncate"
+                                          title={String(r[col] ?? "")}
                                         >
-                                          <span
-                                            className="block truncate"
-                                            title={String(r[col] ?? "")}
-                                          >
-                                            {r[col] !== undefined &&
-                                            r[col] !== null &&
-                                            String(r[col]).trim() !== "" ? (
-                                              String(r[col])
-                                            ) : (
-                                              <span className="text-gray-300">
-                                                —
-                                              </span>
-                                            )}
-                                          </span>
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  );
-                                })}
+                                          {r[col] !== undefined &&
+                                          r[col] !== null &&
+                                          String(r[col]).trim() !== "" ? (
+                                            String(r[col])
+                                          ) : (
+                                            <span className="text-gray-300">
+                                              —
+                                            </span>
+                                          )}
+                                        </span>
+                                      </td>
+                                    ))}
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -836,9 +861,7 @@ export function ScholarImportModal({
                 <button
                   onClick={handleImport}
                   disabled={
-                    !parseResult ||
-                    parseResult.data.length === 0 ||
-                    isImporting
+                    !parseResult || parseResult.data.length === 0 || isImporting
                   }
                   className="flex items-center gap-2 px-5 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >

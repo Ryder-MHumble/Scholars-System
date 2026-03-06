@@ -52,7 +52,7 @@ export interface ScholarDetail extends ScholarListItem {
   metrics_updated_at: string;
   supervised_students: string[];
   supervised_students_count: number;
-  joint_research_projects: string[];
+  joint_research_projects: JointProject[];
   joint_management_roles: string[];
   academic_exchange_records: string[];
   institute_relation_notes: string;

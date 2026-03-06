@@ -88,7 +88,9 @@ export function ExcelImportModal<T>({
   const [step, setStep] = useState<ModalStep>(1);
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<T[]>([]);
-  const [errors, setErrors] = useState<Array<{ row: number; error: string }>>([]);
+  const [errors, setErrors] = useState<Array<{ row: number; error: string }>>(
+    [],
+  );
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -150,7 +152,13 @@ export function ExcelImportModal<T>({
   const handleImport = async () => {
     if (parsedData.length === 0) return;
     setIsImporting(true);
-    setProgress({ total: parsedData.length, processed: 0, successful: 0, failed: 0, duplicates: 0 });
+    setProgress({
+      total: parsedData.length,
+      processed: 0,
+      successful: 0,
+      failed: 0,
+      duplicates: 0,
+    });
     try {
       await onImport(parsedData);
       setProgress({
@@ -193,9 +201,6 @@ export function ExcelImportModal<T>({
     parsedData.length > 0 && !isProcessing && errors.length === 0;
 
   if (!isOpen) return null;
-
-  // Build column key → label map for table header
-  const colMap = Object.fromEntries(columns.map((c) => [c.key, c.label]));
 
   // Validate a row: check all required columns have values
   function rowIsValid(row: T): boolean {
