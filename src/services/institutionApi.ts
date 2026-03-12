@@ -44,8 +44,8 @@ export interface InstitutionCreateRequest {
 }
 
 const BASE_URL = import.meta.env.DEV
-  ? ""
-  : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
+  ? "http://localhost:8002"
+  : "http://43.98.254.243:8001";
 
 export async function fetchInstitutionList(
   page = 1,

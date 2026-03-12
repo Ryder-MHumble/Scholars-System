@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -23,8 +23,11 @@ import type {
   ScholarDetail,
   ScholarDetailPatch,
   EducationRecord,
+  UniversityOption,
 } from "@/services/scholarApi";
+import { fetchUniversities } from "@/services/scholarApi";
 import { ClickToEditField } from "@/components/scholar-detail/shared/ClickToEditField";
+import { ClickToEditWithAutocomplete } from "@/components/scholar-detail/shared/ClickToEditWithAutocomplete";
 import { SideLabel } from "@/components/scholar-detail/shared/SideLabel";
 import { ManagementRoleFormModal } from "@/components/scholar-detail/modals/ManagementRoleFormModal";
 import { EditEducationModal } from "@/components/scholar-detail/modals/EditEducationModal";
@@ -50,6 +53,18 @@ export function DetailLeftSidebar({
   onManagementRolesInlineSave,
 }: DetailLeftSidebarProps) {
   const [bioExpanded, setBioExpanded] = useState(false);
+
+  // Universities + departments autocomplete data
+  const [universities, setUniversities] = useState<UniversityOption[]>([]);
+  useEffect(() => {
+    fetchUniversities()
+      .then(setUniversities)
+      .catch(() => {});
+  }, []);
+  const universityNames = universities.map((u) => u.university);
+  const departmentsForCurrent =
+    universities.find((u) => u.university === scholar.university)
+      ?.departments ?? [];
 
   // Photo editing
   const [isEditingPhoto, setIsEditingPhoto] = useState(false);
@@ -245,9 +260,10 @@ export function DetailLeftSidebar({
                 </div>
                 <div className="flex items-center gap-1 text-sm text-gray-600">
                   <Building2 className="w-3 h-3 text-gray-400 shrink-0" />
-                  <ClickToEditField
+                  <ClickToEditWithAutocomplete
                     value={scholar.university || ""}
                     onSave={async (val) => onFieldSave({ university: val })}
+                    options={universityNames}
                     placeholder="点击添加院校"
                     className={
                       !scholar.university ? "text-gray-400" : "text-gray-600"
@@ -255,9 +271,10 @@ export function DetailLeftSidebar({
                   />
                 </div>
                 <div className="text-xs text-gray-500">
-                  <ClickToEditField
+                  <ClickToEditWithAutocomplete
                     value={scholar.department || ""}
                     onSave={async (val) => onFieldSave({ department: val })}
+                    options={departmentsForCurrent}
                     placeholder="点击添加院系"
                     className={
                       !scholar.department ? "text-gray-400" : "text-gray-500"

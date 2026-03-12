@@ -6,6 +6,7 @@ import AddScholarDetailPage from "./pages/AddScholarDetailPage";
 import InstitutionDetailPage from "./pages/InstitutionDetailPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
+import { InstitutionPickerPage } from "./pages/InstitutionPickerPage";
 
 export default function App() {
   return (
@@ -23,6 +24,10 @@ export default function App() {
             <Route
               path="institutions/:id"
               element={<InstitutionDetailPage />}
+            />
+            <Route
+              path="institutions/picker"
+              element={<InstitutionPickerPage />}
             />
             <Route path="projects/:projectId" element={<ProjectDetailPage />} />
             <Route

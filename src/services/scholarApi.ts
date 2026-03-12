@@ -1,6 +1,6 @@
 const BASE_URL = import.meta.env.DEV
-  ? ""
-  : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
+  ? "http://localhost:8002"
+  : "http://43.98.254.243:8001";
 
 export interface AdjunctSupervisorInfo {
   status: string;
@@ -511,5 +511,16 @@ export interface ScholarStatsResponse {
 export async function fetchScholarStats(): Promise<ScholarStatsResponse> {
   const res = await fetch(`${BASE_URL}/api/v1/scholars/stats`);
   if (!res.ok) throw new Error(`Failed to fetch scholar stats: ${res.status}`);
+  return res.json();
+}
+
+export interface UniversityOption {
+  university: string;
+  departments: string[];
+}
+
+export async function fetchUniversities(): Promise<UniversityOption[]> {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars/universities`);
+  if (!res.ok) throw new Error(`Failed to fetch universities: ${res.status}`);
   return res.json();
 }

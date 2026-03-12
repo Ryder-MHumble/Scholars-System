@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(() => ({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -14,14 +14,6 @@ export default defineConfig(({ mode }) => ({
     // Allow external access to dev server
     host: "0.0.0.0",
     port: 5174,
-    proxy:
-      mode === "development"
-        ? {
-            "/api": {
-              target: "http://127.0.0.1:8001",
-              changeOrigin: true,
-            },
-          }
-        : undefined,
+    proxy: undefined,
   },
 }));

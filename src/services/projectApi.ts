@@ -6,8 +6,8 @@ import type {
 } from "@/types/project";
 
 const BASE_URL = import.meta.env.DEV
-  ? ""
-  : import.meta.env.VITE_API_BASE_URL || "http://43.98.254.243:8001";
+  ? "http://localhost:8002"
+  : "http://43.98.254.243:8001";
 
 export async function fetchProjectList(
   page = 1,
@@ -32,7 +32,9 @@ export async function fetchProjectDetail(id: string): Promise<Project> {
   return res.json();
 }
 
-export async function createProject(data: ProjectCreateRequest): Promise<Project> {
+export async function createProject(
+  data: ProjectCreateRequest,
+): Promise<Project> {
   const res = await fetch(`${BASE_URL}/api/v1/projects/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

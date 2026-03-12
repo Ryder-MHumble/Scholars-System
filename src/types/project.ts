@@ -3,6 +3,9 @@ export interface RelatedScholar {
   role: string;
   institution: string;
   scholar_id?: string;
+  photo_url?: string;
+  title?: string;
+  department?: string;
 }
 
 export interface ProjectOutput {

@@ -3,16 +3,15 @@ import { useParams, Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { useScholarDetail } from "@/hooks/useScholarDetail";
-import { StatsSidebar } from "@/components/scholar-detail/stats/StatsSidebar";
 import { PageSkeleton } from "@/components/scholar-detail/shared/SkeletonLoader";
 import { AddUpdateModal } from "@/components/scholar-detail/modals/AddUpdateModal";
 import { EditAchievementsModal } from "@/components/scholar-detail/modals/EditAchievementsModal";
 import { ContactModal } from "@/components/scholar-detail/modals/ContactModal";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
 import { RelationCard } from "@/components/scholar-detail/sections/RelationCard";
-import { UpdatesCard } from "@/components/scholar-detail/sections/UpdatesCard";
 import { ProjectsCard } from "@/components/scholar-detail/sections/ProjectsCard";
 import { AchievementsDetailCard } from "@/components/scholar-detail/sections/AchievementsDetailCard";
+import { RightSidebar } from "@/components/scholar-detail/sections/RightSidebar";
 import { slideInRight, staggerContainer } from "@/utils/animations";
 
 export default function ScholarDetailPageDemo() {
@@ -143,12 +142,6 @@ export default function ScholarDetailPageDemo() {
                 onSaveExchangeRecords={handleSaveExchangeRecords}
               />
 
-              <UpdatesCard
-                scholar={scholar}
-                onShowAddUpdate={() => setShowAddUpdate(true)}
-                onDeleteUpdate={handleDeleteUpdate}
-              />
-
               <ProjectsCard projects={scholar.joint_research_projects} />
 
               <AchievementsDetailCard
@@ -163,7 +156,11 @@ export default function ScholarDetailPageDemo() {
               initial="hidden"
               animate="visible"
             >
-              <StatsSidebar urlHash={scholar.url_hash} />
+              <RightSidebar
+                scholar={scholar}
+                onShowAddUpdate={() => setShowAddUpdate(true)}
+                onDeleteUpdate={handleDeleteUpdate}
+              />
             </motion.div>
           </div>
         </div>

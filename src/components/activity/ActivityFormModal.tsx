@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   X,
   Calendar,
@@ -13,8 +14,12 @@ import {
   Award,
   ChevronDown,
   ChevronUp,
+  Plus,
+  ExternalLink,
 } from "lucide-react";
 import { fetchActivityDetail } from "@/services/activityApi";
+import { fetchScholarList } from "@/services/scholarApi";
+import type { ScholarListItem } from "@/services/scholarApi";
 import type {
   ActivityEvent,
   ActivityEventDetail,
@@ -75,11 +80,20 @@ export function ActivityFormModal({
   activity,
   mode,
 }: ActivityFormModalProps) {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState<FormData>(defaultForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [speakerExpanded, setSpeakerExpanded] = useState(true);
   const [adminExpanded, setAdminExpanded] = useState(false);
+
+  // Scholar autocomplete
+  const [scholarResults, setScholarResults] = useState<ScholarListItem[]>([]);
+  const [scholarSearching, setScholarSearching] = useState(false);
+  const [showScholarDropdown, setShowScholarDropdown] = useState(false);
+  const speakerInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // When editing, load full detail to get all fields
   useEffect(() => {
@@ -88,7 +102,6 @@ export function ActivityFormModal({
     if (mode === "edit" && activity) {
       fetchActivityDetail(activity.id)
         .then((detail: ActivityEventDetail) => {
-          // Convert ISO datetime to datetime-local format
           const dateStr = detail.event_date
             ? detail.event_date.slice(0, 16)
             : "";
@@ -113,7 +126,6 @@ export function ActivityFormModal({
           });
         })
         .catch(() => {
-          // Fallback to list fields
           setFormData({
             ...defaultForm,
             event_type: activity.event_type,
@@ -131,7 +143,73 @@ export function ActivityFormModal({
     setErrors({});
     setSpeakerExpanded(true);
     setAdminExpanded(false);
+    setScholarResults([]);
+    setShowScholarDropdown(false);
   }, [activity, mode, isOpen]);
+
+  // Debounced scholar search
+  useEffect(() => {
+    const name = formData.speaker_name;
+    if (!name || name.length < 1) {
+      setScholarResults([]);
+      setShowScholarDropdown(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setScholarSearching(true);
+      try {
+        const result = await fetchScholarList(1, 8, { search: name });
+        setScholarResults(result.items);
+        setShowScholarDropdown(true);
+      } catch {
+        // ignore search errors
+      } finally {
+        setScholarSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formData.speaker_name]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showScholarDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        speakerInputRef.current &&
+        !speakerInputRef.current.contains(e.target as Node)
+      ) {
+        setShowScholarDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showScholarDropdown]);
+
+  const selectScholar = (scholar: ScholarListItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      speaker_name: scholar.name,
+      speaker_organization: scholar.university || prev.speaker_organization,
+      speaker_position: scholar.position || prev.speaker_position,
+      speaker_photo_url: scholar.photo_url || prev.speaker_photo_url,
+    }));
+    setShowScholarDropdown(false);
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.speaker_name;
+      delete next.speaker_organization;
+      return next;
+    });
+  };
+
+  const handleNavigateToAddScholar = () => {
+    onClose();
+    navigate("/scholars/add");
+  };
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -270,7 +348,7 @@ export function ActivityFormModal({
                   />
                 </div>
 
-                {/* Series Number */}
+                {/* Series Number + Certificate */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -402,25 +480,110 @@ export function ActivityFormModal({
               {speakerExpanded && (
                 <div className="space-y-4 pt-2">
                   <div className="grid grid-cols-2 gap-4">
+                    {/* Speaker name with scholar autocomplete */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         主讲人姓名 <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
                         <input
+                          ref={speakerInputRef}
                           type="text"
                           value={formData.speaker_name}
-                          onChange={(e) =>
-                            set("speaker_name", e.target.value)
-                          }
-                          placeholder="请输入姓名"
+                          onChange={(e) => set("speaker_name", e.target.value)}
+                          onFocus={() => {
+                            if (scholarResults.length > 0)
+                              setShowScholarDropdown(true);
+                          }}
+                          placeholder="输入姓名从学者库搜索"
                           className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                             errors.speaker_name
                               ? "border-red-300"
                               : "border-gray-200"
                           }`}
                         />
+                        {/* Scholar search dropdown */}
+                        {showScholarDropdown && (
+                          <div
+                            ref={dropdownRef}
+                            className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                          >
+                            {scholarSearching ? (
+                              <div className="px-3 py-3 text-xs text-gray-400 text-center">
+                                搜索中...
+                              </div>
+                            ) : scholarResults.length > 0 ? (
+                              <>
+                                <div className="max-h-48 overflow-y-auto">
+                                  {scholarResults.map((scholar) => (
+                                    <button
+                                      key={scholar.url_hash}
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        selectScholar(scholar);
+                                      }}
+                                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors text-left"
+                                    >
+                                      {scholar.photo_url ? (
+                                        <img
+                                          src={scholar.photo_url}
+                                          alt={scholar.name}
+                                          className="w-8 h-8 rounded-full object-cover shrink-0"
+                                        />
+                                      ) : (
+                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                                          <User className="w-4 h-4 text-gray-400" />
+                                        </div>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-900">
+                                          {scholar.name}
+                                        </p>
+                                        <p className="text-xs text-gray-500 truncate">
+                                          {[scholar.position, scholar.university]
+                                            .filter(Boolean)
+                                            .join(" · ")}
+                                        </p>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="border-t border-gray-100 px-3 py-2">
+                                  <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      handleNavigateToAddScholar();
+                                    }}
+                                    className="w-full flex items-center justify-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 py-1"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    找不到？前往新增学者
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="px-3 py-3 text-center">
+                                <p className="text-xs text-gray-500 mb-2">
+                                  学者库中未找到匹配学者
+                                </p>
+                                <button
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleNavigateToAddScholar();
+                                  }}
+                                  className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 mx-auto"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                  前往新增学者
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       {errors.speaker_name && (
                         <p className="mt-1 text-xs text-red-600">
@@ -428,6 +591,8 @@ export function ActivityFormModal({
                         </p>
                       )}
                     </div>
+
+                    {/* Position */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         职务/职称
@@ -443,6 +608,8 @@ export function ActivityFormModal({
                       />
                     </div>
                   </div>
+
+                  {/* Organization */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       所在单位 <span className="text-red-500">*</span>
@@ -469,6 +636,8 @@ export function ActivityFormModal({
                       </p>
                     )}
                   </div>
+
+                  {/* Bio */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       主讲人简介
@@ -481,6 +650,8 @@ export function ActivityFormModal({
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
                     />
                   </div>
+
+                  {/* Photo URL */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       照片文件名

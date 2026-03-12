@@ -12,9 +12,13 @@ import {
   Clock,
   Search,
   CalendarDays,
+  LayoutGrid,
+  CalendarRange,
+  ArrowDownUp,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ActivityFormModal } from "@/components/activity/ActivityFormModal";
+import { ActivityCard } from "@/components/activity/ActivityCard";
 import {
   createActivity,
   fetchActivities,
@@ -58,7 +62,7 @@ const EVENT_TYPE_BADGE: Record<string, string> = {
   其他: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
-// ─── Activity list item in panel ─────────────────────────────────────────────
+// ─── Activity list item in calendar panel ────────────────────────────────────
 function ActivityListItem({
   activity,
   onClick,
@@ -151,9 +155,16 @@ export default function ActivityListPage() {
   const navigate = useNavigate();
   const today = new Date();
 
+  // View mode
+  const [viewMode, setViewMode] = useState<"card" | "calendar">("card");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+
+  // Calendar state
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed
   const [selectedDay, setSelectedDay] = useState<number | null>(null); // null = show full month
+
+  // Common state
   const [activeType, setActiveType] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -183,7 +194,6 @@ export default function ActivityListPage() {
         allItems.push(...pageData.items);
       }
 
-      console.log("Loaded activities:", allItems.length);
       setAllActivities(allItems);
     } catch (err) {
       console.error("Failed to load activities:", err);
@@ -205,7 +215,6 @@ export default function ActivityListPage() {
     });
 
     if (!hasInCurrent) {
-      // Find the activity with the most recent date
       const latest = allActivities.reduce((max, a) =>
         new Date(a.event_date).getTime() > new Date(max.event_date).getTime()
           ? a
@@ -220,7 +229,7 @@ export default function ActivityListPage() {
   }, [allActivities]);
 
   useEffect(() => {
-    autoJumped.current = false; // allow re-jump when type filter changes
+    autoJumped.current = false;
     loadActivities(activeType);
   }, [activeType]);
 
@@ -230,7 +239,7 @@ export default function ActivityListPage() {
       .catch(() => {});
   }, []);
 
-  // Calendar maths
+  // ── Calendar maths ──
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
 
@@ -252,7 +261,7 @@ export default function ActivityListPage() {
     [dayActivities],
   );
 
-  // Panel list
+  // Panel list (calendar view)
   const panelActivities = useMemo<ActivityEvent[]>(() => {
     let list: ActivityEvent[];
     if (selectedDay !== null) {
@@ -278,6 +287,26 @@ export default function ActivityListPage() {
   const panelTitle = selectedDay
     ? `${currentYear}年${currentMonth + 1}月${selectedDay}日`
     : `${currentYear}年${currentMonth + 1}月`;
+
+  // Card view: sorted + filtered activities
+  const cardActivities = useMemo<ActivityEvent[]>(() => {
+    let list = [...allActivities];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (a) =>
+          a.title.toLowerCase().includes(q) ||
+          a.speaker_name.toLowerCase().includes(q) ||
+          a.speaker_organization.toLowerCase().includes(q),
+      );
+    }
+    list.sort((a, b) => {
+      const diff =
+        new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
+      return sortOrder === "desc" ? -diff : diff;
+    });
+    return list;
+  }, [allActivities, searchQuery, sortOrder]);
 
   // Month navigation
   const prevMonth = () => {
@@ -350,14 +379,41 @@ export default function ActivityListPage() {
               场活动
             </p>
           </div>
-          <button
-            onClick={() => setFormModalOpen(true)}
-            disabled={isSubmitting}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
-          >
-            <Plus className="w-4 h-4" />
-            添加活动
-          </button>
+          <div className="flex items-center gap-2">
+            {/* View mode toggle */}
+            <div className="flex bg-gray-100 rounded-lg p-1 gap-0.5">
+              <button
+                onClick={() => setViewMode("card")}
+                title="卡片视图"
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === "card"
+                    ? "bg-white shadow-sm text-primary-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("calendar")}
+                title="日历视图"
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === "calendar"
+                    ? "bg-white shadow-sm text-primary-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <CalendarRange className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              onClick={() => setFormModalOpen(true)}
+              disabled={isSubmitting}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" />
+              添加活动
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -413,7 +469,7 @@ export default function ActivityListPage() {
 
         {/* Type filter + Search */}
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center flex-1">
             <button
               onClick={() => {
                 setActiveType("");
@@ -450,8 +506,20 @@ export default function ActivityListPage() {
                 </span>
               </button>
             ))}
+            {/* Sort toggle — card view only */}
+            {viewMode === "card" && (
+              <button
+                onClick={() =>
+                  setSortOrder((o) => (o === "desc" ? "asc" : "desc"))
+                }
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:border-primary-300 transition-colors"
+              >
+                <ArrowDownUp className="w-3 h-3" />
+                {sortOrder === "desc" ? "最新优先" : "最早优先"}
+              </button>
+            )}
           </div>
-          <div className="relative sm:ml-auto sm:w-60">
+          <div className="relative sm:w-60">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -463,12 +531,36 @@ export default function ActivityListPage() {
           </div>
         </div>
 
-        {/* Calendar + Panel */}
+        {/* Main content */}
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <LoadingSpinner />
           </div>
+        ) : viewMode === "card" ? (
+          /* ── Card grid view ── */
+          cardActivities.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+              <CalendarDays className="w-12 h-12 mb-3 opacity-30" />
+              <p className="text-sm font-medium">暂无活动</p>
+              <p className="text-xs mt-1 opacity-70">
+                尝试调整筛选条件或添加新活动
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+              {cardActivities.map((activity, i) => (
+                <div
+                  key={activity.id}
+                  onClick={() => navigate(`/activities/${activity.id}`)}
+                  className="cursor-pointer"
+                >
+                  <ActivityCard activity={activity} index={i} />
+                </div>
+              ))}
+            </div>
+          )
         ) : (
+          /* ── Calendar + Panel view ── */
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
             {/* ── Calendar ── */}
             <div className="lg:col-span-3 bg-white rounded-xl border border-gray-200 p-5">
@@ -557,9 +649,9 @@ export default function ActivityListPage() {
                         {/* Activity dots */}
                         {hasActs && (
                           <div className="flex gap-0.5 items-center">
-                            {acts.slice(0, 3).map((a, i) => (
+                            {acts.slice(0, 3).map((a, idx) => (
                               <span
-                                key={i}
+                                key={idx}
                                 className={`w-1.5 h-1.5 rounded-full ${
                                   isSelected
                                     ? "bg-white/80"
