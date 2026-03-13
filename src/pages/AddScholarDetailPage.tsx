@@ -9,14 +9,16 @@ import type {
   AwardRecord,
 } from "@/services/scholarApi";
 import { createScholar } from "@/services/scholarApi";
+import type { ScholarDetailPatch } from "@/services/scholarApi";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
 import { RelationCard } from "@/components/scholar-detail/sections/RelationCard";
+import { ProjectsCard } from "@/components/scholar-detail/sections/ProjectsCard";
 import { AchievementsDetailCard } from "@/components/scholar-detail/sections/AchievementsDetailCard";
 import { EditAchievementsModal } from "@/components/scholar-detail/modals/EditAchievementsModal";
+import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfileModal";
 import { staggerContainer, slideInLeft } from "@/utils/animations";
 import { cn } from "@/utils/cn";
 
-type ScholarDetailPatch = Partial<Omit<ScholarDetail, "url_hash">>;
 
 const emptyScholar: ScholarDetail = {
   url_hash: "new",
@@ -82,6 +84,7 @@ export default function AddScholarDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Basic field save handler
   const handleFieldSave = async (patch: ScholarDetailPatch) => {
@@ -219,6 +222,18 @@ export default function AddScholarDetailPage() {
           />
         )}
       </AnimatePresence>
+      <AnimatePresence>
+        {showProfileModal && (
+          <EditProfileModal
+            scholar={scholar}
+            onClose={() => setShowProfileModal(false)}
+            onSubmit={async (patch: ScholarDetailPatch) => {
+              await handleFieldSave(patch);
+              setShowProfileModal(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-[1600px] mx-auto px-4 py-6">
@@ -277,6 +292,7 @@ export default function AddScholarDetailPage() {
                 onEducationSave={handleEducationSave}
                 onManagementRolesSave={handleManagementRolesSave}
                 onManagementRolesInlineSave={handleManagementRolesInlineSave}
+                onEditProfile={() => setShowProfileModal(true)}
               />
             </motion.div>
 
@@ -293,6 +309,8 @@ export default function AddScholarDetailPage() {
                 onRelationNotesSave={handleRelationNotesSave}
                 onSaveExchangeRecords={handleSaveExchangeRecords}
               />
+
+              <ProjectsCard projects={scholar.joint_research_projects} />
 
               <AchievementsDetailCard
                 scholar={scholar}

@@ -357,10 +357,16 @@ export default function HomePage() {
     return new Set(getAncestorIds(activeTab, activeSubTab));
   });
 
+  // Top-level node IDs for accordion logic
+  const topLevelIds = NAV_TREE.map((n) => n.id);
+
   useEffect(() => {
     const ancestors = getAncestorIds(activeTab, activeSubTab);
     setExpandedIds((prev) => {
-      const next = new Set(prev);
+      // Remove other top-level IDs (accordion: only one top-level open)
+      const next = new Set(
+        [...prev].filter((id) => !topLevelIds.includes(id)),
+      );
       ancestors.forEach((id) => next.add(id));
       return next;
     });
@@ -373,8 +379,15 @@ export default function HomePage() {
   const handleToggle = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        // Accordion: if toggling a top-level item, close other top-level items
+        if (topLevelIds.includes(id)) {
+          topLevelIds.forEach((tid) => next.delete(tid));
+        }
+        next.add(id);
+      }
       return next;
     });
   };
@@ -411,7 +424,7 @@ export default function HomePage() {
         </div>
 
         {/* Navigation Tree */}
-        <nav className="flex-1 overflow-y-auto custom-scrollbar py-4 px-3">
+        <nav className="flex-1 overflow-y-auto scrollbar-hide py-4 px-3">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3 px-3">
             核心数据库
           </p>

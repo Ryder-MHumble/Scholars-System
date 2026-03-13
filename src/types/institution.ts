@@ -4,6 +4,39 @@ export interface InstitutionDepartmentListItem {
   org_name: string;
 }
 
+// ---------------------------------------------------------------------------
+// Institution Tree types (for /api/v1/institutions/scholars/tree)
+// ---------------------------------------------------------------------------
+
+export interface InstitutionTreeDepartment {
+  name: string;
+  scholar_count: number;
+}
+
+export interface InstitutionTreeInstitution {
+  id: string;
+  name: string;
+  scholar_count: number;
+  departments: InstitutionTreeDepartment[];
+}
+
+export interface InstitutionTreeCategory {
+  category: string;
+  scholar_count: number;
+  institutions: InstitutionTreeInstitution[];
+}
+
+export interface InstitutionTreeGroup {
+  group: string;
+  scholar_count: number;
+  categories: InstitutionTreeCategory[];
+}
+
+export interface InstitutionTreeResponse {
+  total_scholar_count: number;
+  groups: InstitutionTreeGroup[];
+}
+
 export interface InstitutionListItem {
   id: string;
   name: string;

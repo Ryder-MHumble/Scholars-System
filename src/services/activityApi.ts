@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.DEV
-  ? "http://localhost:8002"
+  ? "http://localhost:8001"
   : "http://43.98.254.243:8001";
 
 // List item (from GET /api/v1/events/)

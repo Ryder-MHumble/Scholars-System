@@ -11,9 +11,12 @@ export default defineConfig(() => ({
     },
   },
   server: {
-    // Allow external access to dev server
     host: "0.0.0.0",
     port: 5174,
     proxy: undefined,
+    watch: {
+      usePolling: true,
+      interval: 1000,
+    },
   },
 }));

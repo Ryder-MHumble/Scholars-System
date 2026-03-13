@@ -6,6 +6,7 @@ import { useScholarDetail } from "@/hooks/useScholarDetail";
 import { PageSkeleton } from "@/components/scholar-detail/shared/SkeletonLoader";
 import { AddUpdateModal } from "@/components/scholar-detail/modals/AddUpdateModal";
 import { EditAchievementsModal } from "@/components/scholar-detail/modals/EditAchievementsModal";
+import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfileModal";
 import { ContactModal } from "@/components/scholar-detail/modals/ContactModal";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
 import { RelationCard } from "@/components/scholar-detail/sections/RelationCard";
@@ -39,6 +40,7 @@ export default function ScholarDetailPageDemo() {
   const [showContactModal, setShowContactModal] = useState(false);
   const [showAddUpdate, setShowAddUpdate] = useState(false);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const getBackLink = () => {
     const prevLocation = location.state?.from;
@@ -99,6 +101,17 @@ export default function ScholarDetailPageDemo() {
           />
         )}
       </AnimatePresence>
+      <AnimatePresence>
+        {showProfileModal && (
+          <EditProfileModal
+            scholar={scholar}
+            onClose={() => setShowProfileModal(false)}
+            onSubmit={async (patch) => {
+              await handleFieldSave(patch);
+            }}
+          />
+        )}
+      </AnimatePresence>
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-[1600px] mx-auto px-4 py-6">
           {/* Header with breadcrumb and actions */}
@@ -126,6 +139,7 @@ export default function ScholarDetailPageDemo() {
               onEducationSave={handleEducationSave}
               onManagementRolesSave={handleManagementRolesSave}
               onManagementRolesInlineSave={handleSaveManagementRolesInline}
+              onEditProfile={() => setShowProfileModal(true)}
             />
 
             {/* Center Content */}

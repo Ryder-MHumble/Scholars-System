@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.DEV
-  ? "http://localhost:8002"
+  ? "http://localhost:8001"
   : "http://43.98.254.243:8001";
 
 export interface AdjunctSupervisorInfo {
@@ -154,6 +154,8 @@ export interface ScholarListFilters {
   department?: string;
   search?: string;
   is_adjunct_supervisor?: boolean;
+  institution_group?: string;
+  institution_category?: string;
 }
 
 export interface NewScholarUpdate {
@@ -274,6 +276,10 @@ export async function fetchScholarList(
   if (filters?.search) params.set("keyword", filters.search);
   if (filters?.is_adjunct_supervisor)
     params.set("is_adjunct_supervisor", "true");
+  if (filters?.institution_group)
+    params.set("institution_group", filters.institution_group);
+  if (filters?.institution_category)
+    params.set("institution_category", filters.institution_category);
 
   const res = await fetch(`${BASE_URL}/api/v1/scholars/?${params}`);
   if (!res.ok) throw new Error(`Failed to fetch scholar list: ${res.status}`);

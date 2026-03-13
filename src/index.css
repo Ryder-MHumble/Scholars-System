@@ -59,6 +59,9 @@
 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 3px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #9ca3af; }
 
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;

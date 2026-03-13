@@ -547,7 +547,7 @@ export default function ActivityListPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 items-stretch">
               {cardActivities.map((activity, i) => (
                 <div
                   key={activity.id}

@@ -2,6 +2,7 @@ import type {
   InstitutionListResponse,
   InstitutionDetail,
   InstitutionPatchRequest,
+  InstitutionTreeResponse,
 } from "@/types/institution";
 
 export interface InstitutionCreateRequest {
@@ -44,7 +45,7 @@ export interface InstitutionCreateRequest {
 }
 
 const BASE_URL = import.meta.env.DEV
-  ? "http://localhost:8002"
+  ? "http://localhost:8001"
   : "http://43.98.254.243:8001";
 
 export async function fetchInstitutionList(
@@ -59,6 +60,12 @@ export async function fetchInstitutionList(
     `${BASE_URL}/api/v1/institutions/scholars/?${params}`,
   );
   if (!res.ok) throw new Error(`机构列表加载失败: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchInstitutionTree(): Promise<InstitutionTreeResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/institutions/scholars/tree`);
+  if (!res.ok) throw new Error(`机构分类树加载失败: ${res.status}`);
   return res.json();
 }
 

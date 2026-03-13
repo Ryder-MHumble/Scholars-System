@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -23,11 +23,7 @@ import type {
   ScholarDetail,
   ScholarDetailPatch,
   EducationRecord,
-  UniversityOption,
 } from "@/services/scholarApi";
-import { fetchUniversities } from "@/services/scholarApi";
-import { ClickToEditField } from "@/components/scholar-detail/shared/ClickToEditField";
-import { ClickToEditWithAutocomplete } from "@/components/scholar-detail/shared/ClickToEditWithAutocomplete";
 import { SideLabel } from "@/components/scholar-detail/shared/SideLabel";
 import { ManagementRoleFormModal } from "@/components/scholar-detail/modals/ManagementRoleFormModal";
 import { EditEducationModal } from "@/components/scholar-detail/modals/EditEducationModal";
@@ -39,10 +35,11 @@ const BIO_LIMIT = 200;
 
 interface DetailLeftSidebarProps {
   scholar: ScholarDetail;
-  onFieldSave: (patch: ScholarDetailPatch) => Promise<void>;
+  onFieldSave?: (patch: ScholarDetailPatch) => Promise<void>;
   onEducationSave: (records: EducationRecord[]) => Promise<void>;
   onManagementRolesSave: (records: string[]) => Promise<void>;
   onManagementRolesInlineSave: (roles: string[]) => Promise<void>;
+  onEditProfile?: () => void;
 }
 
 export function DetailLeftSidebar({
@@ -51,24 +48,13 @@ export function DetailLeftSidebar({
   onEducationSave,
   onManagementRolesSave,
   onManagementRolesInlineSave,
+  onEditProfile,
 }: DetailLeftSidebarProps) {
   const [bioExpanded, setBioExpanded] = useState(false);
 
-  // Universities + departments autocomplete data
-  const [universities, setUniversities] = useState<UniversityOption[]>([]);
-  useEffect(() => {
-    fetchUniversities()
-      .then(setUniversities)
-      .catch(() => {});
-  }, []);
-  const universityNames = universities.map((u) => u.university);
-  const departmentsForCurrent =
-    universities.find((u) => u.university === scholar.university)
-      ?.departments ?? [];
-
-  // Photo editing
+  // Photo URL inline editing
   const [isEditingPhoto, setIsEditingPhoto] = useState(false);
-  const [photoUrlInput, setPhotoUrlInput] = useState("");
+  const [photoUrlDraft, setPhotoUrlDraft] = useState("");
 
   // Education modal
   const [showEducationModal, setShowEducationModal] = useState(false);
@@ -198,105 +184,108 @@ export function DetailLeftSidebar({
           className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
         >
           {/* Profile Header */}
-          <div className="p-6">
+          <div className="p-6 relative">
             <div className="flex items-center gap-4 mb-5">
-              {/* Avatar */}
-              <div className="relative flex-shrink-0 group">
-                {isEditingPhoto ? (
-                  <PhotoEditor
-                    photoUrlInput={photoUrlInput}
-                    setPhotoUrlInput={setPhotoUrlInput}
-                    onSave={async () => {
-                      await onFieldSave({ photo_url: photoUrlInput });
-                      setIsEditingPhoto(false);
-                    }}
-                    onCancel={() => {
-                      setIsEditingPhoto(false);
-                      setPhotoUrlInput("");
-                    }}
+              {/* Avatar — click to edit photo URL */}
+              <div
+                className="flex-shrink-0 relative group cursor-pointer"
+                onClick={() => {
+                  if (!isEditingPhoto && onFieldSave) {
+                    setPhotoUrlDraft(scholar.photo_url || "");
+                    setIsEditingPhoto(true);
+                  }
+                }}
+                title={onFieldSave ? "点击修改头像 URL" : undefined}
+              >
+                {scholar.photo_url ? (
+                  <img
+                    src={scholar.photo_url}
+                    alt={scholar.name}
+                    className="w-[120px] h-[120px] rounded-2xl object-cover border border-gray-200 shadow-sm"
                   />
                 ) : (
-                  <>
-                    {scholar.photo_url ? (
-                      <img
-                        src={scholar.photo_url}
-                        alt={scholar.name}
-                        className="w-[120px] h-[120px] rounded-2xl object-cover border border-gray-200 shadow-sm"
-                      />
-                    ) : (
-                      <div className="w-[120px] h-[120px] rounded-2xl flex items-center justify-center text-4xl font-bold bg-primary-600 text-white shadow-sm">
-                        {getInitial(scholar.name)}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => {
-                        setPhotoUrlInput(scholar.photo_url || "");
-                        setIsEditingPhoto(true);
-                      }}
-                      className="absolute inset-0 rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                      title="修改头像"
-                    >
-                      <Edit3 className="w-5 h-5 text-white" />
-                    </button>
-                  </>
+                  <div className="w-[120px] h-[120px] rounded-2xl flex items-center justify-center text-4xl font-bold bg-primary-600 text-white shadow-sm">
+                    {getInitial(scholar.name)}
+                  </div>
+                )}
+                {onFieldSave && !isEditingPhoto && (
+                  <div className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-colors">
+                    <Edit3 className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                 )}
               </div>
+              {isEditingPhoto && onFieldSave && (
+                <div className="absolute left-6 top-[140px] z-10 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-[calc(100%-48px)]">
+                  <label className="text-xs text-gray-500 mb-1 block">头像 URL</label>
+                  <input
+                    type="text"
+                    value={photoUrlDraft}
+                    onChange={(e) => setPhotoUrlDraft(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full text-sm border border-gray-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <div className="flex justify-end gap-1.5 mt-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setIsEditingPhoto(false); }}
+                      className="text-xs px-2.5 py-1 border border-gray-200 text-gray-500 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await onFieldSave({ photo_url: photoUrlDraft });
+                        setIsEditingPhoto(false);
+                      }}
+                      className="text-xs px-2.5 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
+                    >
+                      确定
+                    </button>
+                  </div>
+                </div>
+              )}
 
-              {/* Info — name / name_en / university / department / position */}
+              {/* Info */}
               <div className="flex-1 min-w-0 space-y-1">
                 <h2 className="text-lg font-bold text-gray-900 leading-snug truncate">
-                  <ClickToEditField
-                    value={scholar.name}
-                    onSave={async (val) => onFieldSave({ name: val })}
-                    className="text-lg font-bold text-gray-900"
-                  />
+                  {scholar.name}
                 </h2>
-                <div className="text-xs text-gray-400">
-                  <ClickToEditField
-                    value={scholar.name_en || ""}
-                    onSave={async (val) => onFieldSave({ name_en: val })}
-                    placeholder="点击添加英文名"
-                  />
-                </div>
-                <div className="flex items-center gap-1 text-sm text-gray-600">
-                  <Building2 className="w-3 h-3 text-gray-400 shrink-0" />
-                  <ClickToEditWithAutocomplete
-                    value={scholar.university || ""}
-                    onSave={async (val) => onFieldSave({ university: val })}
-                    options={universityNames}
-                    placeholder="点击添加院校"
-                    className={
-                      !scholar.university ? "text-gray-400" : "text-gray-600"
-                    }
-                  />
-                </div>
-                <div className="text-xs text-gray-500">
-                  <ClickToEditWithAutocomplete
-                    value={scholar.department || ""}
-                    onSave={async (val) => onFieldSave({ department: val })}
-                    options={departmentsForCurrent}
-                    placeholder="点击添加院系"
-                    className={
-                      !scholar.department ? "text-gray-400" : "text-gray-500"
-                    }
-                  />
-                </div>
-                <div className="text-sm font-medium text-gray-700">
-                  <ClickToEditField
-                    value={scholar.position || ""}
-                    onSave={async (val) => onFieldSave({ position: val })}
-                    placeholder="点击添加职称"
-                    className={
-                      !scholar.position ? "text-gray-400" : "text-gray-700"
-                    }
-                  />
-                </div>
+                {scholar.name_en && (
+                  <p className="text-xs text-gray-400">{scholar.name_en}</p>
+                )}
+                {scholar.university && (
+                  <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <Building2 className="w-3 h-3 text-gray-400 shrink-0" />
+                    <span className="truncate">{scholar.university}</span>
+                  </div>
+                )}
+                {scholar.department && (
+                  <p className="text-xs text-gray-500">{scholar.department}</p>
+                )}
+                {scholar.position && (
+                  <p className="text-sm font-medium text-gray-700">
+                    {scholar.position}
+                  </p>
+                )}
               </div>
             </div>
 
+            {/* Edit Profile Button */}
+            {onEditProfile && (
+              <button
+                onClick={onEditProfile}
+                className="w-full flex items-center justify-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-primary-50 hover:text-primary-600 hover:border-primary-200 transition-colors"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                编辑资料
+              </button>
+            )}
+
             {/* Academic titles */}
             {scholar.academic_titles.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-4">
+              <div className="flex flex-wrap gap-1.5 mt-4">
                 {scholar.academic_titles.slice(0, 3).map((t) => (
                   <span
                     key={t}
@@ -309,7 +298,7 @@ export function DetailLeftSidebar({
               </div>
             )}
             {scholar.is_academician && (
-              <div className="flex flex-wrap gap-1.5 mb-4">
+              <div className="flex flex-wrap gap-1.5 mt-4">
                 <span className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-red-50 text-red-700 rounded-full border border-red-200">
                   <Award className="w-3 h-3" />
                   院士
@@ -322,114 +311,85 @@ export function DetailLeftSidebar({
           <div className="px-5 py-4 border-t border-gray-100">
             <SideLabel icon={Mail} title="联系方式" />
             <div className="space-y-2.5">
-              <div className="flex items-center gap-2.5 text-sm">
-                <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <ClickToEditField
-                  value={scholar.email || ""}
-                  onSave={async (val) => onFieldSave({ email: val })}
-                  placeholder="点击添加邮箱"
-                  renderValue={
-                    scholar.email ? (
-                      <a
-                        href={`mailto:${scholar.email}`}
-                        className="hover:text-primary-600 truncate transition-colors text-gray-600"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {scholar.email}
-                      </a>
-                    ) : undefined
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-2.5 text-sm">
-                <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <ClickToEditField
-                  value={scholar.phone || ""}
-                  onSave={async (val) => onFieldSave({ phone: val })}
-                  placeholder="点击添加电话"
-                  className={!scholar.phone ? "text-gray-400" : "text-gray-600"}
-                />
-              </div>
-              <div className="flex items-center gap-2.5 text-sm">
-                <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <ClickToEditField
-                  value={scholar.office || ""}
-                  onSave={async (val) => onFieldSave({ office: val })}
-                  placeholder="点击添加办公室"
-                  className={
-                    !scholar.office ? "text-gray-400" : "text-gray-600"
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-2.5 text-sm">
-                <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <ClickToEditField
-                  value={scholar.profile_url || ""}
-                  onSave={async (val) => onFieldSave({ profile_url: val })}
-                  placeholder="点击添加个人主页"
-                  renderValue={
-                    scholar.profile_url ? (
-                      <a
-                        href={scholar.profile_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-primary-600 flex items-center gap-1 transition-colors text-gray-600"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        个人主页
-                        <ExternalLink className="w-3 h-3 shrink-0" />
-                      </a>
-                    ) : undefined
-                  }
-                />
-              </div>
+              {scholar.email && (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  <a
+                    href={`mailto:${scholar.email}`}
+                    className="hover:text-primary-600 truncate transition-colors text-gray-600"
+                  >
+                    {scholar.email}
+                  </a>
+                </div>
+              )}
+              {scholar.phone && (
+                <div className="flex items-center gap-2.5 text-sm text-gray-600">
+                  <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  <span>{scholar.phone}</span>
+                </div>
+              )}
+              {scholar.office && (
+                <div className="flex items-center gap-2.5 text-sm text-gray-600">
+                  <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  <span>{scholar.office}</span>
+                </div>
+              )}
+              {scholar.profile_url && (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  <a
+                    href={scholar.profile_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-primary-600 flex items-center gap-1 transition-colors text-gray-600"
+                  >
+                    个人主页
+                    <ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                </div>
+              )}
+              {!scholar.email &&
+                !scholar.phone &&
+                !scholar.office &&
+                !scholar.profile_url && (
+                  <p className="text-xs text-gray-300 italic">暂无联系方式</p>
+                )}
             </div>
           </div>
 
           {/* Academic Links */}
-          <AcademicLinksSection faculty={scholar} onFieldSave={onFieldSave} />
+          <AcademicLinksSection scholar={scholar} />
 
           {/* Bio */}
           <div className="px-5 py-4 border-t border-gray-100">
             <SideLabel icon={User} title="个人简介" />
-            <ClickToEditField
-              value={bioText}
-              onSave={async (val) => onFieldSave({ bio: val })}
-              multiline
-              placeholder="点击添加个人简介"
-              renderValue={
-                bioText ? (
-                  <>
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      {bioNeedsExpand && !bioExpanded
-                        ? bioText.slice(0, BIO_LIMIT) + "..."
-                        : bioText}
-                    </p>
-                    {bioNeedsExpand && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setBioExpanded((v) => !v);
-                        }}
-                        className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 transition-colors"
-                      >
-                        {bioExpanded ? (
-                          <>
-                            <ChevronUp className="w-3 h-3" /> 收起
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="w-3 h-3" /> 展开全文
-                          </>
-                        )}
-                      </button>
+            {bioText ? (
+              <>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {bioNeedsExpand && !bioExpanded
+                    ? bioText.slice(0, BIO_LIMIT) + "..."
+                    : bioText}
+                </p>
+                {bioNeedsExpand && (
+                  <button
+                    onClick={() => setBioExpanded((v) => !v)}
+                    className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+                  >
+                    {bioExpanded ? (
+                      <>
+                        <ChevronUp className="w-3 h-3" /> 收起
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-3 h-3" /> 展开全文
+                      </>
                     )}
-                  </>
-                ) : (
-                  <span className="text-sm text-gray-400 italic">未添加</span>
-                )
-              }
-            />
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-gray-300 italic">暂无个人简介</p>
+            )}
           </div>
 
           {/* Education */}
@@ -444,13 +404,7 @@ export function DetailLeftSidebar({
               </button>
             </div>
             {eduItems.length === 0 ? (
-              <div className="text-sm text-gray-600">
-                <ClickToEditField
-                  value=""
-                  onSave={async (val) => onFieldSave({ phd_institution: val })}
-                  placeholder="点击添加博士培养院校"
-                />
-              </div>
+              <p className="text-xs text-gray-300 italic">暂无教育经历</p>
             ) : (
               <div className="space-y-4">
                 {eduItems.map((edu, i) => (
@@ -472,17 +426,11 @@ export function DetailLeftSidebar({
                           </span>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600">
-                        <ClickToEditField
-                          value={String(edu.institution || "")}
-                          onSave={async (val) =>
-                            onFieldSave({ phd_institution: val })
-                          }
-                          placeholder="点击编辑院校名称"
-                        />
-                      </div>
+                      <p className="text-sm text-gray-600">
+                        {edu.institution || ""}
+                      </p>
                       {edu.major && (
-                        <div className="text-xs text-gray-400">{edu.major}</div>
+                        <p className="text-xs text-gray-400">{edu.major}</p>
                       )}
                     </div>
                   </div>
@@ -583,33 +531,20 @@ export function DetailLeftSidebar({
           {/* Research Areas */}
           <div className="px-5 py-4 border-t border-gray-100">
             <SideLabel icon={BookOpen} title="研究方向" />
-            <ClickToEditField
-              value={(scholar.research_areas ?? []).join(", ")}
-              onSave={async (val) =>
-                onFieldSave({
-                  research_areas: val
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                })
-              }
-              multiline
-              placeholder="点击添加研究方向（多个方向用逗号分隔）"
-              renderValue={
-                scholar.research_areas && scholar.research_areas.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {scholar.research_areas.slice(0, 10).map((area) => (
-                      <span
-                        key={area}
-                        className="text-xs px-2 py-1 bg-primary-50 text-primary-700 rounded-full border border-primary-100"
-                      >
-                        {area}
-                      </span>
-                    ))}
-                  </div>
-                ) : undefined
-              }
-            />
+            {scholar.research_areas && scholar.research_areas.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {scholar.research_areas.slice(0, 10).map((area) => (
+                  <span
+                    key={area}
+                    className="text-xs px-2 py-1 bg-primary-50 text-primary-700 rounded-full border border-primary-100"
+                  >
+                    {area}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-300 italic">暂无研究方向</p>
+            )}
           </div>
         </motion.div>
       </motion.aside>
@@ -617,68 +552,8 @@ export function DetailLeftSidebar({
   );
 }
 
-/* -- Photo editor sub-component -- */
-function PhotoEditor({
-  photoUrlInput,
-  setPhotoUrlInput,
-  onSave,
-  onCancel,
-}: {
-  photoUrlInput: string;
-  setPhotoUrlInput: (v: string) => void;
-  onSave: () => Promise<void>;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="w-[120px] flex flex-col gap-1">
-      {photoUrlInput ? (
-        <img
-          src={photoUrlInput}
-          alt="预览"
-          className="w-[120px] h-[120px] rounded-2xl object-cover border border-primary-300"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-      ) : (
-        <div className="w-[120px] h-[120px] rounded-2xl flex items-center justify-center text-xs text-gray-400 bg-gray-100 border border-dashed border-gray-300">
-          预览
-        </div>
-      )}
-      <input
-        autoFocus
-        type="text"
-        value={photoUrlInput}
-        onChange={(e) => setPhotoUrlInput(e.target.value)}
-        className="w-full text-xs border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-        placeholder="粘贴图片 URL"
-      />
-      <div className="flex gap-1">
-        <button
-          onClick={onSave}
-          className="flex-1 text-xs bg-primary-600 text-white rounded py-0.5 hover:bg-primary-700 transition-colors"
-        >
-          <Check className="w-3 h-3 inline" />
-        </button>
-        <button
-          onClick={onCancel}
-          className="flex-1 text-xs border border-gray-200 text-gray-500 rounded py-0.5 hover:bg-gray-50 transition-colors"
-        >
-          <X className="w-3 h-3 inline" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /* -- Academic links sub-component -- */
-function AcademicLinksSection({
-  faculty: scholar,
-  onFieldSave,
-}: {
-  faculty: ScholarDetail;
-  onFieldSave: (patch: ScholarDetailPatch) => Promise<void>;
-}) {
+function AcademicLinksSection({ scholar }: { scholar: ScholarDetail }) {
   if (
     !scholar.google_scholar_url &&
     !scholar.dblp_url &&
@@ -689,17 +564,9 @@ function AcademicLinksSection({
   }
 
   const links = [
-    {
-      label: "Google Scholar",
-      value: scholar.google_scholar_url,
-      field: "google_scholar_url" as const,
-    },
-    { label: "DBLP", value: scholar.dblp_url, field: "dblp_url" as const },
-    {
-      label: "实验室网站",
-      value: scholar.lab_url,
-      field: "lab_url" as const,
-    },
+    { label: "Google Scholar", value: scholar.google_scholar_url },
+    { label: "DBLP", value: scholar.dblp_url },
+    { label: "实验室网站", value: scholar.lab_url },
   ];
 
   return (
@@ -709,33 +576,23 @@ function AcademicLinksSection({
         {links.map(
           (link) =>
             link.value && (
-              <div key={link.field} className="text-xs">
+              <div key={link.label} className="text-xs">
                 <label className="text-gray-400 block mb-1">{link.label}</label>
-                <ClickToEditField
-                  value={link.value}
-                  onSave={async (val) => onFieldSave({ [link.field]: val })}
-                  renderValue={
-                    <a
-                      href={link.value}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary-600 hover:underline truncate block"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {link.value}
-                    </a>
-                  }
-                />
+                <a
+                  href={link.value}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary-600 hover:underline truncate block"
+                >
+                  {link.value}
+                </a>
               </div>
             ),
         )}
         {scholar.orcid && (
           <div className="text-xs">
             <label className="text-gray-400 block mb-1">ORCID</label>
-            <ClickToEditField
-              value={scholar.orcid}
-              onSave={async (val) => onFieldSave({ orcid: val })}
-            />
+            <span className="text-gray-600">{scholar.orcid}</span>
           </div>
         )}
       </div>
