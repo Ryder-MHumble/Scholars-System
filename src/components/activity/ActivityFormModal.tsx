@@ -26,6 +26,12 @@ import type {
   ActivityCreateRequest,
   ActivityUpdateRequest,
 } from "@/services/activityApi";
+import {
+  getSubcategoriesByCategory,
+  getTypesBySubcategory,
+  getCategoryByType,
+  getAllCategories,
+} from "@/constants/activityCategories";
 
 interface ActivityFormModalProps {
   isOpen: boolean;
@@ -37,12 +43,15 @@ interface ActivityFormModalProps {
   mode: "create" | "edit";
 }
 
-const EVENT_TYPES = [
-  "学科前沿讲座",
-  "前沿沙龙",
-  "学术带头人论坛",
-  "讲座",
-  "其他",
+const SERIES_OPTIONS = [
+  "XAI智汇讲坛",
+  "国际AI科学家大会",
+  "学术年会",
+  "青年论坛",
+  "国际暑校",
+  "开学典礼",
+  "共建高校座谈会",
+  "委员会会议",
 ];
 
 const AUDIT_STATUSES = [
@@ -54,7 +63,9 @@ const AUDIT_STATUSES = [
 type FormData = Omit<ActivityCreateRequest, "scholar_ids">;
 
 const defaultForm: FormData = {
+  category: "",
   event_type: "",
+  series: "",
   series_number: "",
   title: "",
   abstract: "",
@@ -88,6 +99,14 @@ export function ActivityFormModal({
   const [speakerExpanded, setSpeakerExpanded] = useState(true);
   const [adminExpanded, setAdminExpanded] = useState(false);
 
+  // Category cascade state
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
+  const [availableSubcategories, setAvailableSubcategories] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
+
   // Scholar autocomplete
   const [scholarResults, setScholarResults] = useState<ScholarListItem[]>([]);
   const [scholarSearching, setScholarSearching] = useState(false);
@@ -106,7 +125,9 @@ export function ActivityFormModal({
             ? detail.event_date.slice(0, 16)
             : "";
           setFormData({
+            category: detail.category ?? "",
             event_type: detail.event_type ?? "",
+            series: detail.series ?? "",
             series_number: detail.series_number ?? "",
             title: detail.title ?? "",
             abstract: detail.abstract ?? "",
@@ -124,11 +145,33 @@ export function ActivityFormModal({
             created_by: detail.created_by ?? "",
             audit_status: detail.audit_status ?? "pending",
           });
+
+          // Initialize cascade state from existing data
+          if (detail.event_type) {
+            const categoryInfo = getCategoryByType(detail.event_type);
+            if (categoryInfo) {
+              setSelectedCategory(categoryInfo.categoryId);
+              setSelectedSubcategory(categoryInfo.subcategoryId);
+              setAvailableSubcategories(
+                getSubcategoriesByCategory(categoryInfo.categoryId).map(
+                  (sub) => ({
+                    id: sub.id,
+                    name: sub.name,
+                  }),
+                ),
+              );
+              setAvailableTypes(
+                getTypesBySubcategory(categoryInfo.subcategoryId),
+              );
+            }
+          }
         })
         .catch(() => {
           setFormData({
             ...defaultForm,
+            category: activity.category ?? "",
             event_type: activity.event_type,
+            series: activity.series ?? "",
             title: activity.title,
             speaker_name: activity.speaker_name,
             speaker_organization: activity.speaker_organization,
@@ -139,6 +182,10 @@ export function ActivityFormModal({
         });
     } else {
       setFormData(defaultForm);
+      setSelectedCategory("");
+      setSelectedSubcategory("");
+      setAvailableSubcategories([]);
+      setAvailableTypes([]);
     }
     setErrors({});
     setSpeakerExpanded(true);
@@ -206,6 +253,55 @@ export function ActivityFormModal({
     });
   };
 
+  // Handle category cascade
+  const handleCategoryChange = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setSelectedSubcategory("");
+    setFormData((prev) => ({ ...prev, category: categoryId, event_type: "" }));
+
+    const subcategories = getSubcategoriesByCategory(categoryId);
+    setAvailableSubcategories(
+      subcategories.map((sub) => ({ id: sub.id, name: sub.name })),
+    );
+    setAvailableTypes([]);
+
+    if (errors.category) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.category;
+        return next;
+      });
+    }
+  };
+
+  const handleSubcategoryChange = (subcategoryId: string) => {
+    setSelectedSubcategory(subcategoryId);
+    setFormData((prev) => ({ ...prev, event_type: "" }));
+
+    const types = getTypesBySubcategory(subcategoryId);
+    setAvailableTypes(types);
+
+    if (errors.event_type) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.event_type;
+        return next;
+      });
+    }
+  };
+
+  const handleEventTypeChange = (eventType: string) => {
+    setFormData((prev) => ({ ...prev, event_type: eventType }));
+
+    if (errors.event_type) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.event_type;
+        return next;
+      });
+    }
+  };
+
   const handleNavigateToAddScholar = () => {
     onClose();
     navigate("/scholars/add");
@@ -213,6 +309,7 @@ export function ActivityFormModal({
 
   const validate = () => {
     const e: Record<string, string> = {};
+    if (!formData.category.trim()) e.category = "活动分类不能为空";
     if (!formData.event_type.trim()) e.event_type = "活动类型不能为空";
     if (!formData.title.trim()) e.title = "活动标题不能为空";
     if (!formData.speaker_name.trim()) e.speaker_name = "主讲人不能为空";
@@ -286,30 +383,96 @@ export function ActivityFormModal({
                 基本信息
               </h3>
               <div className="space-y-4">
-                {/* Event Type */}
+                {/* Category Cascade Selection (三级级联) */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      一级分类 <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => handleCategoryChange(e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white ${
+                        errors.category ? "border-red-300" : "border-gray-200"
+                      }`}
+                    >
+                      <option value="">请选择分类</option>
+                      {getAllCategories().map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.category && (
+                      <p className="mt-1 text-xs text-red-600">
+                        {errors.category}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      二级分类 <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={selectedSubcategory}
+                      onChange={(e) => handleSubcategoryChange(e.target.value)}
+                      disabled={!selectedCategory}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white disabled:bg-gray-50 disabled:cursor-not-allowed ${
+                        errors.event_type ? "border-red-300" : "border-gray-200"
+                      }`}
+                    >
+                      <option value="">请选择二级分类</option>
+                      {availableSubcategories.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      活动类型 <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.event_type}
+                      onChange={(e) => handleEventTypeChange(e.target.value)}
+                      disabled={!selectedSubcategory}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white disabled:bg-gray-50 disabled:cursor-not-allowed ${
+                        errors.event_type ? "border-red-300" : "border-gray-200"
+                      }`}
+                    >
+                      <option value="">请选择活动类型</option>
+                      {availableTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.event_type && (
+                      <p className="mt-1 text-xs text-red-600">
+                        {errors.event_type}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Series */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    活动类型 <span className="text-red-500">*</span>
+                    活动系列
                   </label>
                   <select
-                    value={formData.event_type}
-                    onChange={(e) => set("event_type", e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white ${
-                      errors.event_type ? "border-red-300" : "border-gray-200"
-                    }`}
+                    value={formData.series ?? ""}
+                    onChange={(e) => set("series", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
-                    <option value="">请选择活动类型</option>
-                    {EVENT_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
+                    <option value="">无（独立活动）</option>
+                    {SERIES_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
                       </option>
                     ))}
                   </select>
-                  {errors.event_type && (
-                    <p className="mt-1 text-xs text-red-600">
-                      {errors.event_type}
-                    </p>
-                  )}
                 </div>
 
                 {/* Title */}
@@ -405,9 +568,7 @@ export function ActivityFormModal({
                       value={formData.event_date}
                       onChange={(e) => set("event_date", e.target.value)}
                       className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                        errors.event_date
-                          ? "border-red-300"
-                          : "border-gray-200"
+                        errors.event_date ? "border-red-300" : "border-gray-200"
                       }`}
                     />
                     {errors.event_date && (
@@ -542,7 +703,10 @@ export function ActivityFormModal({
                                           {scholar.name}
                                         </p>
                                         <p className="text-xs text-gray-500 truncate">
-                                          {[scholar.position, scholar.university]
+                                          {[
+                                            scholar.position,
+                                            scholar.university,
+                                          ]
                                             .filter(Boolean)
                                             .join(" · ")}
                                         </p>
@@ -659,9 +823,7 @@ export function ActivityFormModal({
                     <input
                       type="text"
                       value={formData.speaker_photo_url ?? ""}
-                      onChange={(e) =>
-                        set("speaker_photo_url", e.target.value)
-                      }
+                      onChange={(e) => set("speaker_photo_url", e.target.value)}
                       placeholder="例如：zhou-ming-photo.png"
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />

@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.DEV
-  ? "http://localhost:8001"
+  ? "http://localhost:8002"
   : "http://43.98.254.243:8001";
 
 export interface AdjunctSupervisorInfo {
@@ -156,6 +156,8 @@ export interface ScholarListFilters {
   is_adjunct_supervisor?: boolean;
   institution_group?: string;
   institution_category?: string;
+  region?: string;
+  affiliation_type?: string;
 }
 
 export interface NewScholarUpdate {
@@ -176,6 +178,7 @@ export interface RelationPatch {
   joint_research_projects?: string[];
   joint_management_roles?: string[];
   academic_exchange_records?: string[];
+  tags?: string[];
   relation_updated_by?: string;
 }
 
@@ -262,10 +265,44 @@ export interface StudentPatch {
   updated_by?: string;
 }
 
+export interface ScholarUniversityItem {
+  university: string;
+  scholar_count: number;
+  departments: { name: string; scholar_count: number }[];
+}
+
+export async function fetchScholarUniversities(filters?: {
+  region?: string;
+  affiliation_type?: string;
+}): Promise<ScholarUniversityItem[]> {
+  const params = new URLSearchParams();
+  params.set("view", "hierarchy");
+  params.set("entity_type", "organization");
+  if (filters?.region) params.set("region", filters.region);
+  if (filters?.affiliation_type) params.set("org_type", filters.affiliation_type);
+  const query = params.toString();
+  const res = await fetch(`${BASE_URL}/api/v1/institutions${query ? `?${query}` : ""}`);
+  if (!res.ok) throw new Error(`Failed to fetch scholar universities: ${res.status}`);
+  const data = await res.json();
+
+  // Transform the new API response to match the old format
+  // Backend returns: { organizations: [...] }
+  const organizations = data.organizations || data.items || [];
+  return organizations.map((inst: any) => ({
+    university: inst.name,
+    scholar_count: inst.scholar_count || 0,
+    departments: (inst.departments || []).map((dept: any) => ({
+      name: dept.name,
+      scholar_count: dept.scholar_count || 0,
+    })),
+  }));
+}
+
 export async function fetchScholarList(
   page: number = 1,
   pageSize: number = 20,
   filters?: ScholarListFilters,
+  signal?: AbortSignal,
 ): Promise<ScholarListResponse> {
   const params = new URLSearchParams({
     page: String(page),
@@ -280,8 +317,10 @@ export async function fetchScholarList(
     params.set("institution_group", filters.institution_group);
   if (filters?.institution_category)
     params.set("institution_category", filters.institution_category);
+  if (filters?.region) params.set("region", filters.region);
+  if (filters?.affiliation_type) params.set("affiliation_type", filters.affiliation_type);
 
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/?${params}`);
+  const res = await fetch(`${BASE_URL}/api/v1/scholars?${params}`, { signal });
   if (!res.ok) throw new Error(`Failed to fetch scholar list: ${res.status}`);
   return res.json();
 }
@@ -473,7 +512,7 @@ export interface BatchScholarCreateResponse {
 export async function createScholar(
   data: ScholarCreate,
 ): Promise<ScholarDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/`, {
+  const res = await fetch(`${BASE_URL}/api/v1/scholars`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -526,7 +565,23 @@ export interface UniversityOption {
 }
 
 export async function fetchUniversities(): Promise<UniversityOption[]> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/universities`);
-  if (!res.ok) throw new Error(`Failed to fetch universities: ${res.status}`);
-  return res.json();
+  // Use stats endpoint to get universities and departments
+  const stats = await fetchScholarStats();
+  const universityMap = new Map<string, Set<string>>();
+
+  // Build university -> departments mapping
+  stats.by_department.forEach((item) => {
+    if (!universityMap.has(item.university)) {
+      universityMap.set(item.university, new Set());
+    }
+    universityMap.get(item.university)!.add(item.department);
+  });
+
+  // Convert to UniversityOption array
+  return Array.from(universityMap.entries())
+    .map(([university, departments]) => ({
+      university,
+      departments: Array.from(departments).sort(),
+    }))
+    .sort((a, b) => a.university.localeCompare(b.university));
 }

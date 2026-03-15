@@ -40,9 +40,22 @@ export interface InstitutionTreeResponse {
 export interface InstitutionListItem {
   id: string;
   name: string;
+  type: string;
+  entity_type: string;
+  region: string;
+  org_type: string;
+  classification: string | null;
+  sub_classification: string | null;
+  group: string | null;
+  category: string | null;
+  priority: string | null;
   scholar_count: number;
-  departments: InstitutionDepartmentListItem[];
-  org_name: string;
+  student_count_total: number | null;
+  mentor_count: number | null;
+  parent_id: string | null;
+  avatar?: string | null;
+  departments?: InstitutionDepartmentListItem[];
+  org_name?: string;
 }
 
 export interface InstitutionListResponse {
@@ -81,6 +94,7 @@ export interface InstitutionDetail {
   name: string;
   type: string | null;
   org_name: string;
+  avatar?: string | null;
   category: string | null;
   priority: string | null;
   student_count_24: number | null;
@@ -110,6 +124,7 @@ export interface InstitutionDetail {
 
 export interface InstitutionPatchRequest {
   name?: string;
+  avatar?: string | null;
   category?: string;
   priority?: string;
   student_count_24?: number | null;

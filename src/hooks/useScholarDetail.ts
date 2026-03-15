@@ -142,6 +142,15 @@ export function useScholarDetail(scholarId: string | undefined) {
     setScholar(updated);
   };
 
+  // -- Tags save --
+  const handleSaveTags = async (tags: string[]) => {
+    if (!scholar) return;
+    const updated = await patchScholarRelation(scholar.url_hash, {
+      tags,
+    });
+    setScholar(updated);
+  };
+
   return {
     scholar,
     setScholar,
@@ -158,5 +167,6 @@ export function useScholarDetail(scholarId: string | undefined) {
     handleSaveExchangeRecords,
     handleSaveManagementRolesInline,
     handleRelationNotesSave,
+    handleSaveTags,
   };
 }

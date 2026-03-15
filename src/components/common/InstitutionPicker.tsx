@@ -228,9 +228,9 @@ export function InstitutionPicker({
 
                   {/* Departments */}
                   {expandedInstitutions.has(inst.id) &&
-                    inst.departments.length > 0 && (
+                    (inst.departments?.length ?? 0) > 0 && (
                       <div className="bg-white">
-                        {inst.departments.map((dept, idx) => (
+                        {inst.departments?.map((dept, idx) => (
                           <button
                             key={idx}
                             onClick={() =>

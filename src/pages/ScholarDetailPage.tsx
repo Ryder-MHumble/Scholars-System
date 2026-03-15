@@ -34,6 +34,7 @@ export default function ScholarDetailPageDemo() {
     handleSaveExchangeRecords,
     handleSaveManagementRolesInline,
     handleRelationNotesSave,
+    handleSaveTags,
   } = useScholarDetail(scholarId);
 
   // Modal visibility states
@@ -154,6 +155,7 @@ export default function ScholarDetailPageDemo() {
                 onRelationToggle={handleRelationToggle}
                 onRelationNotesSave={handleRelationNotesSave}
                 onSaveExchangeRecords={handleSaveExchangeRecords}
+                onSaveTags={handleSaveTags}
               />
 
               <ProjectsCard projects={scholar.joint_research_projects} />

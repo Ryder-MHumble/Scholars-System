@@ -21,6 +21,7 @@ export function EditProfileModal({
   onSubmit,
 }: EditProfileModalProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [photoImgFailed, setPhotoImgFailed] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -49,7 +50,9 @@ export function EditProfileModal({
   // Universities autocomplete
   const [universities, setUniversities] = useState<UniversityOption[]>([]);
   useEffect(() => {
-    fetchUniversities().then(setUniversities).catch(() => {});
+    fetchUniversities()
+      .then(setUniversities)
+      .catch(() => {});
   }, []);
 
   const universityNames = universities.map((u) => u.university);
@@ -80,7 +83,11 @@ export function EditProfileModal({
     check("phone", form.phone, scholar.phone);
     check("office", form.office, scholar.office);
     check("profile_url", form.profile_url, scholar.profile_url);
-    check("google_scholar_url", form.google_scholar_url, scholar.google_scholar_url);
+    check(
+      "google_scholar_url",
+      form.google_scholar_url,
+      scholar.google_scholar_url,
+    );
     check("dblp_url", form.dblp_url, scholar.dblp_url);
     check("lab_url", form.lab_url, scholar.lab_url);
     check("orcid", form.orcid, scholar.orcid);
@@ -99,7 +106,29 @@ export function EditProfileModal({
     return patch;
   };
 
+  const validateForm = (): string | null => {
+    if (!form.name.trim()) {
+      return "姓名为必填项";
+    }
+    if (!form.university.trim()) {
+      return "院校为必填项";
+    }
+    if (!form.department.trim()) {
+      return "院系为必填项";
+    }
+    if (!form.email.trim() && !form.phone.trim()) {
+      return "邮箱和电话至少需要填写一个";
+    }
+    return null;
+  };
+
   const handleSubmit = async () => {
+    const validationError = validateForm();
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
+
     const patch = buildPatch();
     if (Object.keys(patch).length === 0) {
       onClose();
@@ -133,7 +162,9 @@ export function EditProfileModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-          <h3 className="text-base font-semibold text-gray-900">编辑学者资料</h3>
+          <h3 className="text-base font-semibold text-gray-900">
+            编辑学者资料
+          </h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -147,55 +178,149 @@ export function EditProfileModal({
           {/* Basic Info */}
           <Section title="基本信息">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="姓名" value={form.name} onChange={(v) => set("name", v)} />
-              <Field label="英文名" value={form.name_en} onChange={(v) => set("name_en", v)} placeholder="English Name" />
+              <Field
+                label="姓名"
+                value={form.name}
+                onChange={(v) => set("name", v)}
+                required
+              />
+              <Field
+                label="英文名"
+                value={form.name_en}
+                onChange={(v) => set("name_en", v)}
+                placeholder="English Name"
+              />
             </div>
-            <Field label="头像 URL" value={form.photo_url} onChange={(v) => set("photo_url", v)} placeholder="https://..." />
+            {/* Avatar preview + URL */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">头像</label>
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                  {form.photo_url && !photoImgFailed ? (
+                    <img
+                      src={form.photo_url}
+                      alt="头像预览"
+                      className="w-full h-full object-cover"
+                      onError={() => setPhotoImgFailed(true)}
+                    />
+                  ) : (
+                    <span className="text-lg font-bold text-gray-400">
+                      {form.name.trim().charAt(0) || "?"}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="url"
+                  value={form.photo_url}
+                  onChange={(e) => {
+                    setPhotoImgFailed(false);
+                    set("photo_url", e.target.value);
+                  }}
+                  placeholder="https://..."
+                  className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 transition-colors"
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <AutocompleteField
                 label="院校"
                 value={form.university}
                 onChange={(v) => set("university", v)}
                 options={universityNames}
+                required
               />
               <AutocompleteField
                 label="院系"
                 value={form.department}
                 onChange={(v) => set("department", v)}
                 options={departmentsForCurrent}
+                required
               />
             </div>
-            <Field label="职称" value={form.position} onChange={(v) => set("position", v)} placeholder="教授 / 副教授 / ..." />
+            <Field
+              label="职称"
+              value={form.position}
+              onChange={(v) => set("position", v)}
+              placeholder="教授 / 副教授 / ..."
+            />
           </Section>
 
           {/* Contact */}
-          <Section title="联系方式">
+          <Section title="联系方式（至少填写一项）">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="邮箱" value={form.email} onChange={(v) => set("email", v)} placeholder="email@example.com" />
-              <Field label="电话" value={form.phone} onChange={(v) => set("phone", v)} />
+              <Field
+                label="邮箱"
+                value={form.email}
+                onChange={(v) => set("email", v)}
+                placeholder="email@example.com"
+              />
+              <Field
+                label="电话"
+                value={form.phone}
+                onChange={(v) => set("phone", v)}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="办公室" value={form.office} onChange={(v) => set("office", v)} />
-              <Field label="个人主页" value={form.profile_url} onChange={(v) => set("profile_url", v)} placeholder="https://..." />
+              <Field
+                label="办公室"
+                value={form.office}
+                onChange={(v) => set("office", v)}
+              />
+              <Field
+                label="个人主页"
+                value={form.profile_url}
+                onChange={(v) => set("profile_url", v)}
+                placeholder="https://..."
+              />
             </div>
           </Section>
 
           {/* Academic Links */}
           <Section title="学术链接">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Google Scholar" value={form.google_scholar_url} onChange={(v) => set("google_scholar_url", v)} placeholder="https://..." />
-              <Field label="DBLP" value={form.dblp_url} onChange={(v) => set("dblp_url", v)} placeholder="https://..." />
+              <Field
+                label="Google Scholar"
+                value={form.google_scholar_url}
+                onChange={(v) => set("google_scholar_url", v)}
+                placeholder="https://..."
+              />
+              <Field
+                label="DBLP"
+                value={form.dblp_url}
+                onChange={(v) => set("dblp_url", v)}
+                placeholder="https://..."
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="实验室网站" value={form.lab_url} onChange={(v) => set("lab_url", v)} placeholder="https://..." />
-              <Field label="ORCID" value={form.orcid} onChange={(v) => set("orcid", v)} placeholder="0000-0000-0000-0000" />
+              <Field
+                label="实验室网站"
+                value={form.lab_url}
+                onChange={(v) => set("lab_url", v)}
+                placeholder="https://..."
+              />
+              <Field
+                label="ORCID"
+                value={form.orcid}
+                onChange={(v) => set("orcid", v)}
+                placeholder="0000-0000-0000-0000"
+              />
             </div>
           </Section>
 
           {/* Bio */}
           <Section title="个人简介">
-            <TextareaField label="中文简介" value={form.bio} onChange={(v) => set("bio", v)} rows={4} />
-            <TextareaField label="英文简介" value={form.bio_en} onChange={(v) => set("bio_en", v)} rows={3} />
+            <TextareaField
+              label="中文简介"
+              value={form.bio}
+              onChange={(v) => set("bio", v)}
+              rows={4}
+            />
+            <TextareaField
+              label="英文简介"
+              value={form.bio_en}
+              onChange={(v) => set("bio_en", v)}
+              rows={3}
+            />
           </Section>
 
           {/* Research Areas */}
@@ -204,7 +329,7 @@ export function EditProfileModal({
               label="研究方向"
               value={form.research_areas}
               onChange={(v) => set("research_areas", v)}
-              placeholder="多个方向用逗号分隔"
+              placeholder="多个方向用英文逗号分隔"
             />
           </Section>
         </div>
@@ -254,15 +379,20 @@ function Field({
   value,
   onChange,
   placeholder,
+  required,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  required?: boolean;
 }) {
   return (
     <div>
-      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <label className="block text-xs text-gray-500 mb-1">
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
       <input
         type="text"
         value={value}
@@ -303,11 +433,13 @@ function AutocompleteField({
   value,
   onChange,
   options,
+  required,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
+  required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
@@ -333,7 +465,10 @@ function AutocompleteField({
 
   return (
     <div ref={containerRef} className="relative">
-      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <label className="block text-xs text-gray-500 mb-1">
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
       <div className="relative">
         <input
           type="text"
@@ -351,7 +486,11 @@ function AutocompleteField({
             } else if (e.key === "ArrowUp") {
               e.preventDefault();
               setHighlightIdx((i) => Math.max(i - 1, -1));
-            } else if (e.key === "Enter" && highlightIdx >= 0 && filtered[highlightIdx]) {
+            } else if (
+              e.key === "Enter" &&
+              highlightIdx >= 0 &&
+              filtered[highlightIdx]
+            ) {
               e.preventDefault();
               onChange(filtered[highlightIdx]);
               setOpen(false);

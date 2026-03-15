@@ -130,7 +130,9 @@ export default function ActivityDetailPage() {
   // Refresh scholars after managing
   const refreshScholars = async () => {
     if (!activityId) return;
-    const s = await fetchActivityScholars(activityId).catch(() => [] as ActivityScholar[]);
+    const s = await fetchActivityScholars(activityId).catch(
+      () => [] as ActivityScholar[],
+    );
     setScholars(s);
     // Also refresh detail to get updated scholar_ids
     const d = await fetchActivityDetail(activityId).catch(() => null);
@@ -145,7 +147,8 @@ export default function ActivityDetailPage() {
 
   const handleDelete = async () => {
     if (!detail) return;
-    if (!confirm(`确定要删除活动「${detail.title}」吗？此操作无法撤销。`)) return;
+    if (!confirm(`确定要删除活动「${detail.title}」吗？此操作无法撤销。`))
+      return;
     try {
       setIsDeleting(true);
       setDeleteError(null);
@@ -161,7 +164,9 @@ export default function ActivityDetailPage() {
   const detailAsListItem: ActivityEvent | null = detail
     ? {
         id: detail.id,
+        category: detail.category,
         event_type: detail.event_type,
+        series: detail.series,
         title: detail.title,
         speaker_name: detail.speaker_name,
         speaker_organization: detail.speaker_organization,
@@ -259,7 +264,9 @@ export default function ActivityDetailPage() {
           )}
 
           {/* ── Hero card ── */}
-          <div className={`rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br ${gradient}`}>
+          <div
+            className={`rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br ${gradient}`}
+          >
             <div className="px-7 py-6 text-white">
               {/* Type + Series */}
               <div className="flex items-center gap-3 mb-3">
@@ -268,8 +275,7 @@ export default function ActivityDetailPage() {
                 </span>
                 {detail.series_number && (
                   <span className="text-xs font-semibold bg-white/15 px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <Hash className="w-3 h-3" />
-                    第 {detail.series_number} 期
+                    <Hash className="w-3 h-3" />第 {detail.series_number} 期
                   </span>
                 )}
                 <AuditBadge status={detail.audit_status} />
@@ -285,7 +291,9 @@ export default function ActivityDetailPage() {
                 <span className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 shrink-0" />
                   {formatDate(detail.event_date)}
-                  {timeStr && <span className="ml-1 font-semibold">{timeStr}</span>}
+                  {timeStr && (
+                    <span className="ml-1 font-semibold">{timeStr}</span>
+                  )}
                 </span>
                 {detail.location && (
                   <span className="flex items-center gap-1.5">
@@ -428,30 +436,53 @@ export default function ActivityDetailPage() {
                   活动信息
                 </h3>
 
-                <InfoRow icon={<Calendar className="w-4 h-4 text-blue-500" />} label="日期">
+                <InfoRow
+                  icon={<Calendar className="w-4 h-4 text-blue-500" />}
+                  label="日期"
+                >
                   <span className="text-sm text-gray-700 font-medium">
                     {new Date(detail.event_date).toLocaleDateString("zh-CN")}
-                    {timeStr && <span className="ml-2 text-primary-600">{timeStr}</span>}
+                    {timeStr && (
+                      <span className="ml-2 text-primary-600">{timeStr}</span>
+                    )}
                   </span>
                 </InfoRow>
 
                 {detail.location && (
-                  <InfoRow icon={<MapPin className="w-4 h-4 text-rose-500" />} label="地点">
-                    <span className="text-sm text-gray-700">{detail.location}</span>
+                  <InfoRow
+                    icon={<MapPin className="w-4 h-4 text-rose-500" />}
+                    label="地点"
+                  >
+                    <span className="text-sm text-gray-700">
+                      {detail.location}
+                    </span>
                   </InfoRow>
                 )}
 
                 {detail.duration && (
-                  <InfoRow icon={<Clock className="w-4 h-4 text-amber-500" />} label="时长">
-                    <span className="text-sm text-gray-700">{detail.duration} 小时</span>
+                  <InfoRow
+                    icon={<Clock className="w-4 h-4 text-amber-500" />}
+                    label="时长"
+                  >
+                    <span className="text-sm text-gray-700">
+                      {detail.duration} 小时
+                    </span>
                   </InfoRow>
                 )}
 
-                <InfoRow icon={<Users className="w-4 h-4 text-purple-500" />} label="参与学者">
-                  <span className="text-sm text-gray-700">{scholars.length} 人</span>
+                <InfoRow
+                  icon={<Users className="w-4 h-4 text-purple-500" />}
+                  label="参与学者"
+                >
+                  <span className="text-sm text-gray-700">
+                    {scholars.length} 人
+                  </span>
                 </InfoRow>
 
-                <InfoRow icon={<Circle className="w-4 h-4 text-gray-400" />} label="审核状态">
+                <InfoRow
+                  icon={<Circle className="w-4 h-4 text-gray-400" />}
+                  label="审核状态"
+                >
                   <AuditBadge status={detail.audit_status} />
                 </InfoRow>
               </div>
@@ -467,7 +498,10 @@ export default function ActivityDetailPage() {
                   </h3>
 
                   {detail.certificate_number && (
-                    <InfoRow icon={<Award className="w-4 h-4 text-emerald-500" />} label="证书编号">
+                    <InfoRow
+                      icon={<Award className="w-4 h-4 text-emerald-500" />}
+                      label="证书编号"
+                    >
                       <span className="text-sm text-gray-700 font-mono">
                         {detail.certificate_number}
                       </span>
@@ -475,20 +509,35 @@ export default function ActivityDetailPage() {
                   )}
 
                   {detail.publicity && (
-                    <InfoRow icon={<Megaphone className="w-4 h-4 text-orange-500" />} label="宣传方式">
-                      <span className="text-sm text-gray-700">{detail.publicity}</span>
+                    <InfoRow
+                      icon={<Megaphone className="w-4 h-4 text-orange-500" />}
+                      label="宣传方式"
+                    >
+                      <span className="text-sm text-gray-700">
+                        {detail.publicity}
+                      </span>
                     </InfoRow>
                   )}
 
                   {detail.needs_email_invitation && (
-                    <InfoRow icon={<CheckCircle className="w-4 h-4 text-blue-500" />} label="">
-                      <span className="text-sm text-blue-600 font-medium">需发邮件邀请</span>
+                    <InfoRow
+                      icon={<CheckCircle className="w-4 h-4 text-blue-500" />}
+                      label=""
+                    >
+                      <span className="text-sm text-blue-600 font-medium">
+                        需发邮件邀请
+                      </span>
                     </InfoRow>
                   )}
 
                   {detail.created_by && (
-                    <InfoRow icon={<User className="w-4 h-4 text-gray-400" />} label="录入人">
-                      <span className="text-sm text-gray-700">{detail.created_by}</span>
+                    <InfoRow
+                      icon={<User className="w-4 h-4 text-gray-400" />}
+                      label="录入人"
+                    >
+                      <span className="text-sm text-gray-700">
+                        {detail.created_by}
+                      </span>
                     </InfoRow>
                   )}
                 </div>
@@ -508,7 +557,9 @@ export default function ActivityDetailPage() {
                   </div>
                   {detail.updated_at && (
                     <div>
-                      <p className="text-[10px] text-gray-400 mb-0.5">最后更新</p>
+                      <p className="text-[10px] text-gray-400 mb-0.5">
+                        最后更新
+                      </p>
                       <p className="text-xs text-gray-600">
                         {new Date(detail.updated_at).toLocaleString("zh-CN")}
                       </p>
@@ -526,7 +577,9 @@ export default function ActivityDetailPage() {
         <ActivityFormModal
           isOpen={formModalOpen}
           onClose={() => setFormModalOpen(false)}
-          onSubmit={handleUpdate as Parameters<typeof ActivityFormModal>[0]["onSubmit"]}
+          onSubmit={
+            handleUpdate as Parameters<typeof ActivityFormModal>[0]["onSubmit"]
+          }
           activity={detailAsListItem}
           mode="edit"
         />

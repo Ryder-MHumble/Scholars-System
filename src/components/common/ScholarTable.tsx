@@ -152,7 +152,7 @@ export function ScholarTable({
                 {/* 研究方向 */}
                 <td className="px-5 py-3.5">
                   <div className="flex flex-wrap gap-1 max-w-[200px]">
-                    {s.research_areas.slice(0, 2).map((f) => (
+                    {(s.research_areas ?? []).slice(0, 2).map((f) => (
                       <span
                         key={f}
                         className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-100 group-hover:bg-primary-100/70 transition-colors duration-150"
@@ -160,12 +160,12 @@ export function ScholarTable({
                         {f}
                       </span>
                     ))}
-                    {s.research_areas.length > 2 && (
+                    {(s.research_areas?.length ?? 0) > 2 && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400 border border-gray-200">
-                        +{s.research_areas.length - 2}
+                        +{s.research_areas!.length - 2}
                       </span>
                     )}
-                    {s.research_areas.length === 0 && (
+                    {!s.research_areas?.length && (
                       <span className="text-xs text-gray-300">—</span>
                     )}
                   </div>

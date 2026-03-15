@@ -1,63 +1,141 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Search,
   BookOpen,
-  Award,
   TrendingUp,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
-import { ALL_VENUES } from "@/data/venues";
 import type { Venue, VenueType, VenueRank } from "@/types/venue";
 import { cn } from "@/utils/cn";
 
+const API_BASE_URL = import.meta.env.DEV
+  ? "http://localhost:8002/api/v1"
+  : "http://43.98.254.243:8001/api/v1";
+
 export default function VenueListPage() {
+  const [searchParams] = useSearchParams();
+
+  // Initialize state from URL params
+  const subtab = searchParams.get("subtab");
+  const initialType: VenueType | "全部" =
+    subtab === "top_conferences"
+      ? "会议"
+      : subtab === "journals"
+        ? "期刊"
+        : "全部";
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedType, setSelectedType] = useState<VenueType | "全部">("全部");
+  const [selectedType, setSelectedType] = useState<VenueType | "全部">(
+    initialType,
+  );
   const [selectedRank, setSelectedRank] = useState<VenueRank | "全部">("全部");
   const [selectedField, setSelectedField] = useState<string>("全部");
 
-  // Get unique fields
+  // API state
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Sync state with URL params
+  useEffect(() => {
+    const subtab = searchParams.get("subtab");
+    if (subtab === "top_conferences") {
+      setSelectedType("会议");
+    } else if (subtab === "journals") {
+      setSelectedType("期刊");
+    } else {
+      setSelectedType("全部");
+    }
+  }, [searchParams]);
+
+  // Fetch venues from API
+  useEffect(() => {
+    const fetchVenues = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const params = new URLSearchParams();
+        if (selectedType !== "全部") {
+          params.append(
+            "type",
+            selectedType === "会议" ? "conference" : "journal",
+          );
+        }
+        if (selectedRank !== "全部") {
+          params.append("rank", selectedRank);
+        }
+        if (selectedField !== "全部") {
+          params.append("field", selectedField);
+        }
+        if (searchQuery.trim()) {
+          params.append("keyword", searchQuery.trim());
+        }
+        params.append("page_size", "100");
+
+        const response = await fetch(`${API_BASE_URL}/venues/?${params}`);
+        if (!response.ok) {
+          throw new Error(`API 请求失败: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Transform API data to match frontend Venue type
+        const transformedVenues: Venue[] = (data.items || []).map(
+          (item: any) => ({
+            id: item.id,
+            name: item.name,
+            nameEn: item.name,
+            fullName: item.full_name || item.name,
+            type: item.type === "conference" ? "会议" : "期刊",
+            rank: item.rank as VenueRank,
+            field: item.fields?.[0] || "未分类",
+            description: item.description || "",
+            website: item.website,
+            h5Index: item.h5_index,
+            acceptanceRate: item.acceptance_rate
+              ? `${Math.round(item.acceptance_rate * 100)}%`
+              : undefined,
+            impactFactor: item.impact_factor,
+          }),
+        );
+
+        setVenues(transformedVenues);
+      } catch (err) {
+        console.error("Failed to fetch venues:", err);
+        setError(err instanceof Error ? err.message : "加载失败");
+        setVenues([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Debounce search query
+    const timeoutId = setTimeout(
+      () => {
+        fetchVenues();
+      },
+      searchQuery.trim() ? 300 : 0,
+    );
+
+    return () => clearTimeout(timeoutId);
+  }, [selectedType, selectedRank, selectedField, searchQuery]);
+
+  // Get unique fields from API data
   const fields = useMemo(() => {
-    const fieldSet = new Set(ALL_VENUES.map((v) => v.field));
+    const fieldSet = new Set(venues.map((v) => v.field));
     return ["全部", ...Array.from(fieldSet)];
-  }, []);
-
-  // Filter venues
-  const filteredVenues = useMemo(() => {
-    let venues = ALL_VENUES;
-
-    if (selectedType !== "全部") {
-      venues = venues.filter((v) => v.type === selectedType);
-    }
-
-    if (selectedRank !== "全部") {
-      venues = venues.filter((v) => v.rank === selectedRank);
-    }
-
-    if (selectedField !== "全部") {
-      venues = venues.filter((v) => v.field === selectedField);
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      venues = venues.filter(
-        (v) =>
-          v.name.toLowerCase().includes(query) ||
-          v.nameEn.toLowerCase().includes(query) ||
-          v.fullName?.toLowerCase().includes(query) ||
-          v.field.toLowerCase().includes(query),
-      );
-    }
-
-    return venues;
-  }, [searchQuery, selectedType, selectedRank, selectedField]);
+  }, [venues]);
 
   const handleVenueClick = (venue: Venue) => {
     if (venue.isExternal && venue.externalUrl) {
       window.open(venue.externalUrl, "_blank");
+    } else if (venue.website) {
+      window.open(venue.website, "_blank");
     } else {
-      // TODO: Navigate to venue detail page or show related scholars
       alert("查看相关学者功能开发中");
     }
   };
@@ -88,11 +166,11 @@ export default function VenueListPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">期刊会议</h2>
+              <h2 className="text-2xl font-bold text-gray-900">学术社群</h2>
               <p className="text-sm text-gray-500 mt-1">
                 AI 领域顶级期刊与会议 · 共{" "}
                 <span className="font-semibold text-gray-700">
-                  {filteredVenues.length}
+                  {loading ? "..." : venues.length}
                 </span>{" "}
                 个
               </p>
@@ -110,24 +188,6 @@ export default function VenueListPage() {
                 placeholder="搜索期刊或会议..."
                 className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
               />
-            </div>
-
-            {/* Type Filter */}
-            <div className="flex items-center gap-2">
-              {(["全部", "会议", "期刊"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedType(type)}
-                  className={cn(
-                    "px-3 py-2 text-sm font-medium rounded-lg transition-colors",
-                    selectedType === type
-                      ? "bg-primary-600 text-white shadow-sm"
-                      : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200",
-                  )}
-                >
-                  {type}
-                </button>
-              ))}
             </div>
 
             {/* Rank Filter */}
@@ -167,16 +227,35 @@ export default function VenueListPage() {
             ))}
           </div>
 
-          {/* Venue Grid */}
-          {/* Venue Grid */}
-          {filteredVenues.length === 0 ? (
+          {/* Loading State */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 text-primary-600 animate-spin mb-4" />
+              <p className="text-gray-500">加载中...</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && !loading && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <BookOpen className="w-16 h-16 text-red-300 mb-4" />
+              <p className="text-red-500 mb-2">加载失败</p>
+              <p className="text-sm text-gray-500">{error}</p>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && !error && venues.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16">
               <BookOpen className="w-16 h-16 text-gray-300 mb-4" />
               <p className="text-gray-500">未找到匹配的期刊或会议</p>
             </div>
-          ) : (
+          )}
+
+          {/* Venue Grid */}
+          {!loading && !error && venues.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredVenues.map((venue, index) => (
+              {venues.map((venue, index) => (
                 <motion.div
                   key={venue.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -185,32 +264,13 @@ export default function VenueListPage() {
                 >
                   <button
                     onClick={() => handleVenueClick(venue)}
-                    className="w-full bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg hover:border-primary-300 transition-all text-left group"
+                    className="w-full bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg hover:border-primary-300 transition-all text-left group relative overflow-hidden"
                   >
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={cn(
-                            "w-10 h-10 rounded-lg flex items-center justify-center",
-                            venue.type === "会议"
-                              ? "bg-gradient-to-br from-blue-500 to-blue-600"
-                              : "bg-gradient-to-br from-purple-500 to-purple-600",
-                          )}
-                        >
-                          {venue.type === "会议" ? (
-                            <Award className="w-5 h-5 text-white" />
-                          ) : (
-                            <BookOpen className="w-5 h-5 text-white" />
-                          )}
-                        </div>
-                        {venue.isExternal && (
-                          <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors" />
-                        )}
-                      </div>
+                    {/* Rank Badge - Top Right */}
+                    <div className="absolute top-4 right-4">
                       <span
                         className={cn(
-                          "px-2 py-1 text-xs font-bold rounded border",
+                          "px-2.5 py-1 text-sm font-bold rounded-lg border shadow-sm",
                           getRankColor(venue.rank),
                         )}
                       >
@@ -218,34 +278,36 @@ export default function VenueListPage() {
                       </span>
                     </div>
 
-                    {/* Name */}
-                    <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors">
-                      {venue.nameEn}
-                    </h3>
-                    <p className="text-xs text-gray-500 mb-3 line-clamp-1">
-                      {venue.fullName}
-                    </p>
+                    {/* Name Section */}
+                    <div className="pr-12 mb-3">
+                      <h3 className="text-lg font-bold text-gray-900 mb-1.5 group-hover:text-primary-600 transition-colors">
+                        {venue.nameEn}
+                      </h3>
+                      <p className="text-xs text-gray-500 line-clamp-1">
+                        {venue.fullName}
+                      </p>
+                    </div>
 
                     {/* Field Tag */}
                     <div className="mb-3">
-                      <span className="inline-block px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
+                      <span className="inline-block px-2.5 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-medium">
                         {venue.field}
                       </span>
                     </div>
 
                     {/* Description */}
                     {venue.description && (
-                      <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                      <p className="text-xs text-gray-600 mb-3 line-clamp-2 leading-relaxed">
                         {venue.description}
                       </p>
                     )}
 
-                    {/* Stats */}
+                    {/* Stats Footer */}
                     <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
                       {venue.h5Index && (
                         <div className="flex items-center gap-1">
                           <TrendingUp className="w-3.5 h-3.5 text-gray-400" />
-                          <span className="text-xs text-gray-600">
+                          <span className="text-xs text-gray-600 font-medium">
                             H5: {venue.h5Index}
                           </span>
                         </div>
@@ -253,15 +315,18 @@ export default function VenueListPage() {
                       {venue.impactFactor && (
                         <div className="flex items-center gap-1">
                           <TrendingUp className="w-3.5 h-3.5 text-gray-400" />
-                          <span className="text-xs text-gray-600">
+                          <span className="text-xs text-gray-600 font-medium">
                             IF: {venue.impactFactor}
                           </span>
                         </div>
                       )}
                       {venue.acceptanceRate && (
-                        <div className="text-xs text-gray-600">
+                        <div className="text-xs text-gray-600 font-medium">
                           录用率: {venue.acceptanceRate}
                         </div>
+                      )}
+                      {venue.website && (
+                        <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-600 transition-colors ml-auto" />
                       )}
                     </div>
                   </button>

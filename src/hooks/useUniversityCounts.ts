@@ -1,10 +1,9 @@
 /**
  * 获取高校/院系学者数量的自定义 Hook
- * 使用 /api/v1/institutions/scholars 获取完整的机构列表及学者数量
- * 用于构建院校选择器和侧边栏树的动态计数
+ * 使用 /api/v1/institutions?view=hierarchy 从机构数据聚合，支持 region/org_type 过滤
  */
 import { useEffect, useState } from "react";
-import { fetchAllInstitutions } from "@/services/institutionApi";
+import { fetchScholarUniversities } from "@/services/scholarApi";
 import type { InstitutionDepartmentListItem } from "@/types/institution";
 
 export interface UniversityData {
@@ -15,44 +14,55 @@ export interface UniversityData {
   departments: InstitutionDepartmentListItem[];
 }
 
-export function useUniversityCounts() {
+export function useUniversityCounts(filters?: {
+  region?: string;
+  affiliation_type?: string;
+}) {
   const [universities, setUniversities] = useState<UniversityData[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const region = filters?.region;
+  const affiliationType = filters?.affiliation_type;
+
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const institutions = await fetchAllInstitutions();
+
+        const items = await fetchScholarUniversities({
+          region,
+          affiliation_type: affiliationType,
+        });
 
         const unis: UniversityData[] = [];
         const countsMap: Record<string, number> = {};
         let total = 0;
 
-        for (const inst of institutions) {
+        for (const item of items) {
           const uniData: UniversityData = {
-            id: inst.id,
-            name: inst.name,
-            count: inst.departments.length,
-            scholarCount: inst.scholar_count,
-            departments: inst.departments,
+            id: item.university,
+            name: item.university,
+            count: item.departments.length,
+            scholarCount: item.scholar_count,
+            departments: item.departments.map((d) => ({
+              id: d.name,
+              name: d.name,
+              scholar_count: d.scholar_count,
+              org_name: "", // Not provided by /api/v1/institutions endpoint
+            })),
           };
           unis.push(uniData);
-          countsMap[inst.name] = inst.scholar_count;
-          total += inst.scholar_count;
+          countsMap[item.university] = item.scholar_count;
+          total += item.scholar_count;
 
-          // Add department counts
-          for (const dept of inst.departments) {
-            countsMap[`${inst.name}::${dept.name}`] = dept.scholar_count;
+          for (const dept of item.departments) {
+            countsMap[`${item.university}::${dept.name}`] = dept.scholar_count;
           }
         }
-
-        // Sort by scholar count descending
-        unis.sort((a, b) => b.scholarCount - a.scholarCount);
 
         setUniversities(unis);
         setCounts(countsMap);
@@ -60,7 +70,7 @@ export function useUniversityCounts() {
       } catch (err) {
         const errorMsg =
           err instanceof Error ? err.message : "Failed to load university data";
-        console.error("Failed to fetch institutions:", err);
+        console.error("Failed to fetch scholar universities:", err);
         setError(errorMsg);
         setTotalCount(0);
         setUniversities([]);
@@ -71,7 +81,7 @@ export function useUniversityCounts() {
     };
 
     load();
-  }, []);
+  }, [region, affiliationType]);
 
   return { universities, counts, totalCount, loading, error };
 }

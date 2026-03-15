@@ -7,6 +7,7 @@ import {
 } from "@/services/scholarApi";
 import { useUniversityCounts } from "@/hooks/useUniversityCounts";
 import type { UniNode } from "@/components/common/UniversitySidebarTree";
+import { parseSubtabFilter } from "@/utils/institutionClassifier";
 
 const PAGE_SIZE = 20;
 
@@ -17,8 +18,10 @@ export function useScholarList() {
   const activeDept = searchParams.get("department");
   const pageParam = searchParams.get("page");
   const isJointMentor = searchParams.get("is_adjunct_supervisor") === "true";
+  const activeSubTab = searchParams.get("subtab");
 
   const [query, setQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(pageParam ? parseInt(pageParam, 10) : 1);
 
   /* API state */
@@ -27,49 +30,83 @@ export function useScholarList() {
   const [error, setError] = useState<string | null>(null);
   const [deletingHash, setDeletingHash] = useState<string | null>(null);
 
-  /* University counts */
+  // 根据当前 subtab 过滤机构节点
+  const { region: subtabRegion, type: subtabType } = useMemo(
+    () => parseSubtabFilter(activeSubTab),
+    [activeSubTab],
+  );
+
+  // 将前端分类值映射到后端 API 参数
+  const apiRegion = useMemo(() => {
+    if (subtabRegion === "domestic") return "国内";
+    if (subtabRegion === "international") return "国际";
+    return undefined;
+  }, [subtabRegion]);
+
+  const apiAffiliationType = useMemo(() => {
+    if (subtabType === "university") return "高校";
+    if (subtabType === "company") return "企业";
+    if (subtabType === "research_institute") return "研究机构";
+    if (subtabType === "other") return "其他";
+    return undefined;
+  }, [subtabType]);
+
+  /* University counts — filtered by current subtab */
   const {
     universities,
     totalCount,
     loading: uniLoading,
     error: uniError,
-  } = useUniversityCounts();
+  } = useUniversityCounts({ region: apiRegion, affiliation_type: apiAffiliationType });
 
-  const uniNodes = useMemo<UniNode[]>(
-    () =>
-      universities.map((uni) => ({
-        name: uni.name,
-        departments: uni.departments.map((dept) => ({
-          name: dept.name,
-          count: dept.scholar_count,
-        })),
-        count: uni.scholarCount,
+  // uniNodes already filtered by backend, no client-side re-filtering needed
+  const filteredUniNodes = useMemo<UniNode[]>(() => {
+    if (!Array.isArray(universities)) return [];
+    return universities.map((uni) => ({
+      name: uni.name,
+      departments: uni.departments.map((dept) => ({
+        name: dept.name,
+        count: dept.scholar_count,
       })),
-    [universities],
-  );
+      count: uni.scholarCount,
+    }));
+  }, [universities]);
 
-  /* Fetch paginated data */
+  /* Fetch paginated data — cancel in-flight request on dep change */
   useEffect(() => {
+    const controller = new AbortController();
     setIsLoading(true);
     setError(null);
-    fetchScholarList(page, PAGE_SIZE, {
-      university: activeUni ?? undefined,
-      department: activeDept ?? undefined,
-      search: query.trim() || undefined,
-      is_adjunct_supervisor: isJointMentor || undefined,
-    })
+    fetchScholarList(
+      page,
+      PAGE_SIZE,
+      {
+        university: activeUni ?? undefined,
+        department: activeDept ?? undefined,
+        search: query.trim() || undefined,
+        is_adjunct_supervisor: isJointMentor || undefined,
+        region: apiRegion,
+        affiliation_type: apiAffiliationType,
+      },
+      controller.signal,
+    )
       .then((res) => {
         setApiData(res);
         setIsLoading(false);
       })
       .catch((err) => {
-        setError(err.message ?? "加载失败");
-        setIsLoading(false);
+        if (err.name !== "AbortError") {
+          setError(err.message ?? "加载失败");
+          setIsLoading(false);
+        }
       });
-  }, [page, activeUni, activeDept, query, isJointMentor]);
+    return () => controller.abort();
+  }, [page, activeUni, activeDept, query, isJointMentor, apiRegion, apiAffiliationType]);
 
-  /* Sync page to URL */
+  /* Sync page to URL — only write when URL value actually differs */
   useEffect(() => {
+    const currentPage = pageParam ? parseInt(pageParam, 10) : 1;
+    if (currentPage === page) return; // already in sync, skip
     const newParams = new URLSearchParams(searchParams);
     if (page === 1) {
       newParams.delete("page");
@@ -135,6 +172,8 @@ export function useScholarList() {
         department: activeDept ?? undefined,
         search: query.trim() || undefined,
         is_adjunct_supervisor: isJointMentor || undefined,
+        region: apiRegion,
+        affiliation_type: apiAffiliationType,
       })
         .then((res) => {
           setApiData(res);
@@ -160,6 +199,8 @@ export function useScholarList() {
       department: activeDept ?? undefined,
       search: query.trim() || undefined,
       is_adjunct_supervisor: isJointMentor || undefined,
+      region: apiRegion,
+      affiliation_type: apiAffiliationType,
     })
       .then((res) => {
         setApiData(res);
@@ -194,18 +235,21 @@ export function useScholarList() {
 
   return {
     // Sidebar data
-    uniNodes,
+    filteredUniNodes,
     totalCount,
     uniLoading,
     uniError,
     activeUni,
     activeDept,
+    activeSubTab,
     handleSelectUni,
     handleSelectDept,
 
     // Search & filter
     query,
     setQuery,
+    searchInput,
+    setSearchInput,
     filterChips,
     hasAnyFilter,
     clearAll,

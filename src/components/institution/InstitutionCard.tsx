@@ -177,9 +177,17 @@ function getDeptAccent(id: string, idx: number) {
 
 // ── University logo component ──────────────────────────────────────────────
 
-function UniversityLogo({ name, id }: { name: string; id: string }) {
+function UniversityLogo({
+  name,
+  id,
+  avatar,
+}: {
+  name: string;
+  id: string;
+  avatar?: string | null;
+}) {
   const [imgFailed, setImgFailed] = useState(false);
-  const logoSrc = getLogoSrc(name);
+  const logoSrc = avatar || getLogoSrc(name);
   const gradient = getGradient(id);
   const initial = name.trim().charAt(0);
 
@@ -233,7 +241,11 @@ export function InstitutionCard({ institution, index }: InstitutionCardProps) {
       <div className="p-5">
         {/* Header: logo + name */}
         <div className="flex items-start gap-3.5">
-          <UniversityLogo name={institution.name} id={institution.id} />
+          <UniversityLogo
+            name={institution.name}
+            id={institution.id}
+            avatar={institution.avatar}
+          />
 
           <div className="flex-1 min-w-0 pt-1">
             <h3 className="text-sm font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
@@ -267,18 +279,18 @@ export function InstitutionCard({ institution, index }: InstitutionCardProps) {
             </div>
           </div>
 
-          {institution.departments.length > 0 && (
+          {(institution.departments?.length ?? 0) > 0 && (
             <span className="text-[9px] text-slate-500 font-semibold bg-slate-50 px-2 py-0.5 rounded-full whitespace-nowrap">
-              {institution.departments.length} 院系
+              {institution.departments!.length} 院系
             </span>
           )}
         </div>
       </div>
 
       {/* Department chips */}
-      {institution.departments.length > 0 && (
+      {(institution.departments?.length ?? 0) > 0 && (
         <div className="px-5 pb-5 flex flex-wrap gap-1.5">
-          {institution.departments.slice(0, 3).map((dept, i) => (
+          {institution.departments!.slice(0, 3).map((dept, i) => (
             <span
               key={dept.name}
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium ${getDeptAccent(institution.id, i)}`}
@@ -289,9 +301,9 @@ export function InstitutionCard({ institution, index }: InstitutionCardProps) {
               )}
             </span>
           ))}
-          {institution.departments.length > 3 && (
+          {institution.departments!.length > 3 && (
             <span className="px-2.5 py-1 rounded-full text-[11px] text-slate-400 bg-slate-50 font-medium">
-              +{institution.departments.length - 3} 更多
+              +{institution.departments!.length - 3} 更多
             </span>
           )}
         </div>

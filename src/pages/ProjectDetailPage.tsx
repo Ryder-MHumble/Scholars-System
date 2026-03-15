@@ -1,12 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
-  Calendar,
   Building2,
-  Users,
-  FileText,
   Trash2,
   Loader2,
   AlertCircle,
@@ -15,22 +12,19 @@ import {
   Plus,
   X,
   Pencil,
-  ChevronDown,
-  Check,
   Tag,
   Key,
   Link2,
+  Calendar,
+  FileText,
+  Users,
 } from "lucide-react";
 import {
   fetchProjectDetail,
   deleteProject,
   patchProject,
 } from "@/services/projectApi";
-import type {
-  Project,
-  RelatedScholar,
-  ProjectOutput,
-} from "@/types/project";
+import type { Project, RelatedScholar, ProjectOutput } from "@/types/project";
 import { cn } from "@/utils/cn";
 import { FieldEditor } from "@/components/common/FieldEditor";
 import {
@@ -38,459 +32,10 @@ import {
   ScholarAvatar,
   type ScholarPickResult,
 } from "@/components/common/ScholarSearchPicker";
-
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-const STATUS_OPTIONS = ["在研", "已结题", "已验收", "已终止"];
-const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> =
-  {
-    在研: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" },
-    已结题: { bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" },
-    已验收: {
-      bg: "bg-emerald-50",
-      text: "text-emerald-700",
-      dot: "bg-emerald-500",
-    },
-    已终止: { bg: "bg-red-50", text: "text-red-600", dot: "bg-red-500" },
-  };
-
-const ROLE_PRESETS = ["负责人", "参与者", "顾问", "联络人", "共同PI", "博士后"];
-
-const OUTPUT_TYPE_OPTIONS = ["论文", "专利", "报告", "软件", "数据集", "其他"];
-
-// ─── Sub-components ─────────────────────────────────────────────────────────
-
-/** Clickable status badge with dropdown */
-function StatusSwitcher({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-
-  const colors = STATUS_COLORS[value] ?? {
-    bg: "bg-gray-100",
-    text: "text-gray-600",
-    dot: "bg-gray-400",
-  };
-
-  return (
-    <div ref={ref} className="relative inline-block">
-      <button
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all",
-          colors.bg,
-          colors.text,
-          "hover:ring-2 hover:ring-offset-1 hover:ring-gray-300",
-        )}
-      >
-        <span className={cn("w-2 h-2 rounded-full", colors.dot)} />
-        {value}
-        <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
-            className="absolute top-full left-0 mt-1.5 bg-white rounded-lg border border-gray-200 shadow-lg z-50 py-1 min-w-[120px]"
-          >
-            {STATUS_OPTIONS.map((opt) => {
-              const c = STATUS_COLORS[opt]!;
-              return (
-                <button
-                  key={opt}
-                  onClick={() => {
-                    onChange(opt);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors",
-                    opt === value ? "font-medium" : "",
-                  )}
-                >
-                  <span className={cn("w-2 h-2 rounded-full", c.dot)} />
-                  {opt}
-                  {opt === value && (
-                    <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />
-                  )}
-                </button>
-              );
-            })}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-/** Inline editable tag list (for keywords, tags, cooperation_institutions) */
-function EditableTagList({
-  items,
-  onUpdate,
-  color,
-  icon,
-  placeholder,
-}: {
-  items: string[];
-  onUpdate: (items: string[]) => Promise<void>;
-  color: "blue" | "purple" | "emerald";
-  icon?: React.ReactNode;
-  placeholder: string;
-}) {
-  const [adding, setAdding] = useState(false);
-  const [newItem, setNewItem] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const colorMap = {
-    blue: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100",
-    purple:
-      "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100",
-    emerald:
-      "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
-  };
-
-  const handleAdd = async () => {
-    const val = newItem.trim();
-    if (!val || items.includes(val)) return;
-    await onUpdate([...items, val]);
-    setNewItem("");
-    inputRef.current?.focus();
-  };
-
-  const handleRemove = async (index: number) => {
-    await onUpdate(items.filter((_, i) => i !== index));
-  };
-
-  return (
-    <div>
-      <div className="flex flex-wrap gap-2">
-        {items.map((item, i) => (
-          <span
-            key={i}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border group/tag transition-colors",
-              colorMap[color],
-            )}
-          >
-            {icon}
-            {item}
-            <button
-              onClick={() => handleRemove(i)}
-              className="p-0.5 rounded-full opacity-0 group-hover/tag:opacity-100 hover:bg-black/10 transition-all"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </span>
-        ))}
-        {adding ? (
-          <div className="inline-flex items-center gap-1">
-            <input
-              ref={inputRef}
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAdd();
-                if (e.key === "Escape") {
-                  setAdding(false);
-                  setNewItem("");
-                }
-              }}
-              placeholder={placeholder}
-              className="px-2 py-1 text-xs border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 w-28"
-              autoFocus
-            />
-            <button
-              onClick={handleAdd}
-              className="p-1 text-primary-600 hover:bg-primary-50 rounded-full transition-colors"
-            >
-              <Check className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                setAdding(false);
-                setNewItem("");
-              }}
-              className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-full transition-colors border border-dashed border-gray-300"
-          >
-            <Plus className="w-3 h-3" />
-            添加
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Role selector with presets + custom input */
-function RoleSelector({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (role: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [custom, setCustom] = useState(false);
-  const [customValue, setCustomValue] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setCustom(false);
-      }
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-
-  const roleColor = value === "负责人"
-    ? "bg-amber-100 text-amber-800 border-amber-200"
-    : "bg-gray-100 text-gray-700 border-gray-200";
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all",
-          roleColor,
-          "hover:ring-1 hover:ring-offset-1 hover:ring-gray-300",
-        )}
-      >
-        {value || "设置角色"}
-        <ChevronDown className="w-3 h-3 opacity-60" />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.12 }}
-            className="absolute top-full right-0 mt-1.5 bg-white rounded-lg border border-gray-200 shadow-lg z-50 py-1 min-w-[140px]"
-          >
-            {ROLE_PRESETS.map((role) => (
-              <button
-                key={role}
-                onClick={() => {
-                  onChange(role);
-                  setOpen(false);
-                  setCustom(false);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 transition-colors text-left",
-                  role === value ? "font-medium text-primary-700" : "",
-                )}
-              >
-                {role}
-                {role === value && (
-                  <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />
-                )}
-              </button>
-            ))}
-            <div className="border-t border-gray-100 mt-1 pt-1">
-              {custom ? (
-                <div className="px-2 py-1.5">
-                  <input
-                    value={customValue}
-                    onChange={(e) => setCustomValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && customValue.trim()) {
-                        onChange(customValue.trim());
-                        setOpen(false);
-                        setCustom(false);
-                        setCustomValue("");
-                      }
-                      if (e.key === "Escape") setCustom(false);
-                    }}
-                    placeholder="自定义角色..."
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
-                    autoFocus
-                  />
-                </div>
-              ) : (
-                <button
-                  onClick={() => setCustom(true)}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
-                >
-                  <Pencil className="w-3 h-3" />
-                  自定义...
-                </button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-/** Add output modal */
-function AddOutputModal({
-  onAdd,
-  onClose,
-}: {
-  onAdd: (output: ProjectOutput) => void;
-  onClose: () => void;
-}) {
-  const [form, setForm] = useState<ProjectOutput>({
-    type: "论文",
-    title: "",
-    year: new Date().getFullYear(),
-    authors: [],
-    venue: "",
-  });
-  const [authorsStr, setAuthorsStr] = useState("");
-
-  const handleSubmit = () => {
-    if (!form.title.trim()) return;
-    onAdd({
-      ...form,
-      title: form.title.trim(),
-      authors: authorsStr
-        .split(/[,，]/)
-        .map((a) => a.trim())
-        .filter(Boolean),
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
-      >
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-bold text-gray-900">添加项目成果</h3>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-              成果类型
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {OUTPUT_TYPE_OPTIONS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setForm({ ...form, type: t })}
-                  className={cn(
-                    "px-3 py-1.5 text-sm rounded-lg border transition-colors",
-                    form.type === t
-                      ? "bg-primary-50 text-primary-700 border-primary-300 font-medium"
-                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50",
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-              标题 *
-            </label>
-            <input
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="请输入成果标题"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                年份
-              </label>
-              <input
-                type="number"
-                value={form.year}
-                onChange={(e) =>
-                  setForm({ ...form, year: Number(e.target.value) })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                发表/授予机构
-              </label>
-              <input
-                value={form.venue}
-                onChange={(e) => setForm({ ...form, venue: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="如期刊、会议名称"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-              作者（逗号分隔）
-            </label>
-            <input
-              value={authorsStr}
-              onChange={(e) => setAuthorsStr(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="张三, 李四, ..."
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-              链接（可选）
-            </label>
-            <input
-              value={form.url ?? ""}
-              onChange={(e) => setForm({ ...form, url: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="https://..."
-            />
-          </div>
-        </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            取消
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!form.title.trim()}
-            className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            添加
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
+import { StatusSwitcher } from "@/components/project/StatusSwitcher";
+import { EditableTagList } from "@/components/project/EditableTagList";
+import { RoleSelector } from "@/components/project/RoleSelector";
+import { AddOutputModal } from "@/components/project/AddOutputModal";
 
 // ─── Section wrapper ────────────────────────────────────────────────────────
 
@@ -738,9 +283,7 @@ export default function ProjectDetailPage() {
                   <span className="flex items-center gap-1 text-xs text-gray-500">
                     <Calendar className="w-3.5 h-3.5" />
                     {project.start_year}
-                    {project.end_year
-                      ? ` - ${project.end_year}`
-                      : " - 至今"}
+                    {project.end_year ? ` - ${project.end_year}` : " - 至今"}
                   </span>
                 )}
               </div>
@@ -766,10 +309,7 @@ export default function ProjectDetailPage() {
           {/* ── Left Column (2/3) ─────────────────────────────────────── */}
           <div className="lg:col-span-2 space-y-6">
             {/* Project Overview */}
-            <Section
-              title="项目概览"
-              icon={<FileText className="w-5 h-5" />}
-            >
+            <Section title="项目概览" icon={<FileText className="w-5 h-5" />}>
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-x-8 gap-y-5">
                   <div>
@@ -812,10 +352,7 @@ export default function ProjectDetailPage() {
                     <FieldEditor
                       value={project.funding_amount}
                       onSave={(v) =>
-                        updateField(
-                          "funding_amount",
-                          v ? Number(v) : undefined,
-                        )
+                        updateField("funding_amount", v ? Number(v) : undefined)
                       }
                       label="资助金额"
                       type="number"
@@ -922,11 +459,7 @@ export default function ProjectDetailPage() {
                           if (scholar.scholar_id)
                             navigate(`/scholars/${scholar.scholar_id}`);
                         }}
-                        title={
-                          scholar.scholar_id
-                            ? "查看学者详情"
-                            : undefined
-                        }
+                        title={scholar.scholar_id ? "查看学者详情" : undefined}
                       >
                         <ScholarAvatar
                           name={scholar.name}
@@ -946,9 +479,7 @@ export default function ProjectDetailPage() {
                             )}
                             onClick={() => {
                               if (scholar.scholar_id)
-                                navigate(
-                                  `/scholars/${scholar.scholar_id}`,
-                                );
+                                navigate(`/scholars/${scholar.scholar_id}`);
                             }}
                           >
                             {scholar.name}
@@ -1087,10 +618,7 @@ export default function ProjectDetailPage() {
           {/* ── Right Column (1/3) ────────────────────────────────────── */}
           <div className="space-y-6">
             {/* Keywords */}
-            <Section
-              title="关键词"
-              icon={<Tag className="w-5 h-5" />}
-            >
+            <Section title="关键词" icon={<Tag className="w-5 h-5" />}>
               <EditableTagList
                 items={project.keywords ?? []}
                 onUpdate={(items) => updateField("keywords", items)}
@@ -1103,10 +631,7 @@ export default function ProjectDetailPage() {
             </Section>
 
             {/* Tags */}
-            <Section
-              title="标签"
-              icon={<Tag className="w-5 h-5" />}
-            >
+            <Section title="标签" icon={<Tag className="w-5 h-5" />}>
               <EditableTagList
                 items={project.tags ?? []}
                 onUpdate={(items) => updateField("tags", items)}
