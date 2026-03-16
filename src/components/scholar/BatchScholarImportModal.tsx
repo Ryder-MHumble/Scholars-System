@@ -220,7 +220,12 @@ export function BatchScholarImportModal({
       }
     }
     const failedCount = scholars.length - successCount;
-    setImportResult({ success: successCount > 0, successCount, failedCount, errors });
+    setImportResult({
+      success: successCount > 0,
+      successCount,
+      failedCount,
+      errors,
+    });
     setIsImporting(false);
 
     if (successCount > 0) {
@@ -266,8 +271,12 @@ export function BatchScholarImportModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+        onClick={handleClose}
+      >
         <motion.div
+          onClick={(e) => e.stopPropagation()}
           initial={{ opacity: 0, scale: 0.95, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 8 }}
@@ -281,7 +290,9 @@ export function BatchScholarImportModal({
                 <Sparkles className="w-5 h-5 text-primary-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900">批量添加学者</h2>
+                <h2 className="text-lg font-bold text-gray-900">
+                  批量添加学者
+                </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   通过 Excel 文件快速导入多位学者
                 </p>
@@ -302,88 +313,207 @@ export function BatchScholarImportModal({
           <div className="flex-1 overflow-y-auto">
             {/* ──────────── STEP 1: 了解须知 ──────────── */}
             {step === 1 && (
-              <div className="p-6 space-y-4">
-                {/* How-to steps */}
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Info className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-blue-800">
-                      如何使用批量导入
-                    </span>
-                  </div>
-                  <ol className="space-y-2">
-                    {[
-                      "下载下方的标准 Excel 模板文件",
-                      "在模板中按行填写每位学者信息（每行一位学者）",
-                      "上传填写完成的文件，系统自动识别列结构",
-                      "在第三步预览数据无误后，点击「确认导入」",
-                    ].map((text, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm text-blue-700">
-                        <span className="w-5 h-5 rounded-full bg-blue-200 text-blue-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
-                          {i + 1}
+              <div className="p-6">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* ── Left: steps + download ── */}
+                  <div className="flex flex-col gap-4">
+                    <div className="flex-1 rounded-xl border border-blue-100 bg-gradient-to-b from-blue-50 to-white p-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center flex-shrink-0">
+                          <Info className="w-3.5 h-3.5 text-blue-600" />
+                        </div>
+                        <span className="text-sm font-semibold text-blue-900">
+                          操作步骤
                         </span>
-                        {text}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-
-                {/* Cautions */}
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-amber-800">
-                      使用前请注意
-                    </span>
+                      </div>
+                      <ol className="space-y-3">
+                        {[
+                          {
+                            text: "下载右侧标准 Excel 模板文件",
+                            sub: "含所有字段说明",
+                          },
+                          {
+                            text: "按模板列名填写学者信息",
+                            sub: "每行一位学者",
+                          },
+                          {
+                            text: "上传文件，系统自动识别列结构",
+                            sub: "支持中英文列名",
+                          },
+                          { text: "预览无误后确认导入", sub: "操作完成" },
+                        ].map((item, i) => (
+                          <li key={i} className="flex items-start gap-3">
+                            <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm shadow-blue-200">
+                              {i + 1}
+                            </span>
+                            <div>
+                              <p className="text-sm text-gray-800 font-medium leading-snug">
+                                {item.text}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {item.sub}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                          <Download className="w-4 h-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800 leading-tight">
+                            Excel 标准模板
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            含字段说明与示例数据
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleDownloadTemplate}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        下载模板
+                      </button>
+                    </div>
                   </div>
-                  <ul className="space-y-2">
-                    {[
-                      {
-                        icon: "⚠",
-                        text: "「姓名」为唯一必填项，缺少姓名的行将自动跳过",
-                      },
-                      {
-                        icon: "⚠",
-                        text: "重复导入同一学者会创建重复记录，请先检查是否已存在",
-                      },
-                      {
-                        icon: "ℹ",
-                        text: "研究方向可填多个，用中/英文逗号或分号分隔（如：AI,深度学习；NLP）",
-                      },
-                      {
-                        icon: "ℹ",
-                        text: "系统支持中英文列名自动识别，也可使用已有格式的 Excel 文件",
-                      },
-                      {
-                        icon: "⚠",
-                        text: "导入操作不可撤销，请在第三步核对数据无误后再提交",
-                      },
-                    ].map((item, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-amber-800">
-                        <span className="flex-shrink-0 mt-0.5">{item.icon}</span>
-                        <span>{item.text}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
 
-                {/* Template Download */}
-                <div className="border border-gray-200 rounded-xl p-4 flex items-center justify-between bg-gray-50">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">
-                      下载 Excel 标准模板
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      含字段说明与示例数据，推荐使用标准模板
-                    </p>
+                  {/* ── Right: field hints + cautions ── */}
+                  <div className="flex flex-col gap-4">
+                    <div className="flex-1 rounded-xl border border-gray-200 bg-white overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                        <p className="text-sm font-semibold text-gray-700">
+                          字段填写说明
+                        </p>
+                        <span className="text-xs text-gray-400">
+                          <span className="text-red-400 font-bold">*</span>{" "}
+                          为必填
+                        </span>
+                      </div>
+                      <div className="overflow-y-auto max-h-52">
+                        <table className="w-full text-xs">
+                          <tbody className="divide-y divide-gray-50">
+                            {[
+                              {
+                                label: "姓名",
+                                required: true,
+                                hint: "完整中文或英文姓名",
+                              },
+                              {
+                                label: "英文名",
+                                required: false,
+                                hint: "拼音或英文全名",
+                              },
+                              {
+                                label: "职称",
+                                required: false,
+                                hint: "如 教授、副教授、研究员",
+                              },
+                              {
+                                label: "所属院校",
+                                required: false,
+                                hint: "机构全称，如 北京大学",
+                              },
+                              {
+                                label: "院系/部门",
+                                required: false,
+                                hint: "如 计算机科学系",
+                              },
+                              {
+                                label: "邮箱",
+                                required: false,
+                                hint: "学术邮箱地址",
+                              },
+                              {
+                                label: "研究方向",
+                                required: false,
+                                hint: "多个方向用逗号/分号分隔",
+                              },
+                              {
+                                label: "主页",
+                                required: false,
+                                hint: "个人主页 URL",
+                              },
+                              {
+                                label: "谷歌学术",
+                                required: false,
+                                hint: "Google Scholar 链接",
+                              },
+                              {
+                                label: "DBLP",
+                                required: false,
+                                hint: "DBLP 页面链接",
+                              },
+                              {
+                                label: "简介",
+                                required: false,
+                                hint: "个人简介，可留空",
+                              },
+                            ].map((col) => (
+                              <tr
+                                key={col.label}
+                                className={col.required ? "bg-red-50/30" : ""}
+                              >
+                                <td className="pl-4 pr-2 py-2 w-24 shrink-0">
+                                  <span
+                                    className={`inline-flex items-center font-semibold whitespace-nowrap ${col.required ? "text-gray-800" : "text-gray-500"}`}
+                                  >
+                                    {col.label}
+                                    {col.required && (
+                                      <span className="text-red-500 ml-0.5">
+                                        *
+                                      </span>
+                                    )}
+                                  </span>
+                                </td>
+                                <td className="px-2 py-2">
+                                  <span
+                                    className={
+                                      col.required
+                                        ? "text-primary-600 bg-primary-50 border border-primary-100 rounded px-1.5 py-0.5 font-medium text-xs"
+                                        : "text-gray-400 text-xs"
+                                    }
+                                  >
+                                    {col.hint}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-md bg-amber-100 flex items-center justify-center flex-shrink-0">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                        </div>
+                        <span className="text-sm font-semibold text-amber-900">
+                          注意事项
+                        </span>
+                      </div>
+                      <ul className="space-y-2">
+                        {[
+                          "「姓名」为唯一必填项，缺少姓名的行将自动跳过",
+                          "重复导入同一学者会创建重复记录，请先检查",
+                          "系统支持中英文列名自动识别",
+                          "导入后不可撤销，请核对后再提交",
+                        ].map((text, i) => (
+                          <li
+                            key={i}
+                            className="flex items-start gap-2 text-xs text-amber-800"
+                          >
+                            <span className="w-1 h-1 rounded-full bg-amber-400 flex-shrink-0 mt-1.5" />
+                            <span>{text}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
-                  <button
-                    onClick={handleDownloadTemplate}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors flex-shrink-0"
-                  >
-                    <Download className="w-4 h-4" />
-                    下载模板
-                  </button>
                 </div>
               </div>
             )}
@@ -532,15 +662,14 @@ export function BatchScholarImportModal({
                                       key={i}
                                       className="text-xs text-red-700"
                                     >
-                                      {err.row > 0
-                                        ? `第 ${err.row} 行：`
-                                        : ""}
+                                      {err.row > 0 ? `第 ${err.row} 行：` : ""}
                                       {err.error}
                                     </li>
                                   ))}
                                 {parseResult.errors.length > 3 && (
                                   <li className="text-xs text-red-500">
-                                    ...还有 {parseResult.errors.length - 3} 个问题
+                                    ...还有 {parseResult.errors.length - 3}{" "}
+                                    个问题
                                   </li>
                                 )}
                               </ul>

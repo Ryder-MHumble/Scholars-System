@@ -81,22 +81,24 @@ export default function ScholarListPage() {
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="p-6 md:p-8"
         >
-          {/* Header - Modern Design */}
-          <div className="mb-8">
+          {/* Header */}
+          <div className="mb-6">
             {/* Title Row */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-baseline gap-2.5">
-                <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
                   学者信息管理
-                </h1>
-                <span className="text-sm text-gray-400 font-normal">
-                  共 {total} 位学者
-                </span>
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  共{" "}
+                  <span className="font-semibold text-gray-700">{total}</span>{" "}
+                  位学者
+                </p>
               </div>
 
               <Link
                 to="/scholars/add"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors duration-200 shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 添加学者

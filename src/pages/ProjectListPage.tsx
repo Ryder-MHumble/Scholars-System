@@ -11,19 +11,60 @@ import type { ProjectListItem, ProjectCreateRequest } from "@/types/project";
 import type { ExcelColumn } from "@/types/import";
 
 const EXCEL_COLUMNS: ExcelColumn[] = [
-  { key: "name", label: "项目名称", required: true },
-  { key: "pi_name", label: "项目负责人", required: true },
-  { key: "pi_institution", label: "负责人单位", required: true },
-  { key: "funder", label: "资助机构", required: true },
-  { key: "funding_amount", label: "资助金额(万元)" },
-  { key: "start_year", label: "开始年份", required: true },
-  { key: "end_year", label: "结束年份" },
-  { key: "status", label: "项目状态", required: true },
-  { key: "category", label: "项目类别", required: true },
-  { key: "description", label: "项目简介" },
-  { key: "keywords", label: "关键词(逗号分隔)" },
-  { key: "tags", label: "标签(逗号分隔)" },
-  { key: "cooperation_institutions", label: "合作机构(逗号分隔)" },
+  { key: "name", label: "项目名称", required: true, hint: "完整项目名称" },
+  { key: "pi_name", label: "项目负责人", required: true, hint: "负责人姓名" },
+  {
+    key: "pi_institution",
+    label: "负责人单位",
+    required: true,
+    hint: "所属机构全称",
+  },
+  {
+    key: "funder",
+    label: "资助机构",
+    required: true,
+    hint: "如 国家自然科学基金委、科技部",
+  },
+  {
+    key: "funding_amount",
+    label: "资助金额(万元)",
+    hint: "纯数字，单位万元，可留空",
+  },
+  {
+    key: "start_year",
+    label: "开始年份",
+    required: true,
+    hint: "4位数字年份，如 2023",
+  },
+  { key: "end_year", label: "结束年份", hint: "4位数字年份，可留空" },
+  {
+    key: "status",
+    label: "项目状态",
+    required: true,
+    hint: "在研 / 已结题 / 已验收 / 已终止",
+  },
+  {
+    key: "category",
+    label: "项目类别",
+    required: true,
+    hint: "如 国家重点研发计划、国家自然科学基金",
+  },
+  { key: "description", label: "项目简介", hint: "简短描述，可留空" },
+  {
+    key: "keywords",
+    label: "关键词(逗号分隔)",
+    hint: "多个关键词用中英文逗号分隔",
+  },
+  {
+    key: "tags",
+    label: "标签(逗号分隔)",
+    hint: "自定义标签，逗号分隔，可留空",
+  },
+  {
+    key: "cooperation_institutions",
+    label: "合作机构(逗号分隔)",
+    hint: "多个合作机构用逗号分隔，可留空",
+  },
 ];
 
 const STATUS_FILTERS = ["全部", "在研", "已结题", "已验收", "已终止"] as const;
@@ -169,8 +210,7 @@ export default function ProjectListPage() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900">项目库</h2>
               <p className="text-sm text-gray-500 mt-1">
-                共{" "}
-                <span className="font-semibold text-gray-700">{total}</span>{" "}
+                共 <span className="font-semibold text-gray-700">{total}</span>{" "}
                 个项目
               </p>
             </div>
@@ -262,7 +302,9 @@ export default function ProjectListPage() {
               <div
                 key={project.id}
                 className={
-                  deletingId === project.id ? "opacity-50 pointer-events-none" : ""
+                  deletingId === project.id
+                    ? "opacity-50 pointer-events-none"
+                    : ""
                 }
               >
                 <ProjectCard

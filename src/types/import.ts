@@ -14,6 +14,7 @@ export interface ExcelColumn {
   key: string;
   label: string;
   required?: boolean;
+  hint?: string;
   validator?: (value: unknown) => boolean;
 }
 

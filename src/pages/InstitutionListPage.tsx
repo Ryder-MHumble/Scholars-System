@@ -8,6 +8,8 @@ import {
   Plus,
   AlertTriangle,
   Upload,
+  SortAsc,
+  LayoutGrid,
 } from "lucide-react";
 import { useInstitutions } from "@/hooks/useInstitutions";
 import { InstitutionCard } from "@/components/institution/InstitutionCard";
@@ -27,13 +29,27 @@ import {
 import type { InstitutionListItem } from "@/types/institution";
 
 const EXCEL_COLUMNS: ExcelColumn[] = [
-  { key: "id", label: "机构ID", required: true },
-  { key: "name", label: "机构名称", required: true },
-  { key: "region", label: "地区" },
-  { key: "org_type", label: "机构类型" },
-  { key: "classification", label: "分类" },
-  { key: "category", label: "标签" },
-  { key: "priority", label: "优先级" },
+  {
+    key: "id",
+    label: "机构ID",
+    required: true,
+    hint: "唯一英文标识，如 PKU、SJTU、CAS",
+  },
+  {
+    key: "name",
+    label: "机构名称",
+    required: true,
+    hint: "完整中文名称，如 北京大学",
+  },
+  { key: "region", label: "地区", hint: "填写：国内 或 国际" },
+  { key: "org_type", label: "机构类型", hint: "高校 / 研究机构 / 行业学会" },
+  {
+    key: "classification",
+    label: "分类",
+    hint: "共建高校 / 兄弟院校 / 海外高校 / 其他高校（仅高校填写）",
+  },
+  { key: "category", label: "标签", hint: "自定义分类标签，可留空" },
+  { key: "priority", label: "优先级", hint: "数字，越小越靠前显示，可留空" },
 ];
 
 function mapSubtabToFilters(subtab: string | null): {
@@ -81,6 +97,7 @@ export default function InstitutionListPage() {
   const [searchInput, setSearchInput] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"priority" | "alpha">("priority");
 
   const filteredInstitutions = useMemo(() => {
     if (!Array.isArray(institutions)) return [];
@@ -151,6 +168,20 @@ export default function InstitutionListPage() {
     return grouped;
   }, [subtab, filteredInstitutions]);
 
+  const alphaByLetter = useMemo(() => {
+    if (viewMode !== "alpha") return null;
+    const sorted = [...filteredInstitutions].sort((a, b) =>
+      a.name.localeCompare(b.name, "zh"),
+    );
+    const grouped: Record<string, InstitutionListItem[]> = {};
+    sorted.forEach((inst) => {
+      const firstChar = inst.name.charAt(0).toUpperCase();
+      if (!grouped[firstChar]) grouped[firstChar] = [];
+      grouped[firstChar].push(inst);
+    });
+    return grouped;
+  }, [viewMode, filteredInstitutions]);
+
   const handleImport = async (data: Array<Record<string, unknown>>) => {
     for (const row of data) {
       await createInstitution({
@@ -210,6 +241,33 @@ export default function InstitutionListPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* View mode toggle */}
+            <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+              <button
+                onClick={() => setViewMode("priority")}
+                title="优先级视图"
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+                  viewMode === "priority"
+                    ? "bg-primary-600 text-white"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                优先级
+              </button>
+              <button
+                onClick={() => setViewMode("alpha")}
+                title="字母序视图"
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+                  viewMode === "alpha"
+                    ? "bg-primary-600 text-white"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <SortAsc className="w-3.5 h-3.5" />
+                字母序
+              </button>
+            </div>
             <button
               onClick={() => setIsCreateModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
@@ -266,7 +324,38 @@ export default function InstitutionListPage() {
         )}
 
         {/* Institution grid — grouped or flat */}
-        {subtab === "joint_universities" && jointBySubcategory ? (
+        {viewMode === "alpha" && alphaByLetter ? (
+          <div className="space-y-8">
+            {Object.keys(alphaByLetter)
+              .sort((a, b) => a.localeCompare(b, "zh"))
+              .map((letter) => {
+                const items = alphaByLetter[letter];
+                if (!items || items.length === 0) return null;
+                return (
+                  <div key={letter}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary-50 text-primary-700 font-bold text-base border border-primary-100 shrink-0">
+                        {letter}
+                      </span>
+                      <div className="flex-1 h-px bg-gray-200" />
+                      <span className="text-xs text-gray-400">
+                        {items.length} 所
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+                      {items.map((institution, index) => (
+                        <InstitutionCard
+                          key={institution.id}
+                          institution={institution}
+                          index={index}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        ) : subtab === "joint_universities" && jointBySubcategory ? (
           <div className="space-y-8">
             {JOINT_SUBCATEGORY_ORDER.map((cat) => {
               const items = jointBySubcategory[cat];

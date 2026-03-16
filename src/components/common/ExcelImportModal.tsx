@@ -216,8 +216,12 @@ export function ExcelImportModal<T>({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+        onClick={handleClose}
+      >
         <motion.div
+          onClick={(e) => e.stopPropagation()}
           initial={{ opacity: 0, scale: 0.95, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 8 }}
@@ -252,105 +256,164 @@ export function ExcelImportModal<T>({
           <div className="flex-1 overflow-y-auto">
             {/* ──────────── STEP 1: 了解须知 ──────────── */}
             {step === 1 && (
-              <div className="p-6 space-y-4">
-                {/* Steps */}
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Info className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-blue-800">
-                      如何使用批量导入
-                    </span>
-                  </div>
-                  <ol className="space-y-2">
-                    {[
-                      "下载下方的标准 Excel 模板文件",
-                      "按模板中的列名和说明填写数据，每行一条记录",
-                      "上传填写完成的文件，系统自动解析",
-                      "在第三步预览数据无误后，点击「确认导入」",
-                    ].map((text, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-2.5 text-sm text-blue-700"
-                      >
-                        <span className="w-5 h-5 rounded-full bg-blue-200 text-blue-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
-                          {i + 1}
+              <div className="p-6">
+                <div className="grid grid-cols-2 gap-4 h-full">
+                  {/* ── Left column: steps + download ── */}
+                  <div className="flex flex-col gap-4">
+                    {/* How-to steps */}
+                    <div className="flex-1 rounded-xl border border-blue-100 bg-gradient-to-b from-blue-50 to-white p-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center flex-shrink-0">
+                          <Info className="w-3.5 h-3.5 text-blue-600" />
+                        </div>
+                        <span className="text-sm font-semibold text-blue-900">
+                          操作步骤
                         </span>
-                        {text}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
+                      </div>
+                      <ol className="space-y-3">
+                        {[
+                          {
+                            text: "下载右侧标准 Excel 模板文件",
+                            sub: "含所有字段说明",
+                          },
+                          { text: "按模板列名填写数据", sub: "每行一条记录" },
+                          {
+                            text: "上传填写完成的文件",
+                            sub: "系统自动解析校验",
+                          },
+                          { text: "预览无误后确认导入", sub: "操作完成" },
+                        ].map((item, i) => (
+                          <li key={i} className="flex items-start gap-3">
+                            <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm shadow-blue-200">
+                              {i + 1}
+                            </span>
+                            <div>
+                              <p className="text-sm text-gray-800 font-medium leading-snug">
+                                {item.text}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {item.sub}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
 
-                {/* Required fields */}
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-2.5">
-                    字段说明
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {columns.map((col) => (
-                      <span
-                        key={col.key}
-                        className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md ${
-                          col.required
-                            ? "bg-red-50 text-red-700 border border-red-200"
-                            : "bg-gray-100 text-gray-600 border border-gray-200"
-                        }`}
+                    {/* Template download card */}
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                          <Download className="w-4 h-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800 leading-tight">
+                            Excel 标准模板
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            含字段说明与列名
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleDownloadTemplate}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
                       >
-                        {col.label}
-                        {col.required && (
-                          <span className="text-red-400 font-bold">*</span>
-                        )}
-                      </span>
-                    ))}
+                        <Download className="w-3.5 h-3.5" />
+                        下载模板
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    <span className="text-red-400">*</span> 标注为必填字段
-                  </p>
-                </div>
 
-                {/* Cautions */}
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-amber-800">
-                      使用前请注意
-                    </span>
-                  </div>
-                  <ul className="space-y-1.5">
-                    {[
-                      `必填字段（${requiredCols.map((c) => c.label).join("、")}）不能为空，否则该行将跳过`,
-                      "请确保 Excel 文件第一行为列标题行",
-                      "导入操作不可撤销，请在第三步核对数据无误后再提交",
-                      ...(cautionNotes ?? []),
-                    ].map((text, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-2 text-xs text-amber-800"
-                      >
-                        <span className="flex-shrink-0 mt-0.5">•</span>
-                        <span>{text}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                  {/* ── Right column: fields + cautions ── */}
+                  <div className="flex flex-col gap-4">
+                    {/* Field table with hints */}
+                    <div className="flex-1 rounded-xl border border-gray-200 bg-white overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                        <p className="text-sm font-semibold text-gray-700">
+                          字段填写说明
+                        </p>
+                        <span className="text-xs text-gray-400">
+                          <span className="text-red-400 font-bold">*</span>{" "}
+                          为必填
+                        </span>
+                      </div>
+                      <div className="overflow-y-auto max-h-52">
+                        <table className="w-full text-xs">
+                          <tbody className="divide-y divide-gray-50">
+                            {columns.map((col) => (
+                              <tr
+                                key={col.key}
+                                className={col.required ? "bg-red-50/30" : ""}
+                              >
+                                <td className="pl-4 pr-2 py-2 w-28 shrink-0">
+                                  <span
+                                    className={`inline-flex items-center gap-0.5 font-semibold whitespace-nowrap ${
+                                      col.required
+                                        ? "text-gray-800"
+                                        : "text-gray-500"
+                                    }`}
+                                  >
+                                    {col.label}
+                                    {col.required && (
+                                      <span className="text-red-500 ml-0.5">
+                                        *
+                                      </span>
+                                    )}
+                                  </span>
+                                </td>
+                                <td className="px-2 py-2 text-gray-400">
+                                  {col.hint ? (
+                                    <span
+                                      className={`${
+                                        col.required
+                                          ? "text-primary-600 bg-primary-50 border border-primary-100 rounded px-1.5 py-0.5 font-medium"
+                                          : "text-gray-400"
+                                      }`}
+                                    >
+                                      {col.hint}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-300 italic">
+                                      —
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
 
-                {/* Template Download */}
-                <div className="border border-gray-200 rounded-xl p-4 flex items-center justify-between bg-gray-50">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">
-                      下载 Excel 标准模板
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      含字段说明与列名，推荐使用标准模板
-                    </p>
+                    {/* Caution notes */}
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-md bg-amber-100 flex items-center justify-center flex-shrink-0">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                        </div>
+                        <span className="text-sm font-semibold text-amber-900">
+                          注意事项
+                        </span>
+                      </div>
+                      <ul className="space-y-2">
+                        {[
+                          `必填字段（${requiredCols.map((c) => c.label).join("、")}）不能为空`,
+                          "第一行须为列标题行",
+                          "导入后不可撤销，请核对后再提交",
+                          ...(cautionNotes ?? []),
+                        ].map((text, i) => (
+                          <li
+                            key={i}
+                            className="flex items-start gap-2 text-xs text-amber-800"
+                          >
+                            <span className="w-1 h-1 rounded-full bg-amber-400 flex-shrink-0 mt-1.5" />
+                            <span>{text}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
-                  <button
-                    onClick={handleDownloadTemplate}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors flex-shrink-0"
-                  >
-                    <Download className="w-4 h-4" />
-                    下载模板
-                  </button>
                 </div>
               </div>
             )}

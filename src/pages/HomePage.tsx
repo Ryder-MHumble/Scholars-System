@@ -41,7 +41,8 @@ export default function HomePage() {
       if (next.has(id)) {
         next.delete(id);
       } else {
-        if (topLevelIds.includes(id)) topLevelIds.forEach((tid) => next.delete(tid));
+        if (topLevelIds.includes(id))
+          topLevelIds.forEach((tid) => next.delete(tid));
         next.add(id);
       }
       return next;
@@ -50,12 +51,18 @@ export default function HomePage() {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case "institutions": return <InstitutionListPage />;
-      case "scholars": return <ScholarListPage />;
-      case "projects": return <ProjectListPage />;
-      case "activities": return <ActivityListPage />;
-      case "venues": return <VenueListPage />;
-      default: return <InstitutionListPage />;
+      case "institutions":
+        return <InstitutionListPage />;
+      case "scholars":
+        return <ScholarListPage />;
+      case "projects":
+        return <ProjectListPage />;
+      case "activities":
+        return <ActivityListPage />;
+      case "venues":
+        return <VenueListPage />;
+      default:
+        return <InstitutionListPage />;
     }
   };
 
@@ -63,9 +70,22 @@ export default function HomePage() {
     <div className="h-screen flex overflow-hidden">
       {/* Left Sidebar Navigation */}
       <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shrink-0 overflow-hidden">
-        <div className="px-5 pt-6 pb-5 shrink-0 border-b border-gray-100">
-          <h1 className="text-base font-bold text-gray-900 leading-snug">学者知识图谱</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Scholar Knowledge Graph</p>
+        <div className="px-5 pt-5 pb-4 shrink-0 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/ScholarDB.png"
+              alt="ScholarDB Logo"
+              className="w-12 h-12 rounded object-contain"
+            />
+            <div>
+              <h1 className="text-base font-bold text-gray-900 leading-snug">
+                学者知识图谱
+              </h1>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Scholar Knowledge Graph
+              </p>
+            </div>
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto scrollbar-hide py-4 px-3">
