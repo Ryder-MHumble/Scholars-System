@@ -13,7 +13,6 @@ import type {
   ProjectCategory,
   ProjectSubcategory,
 } from "@/constants/projectCategories";
-import { PROJECT_CATEGORIES } from "@/constants/projectCategories";
 
 type ViewMode = "list" | "grid";
 

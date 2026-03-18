@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { X, Check, AlertTriangle } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Check, AlertTriangle, ChevronDown } from "lucide-react";
 import { patchInstitution } from "@/services/institutionApi";
 import type {
   InstitutionDetail,
   InstitutionPatchRequest,
 } from "@/types/institution";
+import { cn } from "@/utils/cn";
 
 export function EditInstitutionModal({
   institution,
@@ -84,6 +85,101 @@ export function EditInstitutionModal({
     </div>
   );
 
+  const CustomSelect = ({
+    label,
+    value,
+    onChange,
+    options,
+  }: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    options: { value: string; label: string }[];
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (
+          dropdownRef.current &&
+          !dropdownRef.current.contains(event.target as Node)
+        ) {
+          setIsOpen(false);
+        }
+      };
+
+      if (isOpen) {
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+          document.removeEventListener("mousedown", handleClickOutside);
+        };
+      }
+    }, [isOpen]);
+
+    const selectedOption = options.find((opt) => opt.value === value);
+
+    return (
+      <div>
+        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+          {label}
+        </label>
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className={cn(
+              "w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-slate-50 hover:bg-white transition-all text-left flex items-center justify-between",
+              isOpen && "bg-white ring-2 ring-blue-400 border-transparent",
+            )}
+          >
+            <span className={value ? "text-slate-900" : "text-slate-400"}>
+              {selectedOption?.label || "未分类"}
+            </span>
+            <ChevronDown
+              className={cn(
+                "w-4 h-4 text-slate-400 transition-transform",
+                isOpen && "rotate-180",
+              )}
+            />
+          </button>
+
+          <AnimatePresence>
+            {isOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+                className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
+              >
+                {options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(option.value);
+                      setIsOpen(false);
+                    }}
+                    className={cn(
+                      "w-full px-3.5 py-2.5 text-sm text-left hover:bg-slate-50 transition-colors flex items-center justify-between",
+                      value === option.value && "bg-blue-50 text-blue-600",
+                    )}
+                  >
+                    <span>{option.label}</span>
+                    {value === option.value && (
+                      <Check className="w-4 h-4 text-blue-600" />
+                    )}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <motion.div
@@ -157,24 +253,20 @@ export function EditInstitutionModal({
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-slate-50 focus:bg-white transition-all"
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                分类
-              </label>
-              <select
-                value={form.classification ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, classification: e.target.value }))
-                }
-                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-slate-50 focus:bg-white transition-all"
-              >
-                <option value="">未分类</option>
-                <option value="共建高校">共建高校</option>
-                <option value="兄弟院校">兄弟院校</option>
-                <option value="海外高校">海外高校</option>
-                <option value="其他高校">其他高校</option>
-              </select>
-            </div>
+            <CustomSelect
+              label="分类"
+              value={form.classification ?? ""}
+              onChange={(value) =>
+                setForm((f) => ({ ...f, classification: value }))
+              }
+              options={[
+                { value: "", label: "未分类" },
+                { value: "共建高校", label: "共建高校" },
+                { value: "兄弟院校", label: "兄弟院校" },
+                { value: "海外高校", label: "海外高校" },
+                { value: "其他高校", label: "其他高校" },
+              ]}
+            />
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                 优先级

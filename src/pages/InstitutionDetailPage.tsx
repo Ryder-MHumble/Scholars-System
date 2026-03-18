@@ -485,9 +485,9 @@ function DepartmentList({
                 style={{ width: `${(dept.scholar_count / maxCount) * 100}%` }}
               />
             </div>
-            {dept.sources.length > 0 && (
+            {(dept.sources?.length ?? 0) > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {dept.sources.map((src) => (
+                {(dept.sources || []).map((src) => (
                   <span
                     key={src.source_id}
                     className={`text-[10px] px-2 py-1 rounded-full font-medium ${

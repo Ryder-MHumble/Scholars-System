@@ -12,7 +12,6 @@ const FIELD_MAPPING: Record<keyof ScholarListItem | string, string> = {
   position: "职称",
   research_areas: "研究方向",
   email: "邮箱",
-  phone: "电话",
   profile_url: "主页链接",
   is_potential_recruit: "是否潜在招募对象",
   is_advisor_committee: "是否导师委员会成员",
@@ -34,7 +33,6 @@ function transformScholarForExport(
       ? scholar.research_areas.join("; ")
       : "",
     [FIELD_MAPPING.email]: scholar.email || "",
-    [FIELD_MAPPING.phone]: scholar.phone || "",
     [FIELD_MAPPING.profile_url]: scholar.profile_url || "",
     [FIELD_MAPPING.is_potential_recruit]: scholar.is_potential_recruit
       ? "是"
@@ -67,7 +65,6 @@ export function exportScholarsToExcel(
     { wch: 12 }, // 职称
     { wch: 30 }, // 研究方向
     { wch: 20 }, // 邮箱
-    { wch: 15 }, // 电话
     { wch: 30 }, // 主页链接
     { wch: 15 }, // 是否潜在招募对象
     { wch: 18 }, // 是否导师委员会成员
