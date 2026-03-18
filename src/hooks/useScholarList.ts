@@ -57,7 +57,11 @@ export function useScholarList() {
     totalCount,
     loading: uniLoading,
     error: uniError,
-  } = useUniversityCounts({ region: apiRegion, affiliation_type: apiAffiliationType });
+  } = useUniversityCounts({
+    region: apiRegion,
+    affiliation_type: apiAffiliationType,
+    is_adjunct_supervisor: isJointMentor || undefined,
+  });
 
   // uniNodes already filtered by backend, no client-side re-filtering needed
   const filteredUniNodes = useMemo<UniNode[]>(() => {
@@ -101,7 +105,15 @@ export function useScholarList() {
         }
       });
     return () => controller.abort();
-  }, [page, activeUni, activeDept, query, isJointMentor, apiRegion, apiAffiliationType]);
+  }, [
+    page,
+    activeUni,
+    activeDept,
+    query,
+    isJointMentor,
+    apiRegion,
+    apiAffiliationType,
+  ]);
 
   /* Sync page to URL — only write when URL value actually differs */
   useEffect(() => {

@@ -17,6 +17,7 @@ export interface UniversityData {
 export function useUniversityCounts(filters?: {
   region?: string;
   affiliation_type?: string;
+  is_adjunct_supervisor?: boolean;
 }) {
   const [universities, setUniversities] = useState<UniversityData[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -26,6 +27,7 @@ export function useUniversityCounts(filters?: {
 
   const region = filters?.region;
   const affiliationType = filters?.affiliation_type;
+  const isAdjunctSupervisor = filters?.is_adjunct_supervisor;
 
   useEffect(() => {
     const load = async () => {
@@ -36,6 +38,7 @@ export function useUniversityCounts(filters?: {
         const items = await fetchScholarUniversities({
           region,
           affiliation_type: affiliationType,
+          is_adjunct_supervisor: isAdjunctSupervisor,
         });
 
         const unis: UniversityData[] = [];
@@ -81,7 +84,7 @@ export function useUniversityCounts(filters?: {
     };
 
     load();
-  }, [region, affiliationType]);
+  }, [region, affiliationType, isAdjunctSupervisor]);
 
   return { universities, counts, totalCount, loading, error };
 }

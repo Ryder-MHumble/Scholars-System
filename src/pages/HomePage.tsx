@@ -88,6 +88,13 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Support Notice */}
+        <div className="px-5 py-3 border-b border-gray-100 bg-blue-50">
+          <p className="text-xs text-blue-700 leading-relaxed">
+            💬 如遇到相关问题请咨询孙铭浩
+          </p>
+        </div>
+
         <nav className="flex-1 overflow-y-auto scrollbar-hide py-4 px-3">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3 px-3">
             核心数据库

@@ -274,15 +274,22 @@ export interface ScholarUniversityItem {
 export async function fetchScholarUniversities(filters?: {
   region?: string;
   affiliation_type?: string;
+  is_adjunct_supervisor?: boolean;
 }): Promise<ScholarUniversityItem[]> {
   const params = new URLSearchParams();
   params.set("view", "hierarchy");
   params.set("entity_type", "organization");
   if (filters?.region) params.set("region", filters.region);
-  if (filters?.affiliation_type) params.set("org_type", filters.affiliation_type);
+  if (filters?.affiliation_type)
+    params.set("org_type", filters.affiliation_type);
+  if (filters?.is_adjunct_supervisor)
+    params.set("is_adjunct_supervisor", "true");
   const query = params.toString();
-  const res = await fetch(`${BASE_URL}/api/v1/institutions${query ? `?${query}` : ""}`);
-  if (!res.ok) throw new Error(`Failed to fetch scholar universities: ${res.status}`);
+  const res = await fetch(
+    `${BASE_URL}/api/v1/institutions${query ? `?${query}` : ""}`,
+  );
+  if (!res.ok)
+    throw new Error(`Failed to fetch scholar universities: ${res.status}`);
   const data = await res.json();
 
   // Transform the new API response to match the old format
@@ -318,7 +325,8 @@ export async function fetchScholarList(
   if (filters?.institution_category)
     params.set("institution_category", filters.institution_category);
   if (filters?.region) params.set("region", filters.region);
-  if (filters?.affiliation_type) params.set("affiliation_type", filters.affiliation_type);
+  if (filters?.affiliation_type)
+    params.set("affiliation_type", filters.affiliation_type);
 
   const res = await fetch(`${BASE_URL}/api/v1/scholars?${params}`, { signal });
   if (!res.ok) throw new Error(`Failed to fetch scholar list: ${res.status}`);
