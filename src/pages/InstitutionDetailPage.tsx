@@ -16,13 +16,22 @@ import {
   UserCog,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { fetchInstitutionDetail, deleteInstitution } from "@/services/institutionApi";
+import {
+  fetchInstitutionDetail,
+  deleteInstitution,
+} from "@/services/institutionApi";
 import type { InstitutionDetail } from "@/types/institution";
 import { UniversityLogo } from "@/components/institution/detail/UniversityLogo";
-import { CategoryBadge, PriorityBadge } from "@/components/institution/detail/InstitutionBadges";
+import {
+  CategoryBadge,
+  PriorityBadge,
+} from "@/components/institution/detail/InstitutionBadges";
 import { StatCard } from "@/components/institution/detail/StatCard";
 import { CollapsibleSection } from "@/components/institution/detail/CollapsibleSection";
-import { TagList, PersonList } from "@/components/institution/detail/PersonComponents";
+import {
+  TagList,
+  PersonList,
+} from "@/components/institution/detail/PersonComponents";
 import { EditInstitutionModal } from "@/components/institution/detail/EditInstitutionModal";
 import { DeleteConfirmDialog } from "@/components/institution/detail/DeleteConfirmDialog";
 
@@ -30,7 +39,9 @@ export default function InstitutionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [institution, setInstitution] = useState<InstitutionDetail | null>(null);
+  const [institution, setInstitution] = useState<InstitutionDetail | null>(
+    null,
+  );
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -61,7 +72,9 @@ export default function InstitutionDetailPage() {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <p className="text-slate-500 mb-3 font-medium">机构不存在或加载失败</p>
+          <p className="text-slate-500 mb-3 font-medium">
+            机构不存在或加载失败
+          </p>
           <button
             onClick={() => navigate("/?tab=institutions")}
             className="text-blue-600 hover:underline text-sm"
@@ -74,21 +87,21 @@ export default function InstitutionDetailPage() {
   }
 
   const hasLeadership =
-    institution.resident_leaders.length > 0 ||
-    institution.degree_committee.length > 0 ||
-    institution.teaching_committee.length > 0;
+    (institution.resident_leaders?.length ?? 0) > 0 ||
+    (institution.degree_committee?.length ?? 0) > 0 ||
+    (institution.teaching_committee?.length ?? 0) > 0;
 
   const hasCooperation =
-    institution.key_departments.length > 0 ||
-    institution.joint_labs.length > 0 ||
-    institution.training_cooperation.length > 0 ||
-    institution.academic_cooperation.length > 0 ||
-    institution.talent_dual_appointment.length > 0;
+    (institution.key_departments?.length ?? 0) > 0 ||
+    (institution.joint_labs?.length ?? 0) > 0 ||
+    (institution.training_cooperation?.length ?? 0) > 0 ||
+    (institution.academic_cooperation?.length ?? 0) > 0 ||
+    (institution.talent_dual_appointment?.length ?? 0) > 0;
 
   const hasActivities =
-    institution.recruitment_events.length > 0 ||
-    institution.visit_exchanges.length > 0 ||
-    institution.cooperation_focus.length > 0;
+    (institution.recruitment_events?.length ?? 0) > 0 ||
+    (institution.visit_exchanges?.length ?? 0) > 0 ||
+    (institution.cooperation_focus?.length ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -157,11 +170,36 @@ export default function InstitutionDetailPage() {
       <div className="max-w-6xl mx-auto px-6 md:px-8 py-8 space-y-5">
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
-          <StatCard label="学者总数" value={institution.scholar_count} icon={Users} styleIdx={0} />
-          <StatCard label="24 级学生" value={institution.student_count_24} icon={GraduationCap} styleIdx={1} />
-          <StatCard label="25 级学生" value={institution.student_count_25} icon={GraduationCap} styleIdx={2} />
-          <StatCard label="学生总数" value={institution.student_count_total} icon={BookOpen} styleIdx={3} />
-          <StatCard label="导师数" value={institution.mentor_count} icon={UserCog} styleIdx={4} />
+          <StatCard
+            label="学者总数"
+            value={institution.scholar_count}
+            icon={Users}
+            styleIdx={0}
+          />
+          <StatCard
+            label="24 级学生"
+            value={institution.student_count_24}
+            icon={GraduationCap}
+            styleIdx={1}
+          />
+          <StatCard
+            label="25 级学生"
+            value={institution.student_count_25}
+            icon={GraduationCap}
+            styleIdx={2}
+          />
+          <StatCard
+            label="学生总数"
+            value={institution.student_count_total}
+            icon={BookOpen}
+            styleIdx={3}
+          />
+          <StatCard
+            label="导师数"
+            value={institution.mentor_count}
+            icon={UserCog}
+            styleIdx={4}
+          />
         </div>
 
         {/* Leadership */}
@@ -170,31 +208,37 @@ export default function InstitutionDetailPage() {
           icon={UserCheck}
           styleIdx={0}
           count={
-            institution.resident_leaders.length +
-            institution.degree_committee.length +
-            institution.teaching_committee.length
+            (institution.resident_leaders?.length ?? 0) +
+            (institution.degree_committee?.length ?? 0) +
+            (institution.teaching_committee?.length ?? 0)
           }
         >
           {!hasLeadership ? (
             <p className="text-sm text-slate-400 italic">暂无数据</p>
           ) : (
             <div className="space-y-4">
-              {institution.resident_leaders.length > 0 && (
+              {(institution.resident_leaders?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">驻校负责人</p>
-                  <TagList items={institution.resident_leaders} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    驻校负责人
+                  </p>
+                  <TagList items={institution.resident_leaders || []} />
                 </div>
               )}
-              {institution.degree_committee.length > 0 && (
+              {(institution.degree_committee?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">学位委员会</p>
-                  <TagList items={institution.degree_committee} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    学位委员会
+                  </p>
+                  <TagList items={institution.degree_committee || []} />
                 </div>
               )}
-              {institution.teaching_committee.length > 0 && (
+              {(institution.teaching_committee?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">教学委员会</p>
-                  <TagList items={institution.teaching_committee} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    教学委员会
+                  </p>
+                  <TagList items={institution.teaching_committee || []} />
                 </div>
               )}
             </div>
@@ -202,26 +246,26 @@ export default function InstitutionDetailPage() {
         </CollapsibleSection>
 
         {/* University leaders */}
-        {institution.university_leaders.length > 0 && (
+        {(institution.university_leaders?.length ?? 0) > 0 && (
           <CollapsibleSection
             title="大学领导"
             icon={GraduationCap}
             styleIdx={1}
-            count={institution.university_leaders.length}
+            count={institution.university_leaders?.length ?? 0}
           >
-            <PersonList items={institution.university_leaders} />
+            <PersonList items={institution.university_leaders || []} />
           </CollapsibleSection>
         )}
 
         {/* Notable scholars */}
-        {institution.notable_scholars.length > 0 && (
+        {(institution.notable_scholars?.length ?? 0) > 0 && (
           <CollapsibleSection
             title="知名学者"
             icon={Users}
             styleIdx={2}
-            count={institution.notable_scholars.length}
+            count={institution.notable_scholars?.length ?? 0}
           >
-            <PersonList items={institution.notable_scholars} />
+            <PersonList items={institution.notable_scholars || []} />
           </CollapsibleSection>
         )}
 
@@ -230,12 +274,12 @@ export default function InstitutionDetailPage() {
           title="院系信息"
           icon={Layers}
           styleIdx={3}
-          count={institution.departments.length}
+          count={institution.departments?.length ?? 0}
         >
-          {institution.departments.length === 0 ? (
+          {(institution.departments?.length ?? 0) === 0 ? (
             <p className="text-sm text-slate-400 italic">暂无院系数据</p>
           ) : (
-            <DepartmentList departments={institution.departments} />
+            <DepartmentList departments={institution.departments || []} />
           )}
         </CollapsibleSection>
 
@@ -243,34 +287,44 @@ export default function InstitutionDetailPage() {
         {hasCooperation && (
           <CollapsibleSection title="合作项目" icon={Handshake} styleIdx={4}>
             <div className="space-y-4">
-              {institution.key_departments.length > 0 && (
+              {(institution.key_departments?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">重点合作院系</p>
-                  <TagList items={institution.key_departments} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    重点合作院系
+                  </p>
+                  <TagList items={institution.key_departments || []} />
                 </div>
               )}
-              {institution.joint_labs.length > 0 && (
+              {(institution.joint_labs?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">联合实验室</p>
-                  <TagList items={institution.joint_labs} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    联合实验室
+                  </p>
+                  <TagList items={institution.joint_labs || []} />
                 </div>
               )}
-              {institution.training_cooperation.length > 0 && (
+              {(institution.training_cooperation?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">培养合作</p>
-                  <TagList items={institution.training_cooperation} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    培养合作
+                  </p>
+                  <TagList items={institution.training_cooperation || []} />
                 </div>
               )}
-              {institution.academic_cooperation.length > 0 && (
+              {(institution.academic_cooperation?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">学术合作</p>
-                  <TagList items={institution.academic_cooperation} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    学术合作
+                  </p>
+                  <TagList items={institution.academic_cooperation || []} />
                 </div>
               )}
-              {institution.talent_dual_appointment.length > 0 && (
+              {(institution.talent_dual_appointment?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">人才双聘</p>
-                  <TagList items={institution.talent_dual_appointment} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    人才双聘
+                  </p>
+                  <TagList items={institution.talent_dual_appointment || []} />
                 </div>
               )}
             </div>
@@ -286,34 +340,46 @@ export default function InstitutionDetailPage() {
             defaultOpen={false}
           >
             <div className="space-y-4">
-              {institution.recruitment_events.length > 0 && (
+              {(institution.recruitment_events?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">招募活动</p>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    招募活动
+                  </p>
                   <div className="space-y-1.5">
-                    {institution.recruitment_events.map((event, i) => (
-                      <p key={i} className="text-sm text-slate-700 bg-slate-50 rounded-xl px-4 py-2.5 leading-relaxed">
+                    {(institution.recruitment_events || []).map((event, i) => (
+                      <p
+                        key={i}
+                        className="text-sm text-slate-700 bg-slate-50 rounded-xl px-4 py-2.5 leading-relaxed"
+                      >
                         {event}
                       </p>
                     ))}
                   </div>
                 </div>
               )}
-              {institution.visit_exchanges.length > 0 && (
+              {(institution.visit_exchanges?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">访问交流</p>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    访问交流
+                  </p>
                   <div className="space-y-1.5">
-                    {institution.visit_exchanges.map((event, i) => (
-                      <p key={i} className="text-sm text-slate-700 bg-slate-50 rounded-xl px-4 py-2.5 leading-relaxed">
+                    {(institution.visit_exchanges || []).map((event, i) => (
+                      <p
+                        key={i}
+                        className="text-sm text-slate-700 bg-slate-50 rounded-xl px-4 py-2.5 leading-relaxed"
+                      >
                         {event}
                       </p>
                     ))}
                   </div>
                 </div>
               )}
-              {institution.cooperation_focus.length > 0 && (
+              {(institution.cooperation_focus?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">合作重点</p>
-                  <TagList items={institution.cooperation_focus} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    合作重点
+                  </p>
+                  <TagList items={institution.cooperation_focus || []} />
                 </div>
               )}
             </div>
@@ -336,14 +402,18 @@ export default function InstitutionDetailPage() {
                 <p className="text-base font-bold text-white">学者数据库</p>
                 <p className="text-sm text-blue-100 mt-0.5">
                   该机构收录{" "}
-                  <span className="font-bold text-white">{institution.scholar_count}</span>{" "}
+                  <span className="font-bold text-white">
+                    {institution.scholar_count}
+                  </span>{" "}
                   位学者的详细信息
                 </p>
               </div>
             </div>
             <button
               onClick={() =>
-                navigate(`/?tab=scholars&university=${encodeURIComponent(institution.name)}`)
+                navigate(
+                  `/?tab=scholars&university=${encodeURIComponent(institution.name)}`,
+                )
               }
               className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-blue-50 text-blue-600 font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl flex-shrink-0"
             >
@@ -400,10 +470,14 @@ function DepartmentList({
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline justify-between gap-2 mb-2">
               <p className="text-sm font-bold text-slate-800">{dept.name}</p>
-              <p className="text-xl font-black text-blue-600 flex-shrink-0">{dept.scholar_count}</p>
+              <p className="text-xl font-black text-blue-600 flex-shrink-0">
+                {dept.scholar_count}
+              </p>
             </div>
             {dept.org_name && dept.org_name !== dept.name && (
-              <p className="text-xs text-slate-400 mb-2 truncate">{dept.org_name}</p>
+              <p className="text-xs text-slate-400 mb-2 truncate">
+                {dept.org_name}
+              </p>
             )}
             <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2.5">
               <div

@@ -8,7 +8,6 @@ import {
   X,
   Plus,
   FileText,
-  Tag,
 } from "lucide-react";
 import type { ScholarDetail } from "@/services/scholarApi";
 import { ClickToEditField } from "@/components/scholar-detail/shared/ClickToEditField";
@@ -32,7 +31,6 @@ interface RelationCardProps {
   ) => Promise<void>;
   onRelationNotesSave: (val: string) => Promise<void>;
   onSaveExchangeRecords: (records: string[]) => Promise<void>;
-  onSaveTags?: (tags: string[]) => Promise<void>;
 }
 
 const RELATION_BADGES = [
@@ -45,7 +43,6 @@ export function RelationCard({
   onRelationToggle,
   onRelationNotesSave,
   onSaveExchangeRecords,
-  onSaveTags,
 }: RelationCardProps) {
   // Exchange records editing state
   const [isExchangeEditMode, setIsExchangeEditMode] = useState(false);
@@ -56,11 +53,6 @@ export function RelationCard({
   const [editingExchangeIdx, setEditingExchangeIdx] = useState<number | null>(
     null,
   );
-
-  // Custom tags state
-  const [customTags, setCustomTags] = useState<string[]>(scholar.tags || []);
-  const [isAddingTag, setIsAddingTag] = useState(false);
-  const [newTagInput, setNewTagInput] = useState("");
 
   const handleEnterExchangeEdit = () => {
     setEditedExchangeRecords([...(scholar.academic_exchange_records ?? [])]);
@@ -97,27 +89,6 @@ export function RelationCard({
 
   const handleDeleteExchangeRecord = (idx: number) => {
     setEditedExchangeRecords((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleAddTag = () => {
-    const trimmed = newTagInput.trim();
-    if (trimmed && !customTags.includes(trimmed)) {
-      const updatedTags = [...customTags, trimmed];
-      setCustomTags(updatedTags);
-      setNewTagInput("");
-      setIsAddingTag(false);
-      if (onSaveTags) {
-        onSaveTags(updatedTags);
-      }
-    }
-  };
-
-  const handleRemoveTag = (tag: string) => {
-    const updatedTags = customTags.filter((t) => t !== tag);
-    setCustomTags(updatedTags);
-    if (onSaveTags) {
-      onSaveTags(updatedTags);
-    }
   };
 
   const relationBadges = RELATION_BADGES.map((badge) => ({
@@ -214,72 +185,6 @@ export function RelationCard({
               }
             />
           ) : null}
-
-          {/* Custom Tags */}
-          <div className="mt-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Tag className="w-3.5 h-3.5 text-gray-400" />
-              <span className="text-xs text-gray-500">自定义标签</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {customTags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-50 border border-purple-200 text-purple-700 text-xs"
-                >
-                  {tag}
-                  <button
-                    onClick={() => handleRemoveTag(tag)}
-                    className="hover:bg-purple-100 rounded-full p-0.5 transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-              {isAddingTag ? (
-                <div className="inline-flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={newTagInput}
-                    onChange={(e) => setNewTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleAddTag();
-                      if (e.key === "Escape") {
-                        setIsAddingTag(false);
-                        setNewTagInput("");
-                      }
-                    }}
-                    placeholder="输入标签名"
-                    autoFocus
-                    className="w-24 px-2 py-1 text-xs border border-purple-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-400"
-                  />
-                  <button
-                    onClick={handleAddTag}
-                    className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsAddingTag(false);
-                      setNewTagInput("");
-                    }}
-                    className="p-1 text-gray-400 hover:bg-gray-50 rounded transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setIsAddingTag(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-dashed border-purple-300 text-purple-600 text-xs hover:bg-purple-50 transition-colors"
-                >
-                  <Plus className="w-3 h-3" />
-                  添加标签
-                </button>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Adjunct Supervisor Details */}

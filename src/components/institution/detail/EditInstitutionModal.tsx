@@ -2,7 +2,10 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Check, AlertTriangle } from "lucide-react";
 import { patchInstitution } from "@/services/institutionApi";
-import type { InstitutionDetail, InstitutionPatchRequest } from "@/types/institution";
+import type {
+  InstitutionDetail,
+  InstitutionPatchRequest,
+} from "@/types/institution";
 
 export function EditInstitutionModal({
   institution,
@@ -18,6 +21,7 @@ export function EditInstitutionModal({
   const [form, setForm] = useState<InstitutionPatchRequest>({
     avatar: institution.avatar ?? "",
     category: institution.category ?? "",
+    classification: institution.classification ?? "",
     priority: institution.priority ?? "",
     student_count_24: institution.student_count_24 ?? undefined,
     student_count_25: institution.student_count_25 ?? undefined,
@@ -138,7 +142,7 @@ export function EditInstitutionModal({
 
           <hr className="border-slate-100" />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                 类别
@@ -152,6 +156,24 @@ export function EditInstitutionModal({
                 placeholder="如: 京外C9"
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-slate-50 focus:bg-white transition-all"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                分类
+              </label>
+              <select
+                value={form.classification ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, classification: e.target.value }))
+                }
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-slate-50 focus:bg-white transition-all"
+              >
+                <option value="">未分类</option>
+                <option value="共建高校">共建高校</option>
+                <option value="兄弟院校">兄弟院校</option>
+                <option value="海外高校">海外高校</option>
+                <option value="其他高校">其他高校</option>
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">

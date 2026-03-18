@@ -96,6 +96,7 @@ export interface InstitutionDetail {
   org_name: string;
   avatar?: string | null;
   category: string | null;
+  classification: string | null;
   priority: string | null;
   student_count_24: number | null;
   student_count_25: number | null;
@@ -126,6 +127,7 @@ export interface InstitutionPatchRequest {
   name?: string;
   avatar?: string | null;
   category?: string;
+  classification?: string;
   priority?: string;
   student_count_24?: number | null;
   student_count_25?: number | null;

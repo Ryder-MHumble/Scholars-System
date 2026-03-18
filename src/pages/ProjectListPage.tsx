@@ -1,379 +1,294 @@
-import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
-import { Search, Plus, Loader2, AlertCircle, RefreshCw } from "lucide-react";
-import { ProjectCard } from "@/components/project/ProjectCard";
-import { ProjectFormModal } from "@/components/project/ProjectFormModal";
-import { ExcelImportButton } from "@/components/common/ExcelImportButton";
-import { ExcelImportModal } from "@/components/common/ExcelImportModal";
-import { useProjects } from "@/hooks/useProjects";
-import { fetchProjectDetail } from "@/services/projectApi";
-import type { ProjectListItem, ProjectCreateRequest } from "@/types/project";
-import type { ExcelColumn } from "@/types/import";
+import { useState, useMemo } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, List, LayoutGrid } from "lucide-react";
+import { cn } from "@/utils/cn";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { Pagination } from "@/components/common/Pagination";
+import { ScholarCard } from "@/components/common/ScholarCard";
+import { ScholarTable } from "@/components/common/ScholarTable";
+import { ProjectCategoryTree } from "@/components/project/ProjectCategoryTree";
+import { useScholarList } from "@/hooks/useScholarList";
+import type {
+  ProjectCategory,
+  ProjectSubcategory,
+} from "@/constants/projectCategories";
+import { PROJECT_CATEGORIES } from "@/constants/projectCategories";
 
-const EXCEL_COLUMNS: ExcelColumn[] = [
-  { key: "name", label: "项目名称", required: true, hint: "完整项目名称" },
-  { key: "pi_name", label: "项目负责人", required: true, hint: "负责人姓名" },
-  {
-    key: "pi_institution",
-    label: "负责人单位",
-    required: true,
-    hint: "所属机构全称",
-  },
-  {
-    key: "funder",
-    label: "资助机构",
-    required: true,
-    hint: "如 国家自然科学基金委、科技部",
-  },
-  {
-    key: "funding_amount",
-    label: "资助金额(万元)",
-    hint: "纯数字，单位万元，可留空",
-  },
-  {
-    key: "start_year",
-    label: "开始年份",
-    required: true,
-    hint: "4位数字年份，如 2023",
-  },
-  { key: "end_year", label: "结束年份", hint: "4位数字年份，可留空" },
-  {
-    key: "status",
-    label: "项目状态",
-    required: true,
-    hint: "在研 / 已结题 / 已验收 / 已终止",
-  },
-  {
-    key: "category",
-    label: "项目类别",
-    required: true,
-    hint: "如 国家重点研发计划、国家自然科学基金",
-  },
-  { key: "description", label: "项目简介", hint: "简短描述，可留空" },
-  {
-    key: "keywords",
-    label: "关键词(逗号分隔)",
-    hint: "多个关键词用中英文逗号分隔",
-  },
-  {
-    key: "tags",
-    label: "标签(逗号分隔)",
-    hint: "自定义标签，逗号分隔，可留空",
-  },
-  {
-    key: "cooperation_institutions",
-    label: "合作机构(逗号分隔)",
-    hint: "多个合作机构用逗号分隔，可留空",
-  },
-];
-
-const STATUS_FILTERS = ["全部", "在研", "已结题", "已验收", "已终止"] as const;
-type StatusFilter = (typeof STATUS_FILTERS)[number];
+type ViewMode = "list" | "grid";
 
 export default function ProjectListPage() {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+
+  const activeCategory = searchParams.get("category") as ProjectCategory | null;
+  const activeSubcategory = searchParams.get(
+    "subcategory",
+  ) as ProjectSubcategory | null;
+
   const {
-    projects,
+    setQuery,
+    searchInput,
+    setSearchInput,
+    items,
+    page,
+    setPage,
+    totalPages,
     total,
-    loading,
+    isLoading,
     error,
-    loadProjects,
-    addProject,
-    updateProject,
-    removeProject,
-  } = useProjects();
+    deletingHash,
+    handleDeleteScholar,
+  } = useScholarList();
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("全部");
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<
-    import("@/types/project").Project | null
-  >(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-
-  const reload = useCallback(
-    (search?: string, status?: string) => {
-      loadProjects(1, search, status);
-    },
-    [loadProjects],
-  );
-
-  useEffect(() => {
-    reload(searchQuery, statusFilter === "全部" ? undefined : statusFilter);
-  }, []);
-
-  const handleSearch = (value: string) => {
-    setSearchQuery(value);
-    reload(value, statusFilter === "全部" ? undefined : statusFilter);
-  };
-
-  const handleStatusFilter = (status: StatusFilter) => {
-    setStatusFilter(status);
-    reload(searchQuery, status === "全部" ? undefined : status);
-  };
-
-  const handleCreate = async (data: ProjectCreateRequest) => {
-    await addProject(data);
-    reload(searchQuery, statusFilter === "全部" ? undefined : statusFilter);
-  };
-
-  const handleEditClick = async (project: ProjectListItem) => {
-    try {
-      const detail = await fetchProjectDetail(project.id);
-      setEditingProject(detail);
-      setIsFormOpen(true);
-    } catch {
-      // fallback: open with list data cast
-      setEditingProject(project as import("@/types/project").Project);
-      setIsFormOpen(true);
+  // Filter scholars by selected category/subcategory
+  const filteredScholars = useMemo(() => {
+    if (!activeCategory && !activeSubcategory) {
+      // Show all scholars with any project category
+      return items.filter(
+        (scholar) =>
+          scholar.project_category ||
+          scholar.project_subcategory ||
+          scholar.adjunct_supervisor?.status,
+      );
     }
-  };
 
-  const handleUpdate = async (data: ProjectCreateRequest) => {
-    if (!editingProject) return;
-    await updateProject(editingProject.id, data);
-    reload(searchQuery, statusFilter === "全部" ? undefined : statusFilter);
-    setEditingProject(null);
-  };
-
-  const handleDeleteClick = (project: ProjectListItem) => {
-    setDeleteConfirmId(project.id);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteConfirmId) return;
-    setDeletingId(deleteConfirmId);
-    setDeleteConfirmId(null);
-    try {
-      await removeProject(deleteConfirmId);
-      reload(searchQuery, statusFilter === "全部" ? undefined : statusFilter);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "删除失败");
-    } finally {
-      setDeletingId(null);
+    if (activeSubcategory) {
+      // Filter by specific subcategory
+      return items.filter((scholar) => {
+        // Special handling for "兼职导师" - include scholars with adjunct_supervisor
+        if (activeCategory === "教育培养" && activeSubcategory === "兼职导师") {
+          return (
+            scholar.project_subcategory === activeSubcategory ||
+            scholar.adjunct_supervisor?.status
+          );
+        }
+        return scholar.project_subcategory === activeSubcategory;
+      });
     }
+
+    if (activeCategory) {
+      // Filter by primary category
+      return items.filter(
+        (scholar) => scholar.project_category === activeCategory,
+      );
+    }
+
+    return items;
+  }, [items, activeCategory, activeSubcategory]);
+
+  // Calculate category counts
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+
+    items.forEach((scholar) => {
+      // Count scholars with adjunct_supervisor as "教育培养-兼职导师"
+      if (scholar.adjunct_supervisor?.status) {
+        const key = "教育培养-兼职导师";
+        counts[key] = (counts[key] || 0) + 1;
+      }
+
+      // Count scholars by their project category/subcategory
+      if (scholar.project_category && scholar.project_subcategory) {
+        const key = `${scholar.project_category}-${scholar.project_subcategory}`;
+        counts[key] = (counts[key] || 0) + 1;
+      }
+    });
+
+    return counts;
+  }, [items]);
+
+  const handleSelectCategory = (category: ProjectCategory | null) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (category) {
+      newParams.set("category", category);
+      newParams.delete("subcategory");
+    } else {
+      newParams.delete("category");
+      newParams.delete("subcategory");
+    }
+    newParams.set("page", "1");
+    setSearchParams(newParams);
   };
 
-  const handleImport = async (data: Record<string, unknown>[]) => {
-    for (const row of data) {
-      const payload: ProjectCreateRequest = {
-        name: String(row.name ?? ""),
-        pi_name: String(row.pi_name ?? ""),
-        pi_institution: String(row.pi_institution ?? ""),
-        funder: String(row.funder ?? ""),
-        funding_amount: row.funding_amount
-          ? Number(row.funding_amount)
-          : undefined,
-        start_year: Number(row.start_year ?? new Date().getFullYear()),
-        end_year: row.end_year ? Number(row.end_year) : undefined,
-        status: String(row.status ?? "在研"),
-        category: String(row.category ?? ""),
-        description: row.description ? String(row.description) : undefined,
-        keywords: row.keywords
-          ? String(row.keywords)
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : [],
-        tags: row.tags
-          ? String(row.tags)
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : [],
-        cooperation_institutions: row.cooperation_institutions
-          ? String(row.cooperation_institutions)
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : [],
-        related_scholars: [],
-        outputs: [],
-      };
-      await addProject(payload);
-    }
-    reload(searchQuery, statusFilter === "全部" ? undefined : statusFilter);
+  const handleSelectSubcategory = (
+    category: ProjectCategory,
+    subcategory: ProjectSubcategory,
+  ) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("category", category);
+    newParams.set("subcategory", subcategory);
+    newParams.set("page", "1");
+    setSearchParams(newParams);
   };
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar bg-gray-50">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className="p-6 md:p-8"
-      >
-        {/* Page Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">项目库</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                共 <span className="font-semibold text-gray-700">{total}</span>{" "}
-                个项目
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() =>
-                  reload(
-                    searchQuery,
-                    statusFilter === "全部" ? undefined : statusFilter,
-                  )
-                }
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                title="刷新"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
-              <ExcelImportButton
-                onClick={() => setIsImportModalOpen(true)}
-                label="批量导入"
-              />
-              <button
-                onClick={() => {
-                  setEditingProject(null);
-                  setIsFormOpen(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                添加项目
-              </button>
-            </div>
-          </div>
+    <div className="h-full overflow-hidden flex bg-gray-50">
+      {/* Category tree sidebar */}
+      <div className="w-64 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col overflow-hidden">
+        <ProjectCategoryTree
+          activeCategory={activeCategory}
+          activeSubcategory={activeSubcategory}
+          onSelectCategory={handleSelectCategory}
+          onSelectSubcategory={handleSelectSubcategory}
+          categoryCounts={categoryCounts}
+          loading={isLoading}
+        />
+      </div>
 
-          {/* Search & Filter */}
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                placeholder="搜索项目名称或负责人..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
+      {/* Scholar list */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="p-6 md:p-8"
+        >
+          {/* Header */}
+          <div className="mb-6">
+            {/* Title Row */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">项目分类</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  共{" "}
+                  <span className="font-semibold text-gray-700">
+                    {filteredScholars.length}
+                  </span>{" "}
+                  位学者
+                </p>
+              </div>
             </div>
+
+            {/* Search and Actions Bar */}
             <div className="flex items-center gap-2">
-              {STATUS_FILTERS.map((status) => (
-                <button
-                  key={status}
-                  onClick={() => handleStatusFilter(status)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    statusFilter === status
-                      ? "bg-primary-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
-          </div>
-        ) : error ? (
-          <div className="bg-white rounded-xl border border-red-200 p-12 text-center">
-            <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
-            <p className="text-red-600 font-medium mb-2">加载失败</p>
-            <p className="text-sm text-gray-500 mb-4">{error}</p>
-            <button
-              onClick={() =>
-                reload(
-                  searchQuery,
-                  statusFilter === "全部" ? undefined : statusFilter,
-                )
-              }
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors"
-            >
-              重试
-            </button>
-          </div>
-        ) : projects.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {projects.map((project, index) => (
-              <div
-                key={project.id}
-                className={
-                  deletingId === project.id
-                    ? "opacity-50 pointer-events-none"
-                    : ""
-                }
-              >
-                <ProjectCard
-                  project={project}
-                  index={index}
-                  onEdit={handleEditClick}
-                  onDelete={handleDeleteClick}
+              {/* Search Input */}
+              <div className="relative flex-1 max-w-lg">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setQuery(searchInput);
+                    }
+                  }}
+                  placeholder="搜索学者、研究方向（按回车搜索）"
+                  className="w-full h-10 pl-10 pr-4 text-[13px] bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-gray-300 focus:ring-1 focus:ring-gray-200 transition-all placeholder:text-gray-400"
                 />
               </div>
-            ))}
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center h-10 bg-white border border-gray-200 rounded-lg p-0.5">
+                {(["list", "grid"] as ViewMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    className={cn(
+                      "flex items-center justify-center w-9 h-full rounded-md transition-all",
+                      viewMode === mode
+                        ? "bg-gray-100 text-gray-900"
+                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50",
+                    )}
+                    title={mode === "list" ? "列表视图" : "卡片视图"}
+                  >
+                    {mode === "list" ? (
+                      <List className="w-[18px] h-[18px]" />
+                    ) : (
+                      <LayoutGrid className="w-[18px] h-[18px]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <p className="text-gray-400">暂无项目数据</p>
-          </div>
-        )}
-      </motion.div>
 
-      {/* Create / Edit Modal */}
-      <ProjectFormModal
-        isOpen={isFormOpen}
-        onClose={() => {
-          setIsFormOpen(false);
-          setEditingProject(null);
-        }}
-        onSubmit={editingProject ? handleUpdate : handleCreate}
-        initialData={editingProject}
-        title={editingProject ? "编辑项目" : "添加项目"}
-      />
-
-      {/* Excel Import Modal */}
-      <ExcelImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onImport={handleImport}
-        columns={EXCEL_COLUMNS}
-        title="批量导入项目"
-        templateFilename="项目导入模板.xlsx"
-      />
-
-      {/* Delete Confirm Dialog */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4"
-          >
-            <h3 className="text-lg font-bold text-gray-900 mb-2">确认删除</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              确定要删除该项目吗？此操作不可撤销。
-            </p>
-            <div className="flex justify-end gap-3">
+          {/* Content */}
+          {isLoading ? (
+            <LoadingSpinner />
+          ) : error ? (
+            <div className="bg-white rounded-xl border border-red-100 flex flex-col items-center justify-center py-16 text-red-400">
+              <p className="text-sm">{error}</p>
               <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
+                onClick={() => setPage(1)}
+                className="mt-3 text-xs text-primary-600 hover:underline"
               >
-                取消
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                删除
+                重试
               </button>
             </div>
-          </motion.div>
-        </div>
-      )}
+          ) : (
+            <AnimatePresence mode="wait">
+              {filteredScholars.length === 0 ? (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="bg-white rounded-xl border border-gray-100 flex flex-col items-center justify-center py-24 text-gray-400"
+                >
+                  <Search className="w-12 h-12 mb-3 opacity-25" />
+                  <p className="text-sm">未找到匹配的学者</p>
+                </motion.div>
+              ) : viewMode === "list" ? (
+                <motion.div
+                  key="list"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ScholarTable
+                    items={filteredScholars}
+                    locationState={{ from: location }}
+                    deletingHash={deletingHash}
+                    onDelete={handleDeleteScholar}
+                  />
+                  <Pagination
+                    page={page}
+                    totalPages={totalPages}
+                    totalItems={total}
+                    onPageChange={setPage}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="grid"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredScholars.map((s, i) => (
+                      <ScholarCard
+                        key={s.url_hash}
+                        scholar={s}
+                        index={i}
+                        state={{ from: location }}
+                        onDelete={handleDeleteScholar}
+                        isDeleting={deletingHash === s.url_hash}
+                      />
+                    ))}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="mt-6">
+                      <Pagination
+                        page={page}
+                        totalPages={totalPages}
+                        totalItems={total}
+                        onPageChange={setPage}
+                        compact
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
+        </motion.div>
+      </div>
     </div>
   );
 }

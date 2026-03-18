@@ -26,12 +26,15 @@ export interface ScholarListItem {
   is_potential_recruit: boolean;
   is_advisor_committee: boolean;
   adjunct_supervisor: AdjunctSupervisorInfo;
+  project_category: string;
+  project_subcategory: string;
 }
 
 export interface ScholarDetail extends ScholarListItem {
   url: string;
   content: string;
-  tags: string[];
+  project_category: string;
+  project_subcategory: string;
   gender: string;
   keywords: string[];
   secondary_departments: string[];
@@ -178,7 +181,8 @@ export interface RelationPatch {
   joint_research_projects?: string[];
   joint_management_roles?: string[];
   academic_exchange_records?: string[];
-  tags?: string[];
+  project_category?: string;
+  project_subcategory?: string;
   relation_updated_by?: string;
 }
 
@@ -331,6 +335,84 @@ export async function fetchScholarList(
   const res = await fetch(`${BASE_URL}/api/v1/scholars?${params}`, { signal });
   if (!res.ok) throw new Error(`Failed to fetch scholar list: ${res.status}`);
   return res.json();
+}
+
+export async function fetchAllScholars(
+  filters?: ScholarListFilters,
+  signal?: AbortSignal,
+): Promise<ScholarListItem[]> {
+  // First, get the first page to know the total count
+  const firstPageParams = new URLSearchParams({
+    page: "1",
+    page_size: "100",
+  });
+  if (filters?.university)
+    firstPageParams.set("university", filters.university);
+  if (filters?.department)
+    firstPageParams.set("department", filters.department);
+  if (filters?.search) firstPageParams.set("keyword", filters.search);
+  if (filters?.is_adjunct_supervisor)
+    firstPageParams.set("is_adjunct_supervisor", "true");
+  if (filters?.institution_group)
+    firstPageParams.set("institution_group", filters.institution_group);
+  if (filters?.institution_category)
+    firstPageParams.set("institution_category", filters.institution_category);
+  if (filters?.region) firstPageParams.set("region", filters.region);
+  if (filters?.affiliation_type)
+    firstPageParams.set("affiliation_type", filters.affiliation_type);
+
+  const firstRes = await fetch(
+    `${BASE_URL}/api/v1/scholars?${firstPageParams}`,
+    { signal },
+  );
+  if (!firstRes.ok)
+    throw new Error(`Failed to fetch all scholars: ${firstRes.status}`);
+  const firstData: ScholarListResponse = await firstRes.json();
+
+  // If all data fits in first page, return it
+  if (firstData.total <= 100) {
+    return firstData.items;
+  }
+
+  // Otherwise, fetch all pages
+  const allScholars: ScholarListItem[] = [...firstData.items];
+  const totalPages = firstData.total_pages;
+
+  // Fetch remaining pages in parallel
+  const pagePromises: Promise<ScholarListResponse>[] = [];
+  for (let page = 2; page <= totalPages; page++) {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: "100",
+    });
+    if (filters?.university) params.set("university", filters.university);
+    if (filters?.department) params.set("department", filters.department);
+    if (filters?.search) params.set("keyword", filters.search);
+    if (filters?.is_adjunct_supervisor)
+      params.set("is_adjunct_supervisor", "true");
+    if (filters?.institution_group)
+      params.set("institution_group", filters.institution_group);
+    if (filters?.institution_category)
+      params.set("institution_category", filters.institution_category);
+    if (filters?.region) params.set("region", filters.region);
+    if (filters?.affiliation_type)
+      params.set("affiliation_type", filters.affiliation_type);
+
+    pagePromises.push(
+      fetch(`${BASE_URL}/api/v1/scholars?${params}`, { signal }).then((res) => {
+        if (!res.ok)
+          throw new Error(`Failed to fetch page ${page}: ${res.status}`);
+        return res.json();
+      }),
+    );
+  }
+
+  const pageResults = await Promise.all(pagePromises);
+  pageResults.forEach((pageData) => {
+    allScholars.push(...pageData.items);
+  });
+
+  return allScholars;
 }
 
 export async function fetchScholarDetail(

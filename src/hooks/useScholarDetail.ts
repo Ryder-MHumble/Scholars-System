@@ -142,11 +142,12 @@ export function useScholarDetail(scholarId: string | undefined) {
     setScholar(updated);
   };
 
-  // -- Tags save --
-  const handleSaveTags = async (tags: string[]) => {
+  // -- Project category save --
+  const handleProjectCategorySave = async (primary: string, sub: string) => {
     if (!scholar) return;
     const updated = await patchScholarRelation(scholar.url_hash, {
-      tags,
+      project_category: primary,
+      project_subcategory: sub,
     });
     setScholar(updated);
   };
@@ -167,6 +168,6 @@ export function useScholarDetail(scholarId: string | undefined) {
     handleSaveExchangeRecords,
     handleSaveManagementRolesInline,
     handleRelationNotesSave,
-    handleSaveTags,
+    handleProjectCategorySave,
   };
 }

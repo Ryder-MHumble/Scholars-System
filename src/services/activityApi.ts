@@ -176,9 +176,20 @@ export async function deleteActivity(eventId: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete activity: ${res.status}`);
 }
 
+export interface ActivityScholarDetail {
+  scholar_id: string;
+  name: string;
+  university?: string;
+  department?: string;
+  position?: string;
+  email?: string;
+  research_areas?: string[];
+  photo_url?: string;
+}
+
 export async function fetchActivityScholars(
   eventId: string,
-): Promise<Array<{ scholar_id: string; name: string }>> {
+): Promise<ActivityScholarDetail[]> {
   const res = await fetch(`${BASE_URL}/api/v1/events/${eventId}/scholars`);
   if (!res.ok)
     throw new Error(`Failed to fetch activity scholars: ${res.status}`);

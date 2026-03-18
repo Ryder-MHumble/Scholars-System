@@ -5,11 +5,11 @@ import { fetchScholarList, type ScholarListItem } from "@/services/scholarApi";
 import { cn } from "@/utils/cn";
 
 export interface ScholarPickResult {
-  scholar_id: string;   // url_hash
+  scholar_id: string; // url_hash
   name: string;
   photo_url: string;
-  institution: string;  // university
-  title: string;        // position
+  institution: string; // university
+  title: string; // position
   department: string;
 }
 
@@ -51,10 +51,33 @@ export function ScholarSearchPicker({
       setLoading(true);
       setSearched(false);
       try {
-        const res = await fetchScholarList(1, 8, { search: query.trim() });
-        const filtered = res.items.filter(
-          (s) => !excludeIds.includes(s.url_hash),
-        );
+        const res = await fetchScholarList(1, 20, { search: query.trim() });
+        // Filter results: prioritize name matches, then filter by relevance
+        const searchTerm = query.trim().toLowerCase();
+        const filtered = res.items
+          .filter((s) => !excludeIds.includes(s.url_hash))
+          .filter((s) => {
+            // Must match name, or university, or department, or research areas
+            const nameMatch = s.name?.toLowerCase().includes(searchTerm);
+            const universityMatch = s.university
+              ?.toLowerCase()
+              .includes(searchTerm);
+            const deptMatch = s.department?.toLowerCase().includes(searchTerm);
+            const researchMatch = s.research_areas?.some((area) =>
+              area.toLowerCase().includes(searchTerm),
+            );
+            return nameMatch || universityMatch || deptMatch || researchMatch;
+          })
+          .sort((a, b) => {
+            // Prioritize exact name matches
+            const aNameMatch = a.name?.toLowerCase().includes(searchTerm);
+            const bNameMatch = b.name?.toLowerCase().includes(searchTerm);
+            if (aNameMatch && !bNameMatch) return -1;
+            if (!aNameMatch && bNameMatch) return 1;
+            return 0;
+          })
+          .slice(0, 8); // Limit to 8 results
+
         setResults(filtered);
         setIsOpen(true);
         setSearched(true);
@@ -149,7 +172,11 @@ export function ScholarSearchPicker({
                       {scholar.name}
                     </p>
                     <p className="text-xs text-gray-500 truncate">
-                      {[scholar.position, scholar.department, scholar.university]
+                      {[
+                        scholar.position,
+                        scholar.department,
+                        scholar.university,
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
@@ -165,9 +192,7 @@ export function ScholarSearchPicker({
           ) : searched ? (
             <div className="px-4 py-5 text-center">
               <p className="text-sm text-gray-500 mb-1">未找到匹配的学者</p>
-              <p className="text-xs text-gray-400">
-                可以新增学者到学者库
-              </p>
+              <p className="text-xs text-gray-400">可以新增学者到学者库</p>
             </div>
           ) : null}
 

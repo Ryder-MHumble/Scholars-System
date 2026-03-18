@@ -61,6 +61,9 @@ export function UniversitySidebarTree({
   totalCount,
   onSearchChange: _onSearchChange,
 }: UniversitySidebarTreeProps) {
+  const [sortMode, setSortMode] = useState<"region-type" | "alphabetical">(
+    "region-type",
+  );
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(),
   );
@@ -84,8 +87,24 @@ export function UniversitySidebarTree({
 
   const q = sidebarSearch.toLowerCase().trim();
 
-  // Group universities by type and region
+  // Group universities by type and region OR alphabetically
   const categories = useMemo(() => {
+    if (sortMode === "alphabetical") {
+      // Alphabetical mode: single group with all universities sorted by name
+      return [
+        {
+          label: "全部机构",
+          type: "all",
+          region: "all",
+          unis: [...uniNodes].sort((a, b) =>
+            a.name.localeCompare(b.name, "zh-CN"),
+          ),
+          totalCount: uniNodes.reduce((sum, u) => sum + u.count, 0),
+        },
+      ];
+    }
+
+    // Region-type mode: original grouping logic
     const groups: Record<string, CategoryGroup> = {};
 
     for (const uni of uniNodes) {
@@ -132,7 +151,7 @@ export function UniversitySidebarTree({
       const bTypeIdx = typeOrder.indexOf(b.type as string);
       return aTypeIdx - bTypeIdx;
     });
-  }, [uniNodes]);
+  }, [uniNodes, sortMode]);
 
   // Filter based on search
   const filteredCategories = useMemo(() => {
@@ -168,6 +187,32 @@ export function UniversitySidebarTree({
 
   return (
     <nav className="space-y-1 px-2 pt-1">
+      {/* 排序模式切换 */}
+      <div className="flex gap-1 mb-2 p-1 bg-gray-100 rounded-lg">
+        <button
+          onClick={() => setSortMode("region-type")}
+          className={cn(
+            "flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-all",
+            sortMode === "region-type"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-600 hover:text-gray-900",
+          )}
+        >
+          按分类
+        </button>
+        <button
+          onClick={() => setSortMode("alphabetical")}
+          className={cn(
+            "flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-all",
+            sortMode === "alphabetical"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-600 hover:text-gray-900",
+          )}
+        >
+          按字母
+        </button>
+      </div>
+
       {/* 全部院校 */}
       <button
         onClick={() => onSelectUni(null)}

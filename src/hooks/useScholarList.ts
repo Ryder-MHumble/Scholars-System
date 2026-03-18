@@ -2,12 +2,14 @@ import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   fetchScholarList,
+  fetchAllScholars,
   deleteScholar,
   type ScholarListResponse,
 } from "@/services/scholarApi";
 import { useUniversityCounts } from "@/hooks/useUniversityCounts";
 import type { UniNode } from "@/components/common/UniversitySidebarTree";
 import { parseSubtabFilter } from "@/utils/institutionClassifier";
+import { exportScholarsToExcel } from "@/utils/scholarExporter";
 
 const PAGE_SIZE = 20;
 
@@ -29,6 +31,7 @@ export function useScholarList() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingHash, setDeletingHash] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // 根据当前 subtab 过滤机构节点
   const { region: subtabRegion, type: subtabType } = useMemo(
@@ -224,6 +227,27 @@ export function useScholarList() {
       });
   };
 
+  const handleExportToExcel = async () => {
+    setIsExporting(true);
+    try {
+      const allScholars = await fetchAllScholars({
+        university: activeUni ?? undefined,
+        department: activeDept ?? undefined,
+        search: query.trim() || undefined,
+        is_adjunct_supervisor: isJointMentor || undefined,
+        region: apiRegion,
+        affiliation_type: apiAffiliationType,
+      });
+      exportScholarsToExcel(allScholars);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "导出失败";
+      alert(errorMsg);
+      console.error("Export error:", err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const items = apiData?.items ?? [];
 
   const filterChips: { label: string; onRemove: () => void }[] = [
@@ -239,7 +263,7 @@ export function useScholarList() {
         ]
       : []),
     ...(isJointMentor
-      ? [{ label: "共建导师", onRemove: handleToggleJointMentor }]
+      ? [{ label: "兼职导师", onRemove: handleToggleJointMentor }]
       : []),
   ].filter((c) => c.label);
 
@@ -281,5 +305,9 @@ export function useScholarList() {
     // Delete
     deletingHash,
     handleDeleteScholar,
+
+    // Export
+    handleExportToExcel,
+    isExporting,
   };
 }

@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   FileSpreadsheet,
   Handshake,
+  Download,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -51,6 +52,8 @@ export default function ScholarListPage() {
     refreshList,
     deletingHash,
     handleDeleteScholar,
+    handleExportToExcel,
+    isExporting,
   } = useScholarList();
 
   const filteredTotalCount = useMemo(
@@ -106,10 +109,10 @@ export default function ScholarListPage() {
             </div>
 
             {/* Search and Actions Bar */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {/* Search Input */}
-              <div className="relative flex-1 max-w-lg">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400 pointer-events-none" />
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input
                   type="text"
                   value={searchInput}
@@ -120,55 +123,96 @@ export default function ScholarListPage() {
                     }
                   }}
                   placeholder="搜索学者、研究方向（按回车搜索）"
-                  className="w-full h-10 pl-10 pr-4 text-[13px] bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-gray-300 focus:ring-1 focus:ring-gray-200 transition-all placeholder:text-gray-400"
+                  className="w-full h-10 pl-10 pr-4 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-100 transition-all placeholder:text-gray-400"
                 />
               </div>
 
-              {/* Joint Mentor Filter */}
-              <button
-                onClick={handleToggleJointMentor}
-                className={cn(
-                  "flex items-center gap-2 h-10 px-3.5 rounded-lg text-[13px] font-medium transition-all whitespace-nowrap border",
-                  isJointMentor
-                    ? "bg-gray-900 hover:bg-gray-800 text-white border-gray-900"
-                    : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200",
-                )}
-              >
-                <Handshake className="w-[18px] h-[18px]" />
-                共建导师
-              </button>
+              {/* Action Buttons Group */}
+              <div className="flex items-center gap-2">
+                {/* Joint Mentor Filter */}
+                <button
+                  onClick={handleToggleJointMentor}
+                  className={cn(
+                    "flex items-center gap-1.5 h-10 px-3 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
+                    isJointMentor
+                      ? "bg-primary-600 hover:bg-primary-700 text-white shadow-sm"
+                      : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200",
+                  )}
+                >
+                  <Handshake className="w-4 h-4" />
+                  <span>共建导师</span>
+                </button>
 
-              {/* View Mode Toggle */}
-              <div className="flex items-center h-10 bg-white border border-gray-200 rounded-lg p-0.5">
-                {(["list", "grid"] as ViewMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={cn(
-                      "flex items-center justify-center w-9 h-full rounded-md transition-all",
-                      viewMode === mode
-                        ? "bg-gray-100 text-gray-900"
-                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50",
-                    )}
-                    title={mode === "list" ? "列表视图" : "卡片视图"}
-                  >
-                    {mode === "list" ? (
-                      <List className="w-[18px] h-[18px]" />
-                    ) : (
-                      <LayoutGrid className="w-[18px] h-[18px]" />
-                    )}
-                  </button>
-                ))}
+                {/* Divider */}
+                <div className="w-px h-6 bg-gray-200" />
+
+                {/* View Mode Toggle */}
+                <div className="flex items-center h-10 bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  {(["list", "grid"] as ViewMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setViewMode(mode)}
+                      className={cn(
+                        "flex items-center justify-center w-10 h-full transition-all border-r border-gray-200 last:border-r-0",
+                        viewMode === mode
+                          ? "bg-gray-50 text-gray-900"
+                          : "text-gray-400 hover:text-gray-600 hover:bg-gray-50",
+                      )}
+                      title={mode === "list" ? "列表视图" : "卡片视图"}
+                    >
+                      {mode === "list" ? (
+                        <List className="w-4 h-4" />
+                      ) : (
+                        <LayoutGrid className="w-4 h-4" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Divider */}
+                <div className="w-px h-6 bg-gray-200" />
+
+                {/* Batch Import */}
+                <button
+                  onClick={() => setShowBatchImportModal(true)}
+                  className="flex items-center gap-1.5 h-10 px-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+                  title="批量导入学者数据"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>批量添加</span>
+                </button>
+
+                {/* Export to Excel */}
+                <button
+                  onClick={handleExportToExcel}
+                  disabled={total === 0 || isExporting}
+                  className={cn(
+                    "flex items-center gap-1.5 h-10 px-3 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
+                    total === 0 || isExporting
+                      ? "bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed"
+                      : "bg-white hover:bg-gray-50 border border-gray-200 text-gray-700",
+                  )}
+                  title={
+                    total === 0
+                      ? "暂无数据可导出"
+                      : isExporting
+                        ? "正在导出..."
+                        : "导出当前筛选条件下的所有学者数据"
+                  }
+                >
+                  {isExporting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                      <span>导出中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>导出Excel</span>
+                    </>
+                  )}
+                </button>
               </div>
-
-              {/* Batch Import */}
-              <button
-                onClick={() => setShowBatchImportModal(true)}
-                className="flex items-center gap-2 h-10 px-3.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-[13px] font-medium transition-all whitespace-nowrap"
-              >
-                <FileSpreadsheet className="w-[18px] h-[18px]" />
-                批量添加
-              </button>
             </div>
 
             {/* Filter Chips */}

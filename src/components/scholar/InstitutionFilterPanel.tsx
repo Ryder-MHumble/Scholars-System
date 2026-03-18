@@ -37,12 +37,19 @@ export function InstitutionFilterPanel({
   const q = panelSearch.toLowerCase().trim();
 
   const filteredNodes = useMemo(() => {
-    if (!q) return uniNodes;
-    return uniNodes.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) ||
-        u.departments.some((d) => d.name.toLowerCase().includes(q)),
-    );
+    let nodes = uniNodes;
+
+    // Apply search filter
+    if (q) {
+      nodes = nodes.filter(
+        (u) =>
+          u.name.toLowerCase().includes(q) ||
+          u.departments.some((d) => d.name.toLowerCase().includes(q)),
+      );
+    }
+
+    // Sort alphabetically by Chinese name
+    return nodes.slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   }, [uniNodes, q]);
 
   const isAllActive = !activeUni && !activeDept;
@@ -111,9 +118,17 @@ export function InstitutionFilterPanel({
             {filteredNodes.map((uni) => {
               const expanded = q ? true : expandedUnis.has(uni.name);
               const isUniActive = activeUni === uni.name && !activeDept;
-              const visibleDepts = q
-                ? uni.departments.filter((d) => d.name.toLowerCase().includes(q))
-                : uni.departments;
+
+              // Filter and sort departments alphabetically
+              const visibleDepts = (
+                q
+                  ? uni.departments.filter((d) =>
+                      d.name.toLowerCase().includes(q),
+                    )
+                  : uni.departments
+              )
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 
               return (
                 <div key={uni.name}>
@@ -141,7 +156,10 @@ export function InstitutionFilterPanel({
                     <button
                       onClick={() => {
                         onSelectUni(uni.name);
-                        if (uni.departments.length > 0 && !expandedUnis.has(uni.name)) {
+                        if (
+                          uni.departments.length > 0 &&
+                          !expandedUnis.has(uni.name)
+                        ) {
                           toggleUni(uni.name);
                         }
                       }}
@@ -152,7 +170,9 @@ export function InstitutionFilterPanel({
                           : "text-gray-600 hover:bg-gray-100 hover:text-gray-800",
                       )}
                     >
-                      <span className="truncate text-sm flex-1 text-left">{uni.name}</span>
+                      <span className="truncate text-sm flex-1 text-left">
+                        {uni.name}
+                      </span>
                       <span
                         className={cn(
                           "text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-md tabular-nums",
@@ -192,7 +212,9 @@ export function InstitutionFilterPanel({
                               <BookOpen
                                 className={cn(
                                   "w-3 h-3 shrink-0",
-                                  isDeptActive ? "text-primary-500" : "text-gray-300",
+                                  isDeptActive
+                                    ? "text-primary-500"
+                                    : "text-gray-300",
                                 )}
                               />
                               <span className="truncate text-xs flex-1 text-left">

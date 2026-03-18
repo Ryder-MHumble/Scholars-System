@@ -19,7 +19,6 @@ import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfile
 import { staggerContainer, slideInLeft } from "@/utils/animations";
 import { cn } from "@/utils/cn";
 
-
 const emptyScholar: ScholarDetail = {
   url_hash: "new",
   name: "",
@@ -65,7 +64,8 @@ const emptyScholar: ScholarDetail = {
   awards: [],
   url: "",
   content: "",
-  tags: [],
+  project_category: "",
+  project_subcategory: "",
   keywords: [],
   adjunct_supervisor: {
     status: "",

@@ -10,6 +10,7 @@ import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfile
 import { ContactModal } from "@/components/scholar-detail/modals/ContactModal";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
 import { RelationCard } from "@/components/scholar-detail/sections/RelationCard";
+import { ProjectCategorySelector } from "@/components/scholar-detail/sections/ProjectCategorySelector";
 import { ProjectsCard } from "@/components/scholar-detail/sections/ProjectsCard";
 import { AchievementsDetailCard } from "@/components/scholar-detail/sections/AchievementsDetailCard";
 import { RightSidebar } from "@/components/scholar-detail/sections/RightSidebar";
@@ -34,7 +35,7 @@ export default function ScholarDetailPageDemo() {
     handleSaveExchangeRecords,
     handleSaveManagementRolesInline,
     handleRelationNotesSave,
-    handleSaveTags,
+    handleProjectCategorySave,
   } = useScholarDetail(scholarId);
 
   // Modal visibility states
@@ -155,7 +156,12 @@ export default function ScholarDetailPageDemo() {
                 onRelationToggle={handleRelationToggle}
                 onRelationNotesSave={handleRelationNotesSave}
                 onSaveExchangeRecords={handleSaveExchangeRecords}
-                onSaveTags={handleSaveTags}
+              />
+
+              <ProjectCategorySelector
+                primaryCategory={scholar.project_category}
+                subcategory={scholar.project_subcategory}
+                onSave={handleProjectCategorySave}
               />
 
               <ProjectsCard projects={scholar.joint_research_projects} />
