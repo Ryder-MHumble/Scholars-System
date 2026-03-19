@@ -25,6 +25,7 @@ import {
 } from "@/services/scholarApi";
 import { getUpdateTypeLabel } from "@/constants/updateTypes";
 import { listItem } from "@/utils/animations";
+import { SelectInput } from "@/components/ui/SelectInput";
 
 interface Props {
   scholar: ScholarDetail;
@@ -446,12 +447,10 @@ function StudentEditForm({
         className="w-full text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
       />
       <div className="flex gap-1">
-        <select
+        <SelectInput
           value={editForm.degree_type ?? ""}
-          onChange={(e) =>
-            setEditForm((p) => ({ ...p, degree_type: e.target.value }))
-          }
-          className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+          onChange={(v) => setEditForm((p) => ({ ...p, degree_type: v }))}
+          className="flex-1 px-2 py-1 text-sm border-gray-200 rounded focus:ring-1 focus:ring-primary-400"
         >
           <option value="">学位</option>
           {["博士", "硕士", "博士后"].map((d) => (
@@ -459,20 +458,18 @@ function StudentEditForm({
               {d}
             </option>
           ))}
-        </select>
-        <select
+        </SelectInput>
+        <SelectInput
           value={editForm.status ?? "在读"}
-          onChange={(e) =>
-            setEditForm((p) => ({ ...p, status: e.target.value }))
-          }
-          className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+          onChange={(v) => setEditForm((p) => ({ ...p, status: v }))}
+          className="flex-1 px-2 py-1 text-sm border-gray-200 rounded focus:ring-1 focus:ring-primary-400"
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
-        </select>
+        </SelectInput>
       </div>
       <div className="flex gap-1">
         <input
@@ -587,12 +584,10 @@ function StudentAddForm({
         className="w-full text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
       />
       <div className="flex gap-1">
-        <select
+        <SelectInput
           value={addForm.degree_type ?? "博士"}
-          onChange={(e) =>
-            setAddForm((p) => ({ ...p, degree_type: e.target.value }))
-          }
-          className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+          onChange={(v) => setAddForm((p) => ({ ...p, degree_type: v }))}
+          className="flex-1 px-2 py-1 text-sm border-gray-200 rounded focus:ring-1 focus:ring-primary-400"
         >
           <option value="">学位</option>
           {["博士", "硕士", "博士后"].map((d) => (
@@ -600,20 +595,18 @@ function StudentAddForm({
               {d}
             </option>
           ))}
-        </select>
-        <select
+        </SelectInput>
+        <SelectInput
           value={addForm.status ?? "在读"}
-          onChange={(e) =>
-            setAddForm((p) => ({ ...p, status: e.target.value }))
-          }
-          className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+          onChange={(v) => setAddForm((p) => ({ ...p, status: v }))}
+          className="flex-1 px-2 py-1 text-sm border-gray-200 rounded focus:ring-1 focus:ring-primary-400"
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
-        </select>
+        </SelectInput>
       </div>
       <div className="flex gap-1">
         <input

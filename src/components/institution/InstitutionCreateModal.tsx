@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, AlertTriangle } from "lucide-react";
 import { ComboboxInput } from "@/components/ui/ComboboxInput";
+import { SelectInput } from "@/components/ui/SelectInput";
 import {
   createInstitution,
   fetchAllInstitutions,
@@ -270,77 +271,59 @@ export function InstitutionCreateModal({
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         地区
                       </label>
-                      <select
+                      <SelectInput
                         value={institutionForm.region}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           setInstitutionForm((f) => ({
                             ...f,
-                            region: e.target.value,
+                            region: v,
                           }))
                         }
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all appearance-none cursor-pointer"
-                        style={{
-                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                          backgroundRepeat: "no-repeat",
-                          backgroundPosition: "right 1rem center",
-                          paddingRight: "2.5rem",
-                        }}
+                        placeholder="请选择地区"
+                        className="px-4 py-2.5 rounded-xl border-slate-200 focus:ring-blue-400"
                       >
-                        <option value="">请选择地区</option>
                         <option value="国内">国内</option>
                         <option value="国际">国际</option>
-                      </select>
+                      </SelectInput>
                     </div>
 
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         机构类型
                       </label>
-                      <select
+                      <SelectInput
                         value={institutionForm.org_type}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           setInstitutionForm((f) => ({
                             ...f,
-                            org_type: e.target.value,
+                            org_type: v,
                           }))
                         }
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all appearance-none cursor-pointer"
-                        style={{
-                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                          backgroundRepeat: "no-repeat",
-                          backgroundPosition: "right 1rem center",
-                          paddingRight: "2.5rem",
-                        }}
+                        placeholder="请选择机构类型"
+                        className="px-4 py-2.5 rounded-xl border-slate-200 focus:ring-blue-400"
                       >
-                        <option value="">请选择机构类型</option>
                         <option value="高校">高校</option>
                         <option value="研究机构">研究机构</option>
                         <option value="行业学会">行业学会</option>
-                      </select>
+                      </SelectInput>
                     </div>
 
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         分类
                       </label>
-                      <select
+                      <SelectInput
                         value={institutionForm.classification}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           setInstitutionForm((f) => ({
                             ...f,
-                            classification: e.target.value,
+                            classification: v,
                           }))
                         }
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white transition-all appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
-                        style={{
-                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                          backgroundRepeat: "no-repeat",
-                          backgroundPosition: "right 1rem center",
-                          paddingRight: "2.5rem",
-                        }}
                         disabled={institutionForm.org_type !== "高校"}
+                        placeholder="请选择分类"
+                        className="px-4 py-2.5 rounded-xl border-slate-200 focus:ring-blue-400"
                       >
-                        <option value="">请选择分类</option>
                         {institutionForm.org_type === "高校" && (
                           <>
                             <option value="共建高校">共建高校</option>
@@ -349,7 +332,7 @@ export function InstitutionCreateModal({
                             <option value="其他高校">其他高校</option>
                           </>
                         )}
-                      </select>
+                      </SelectInput>
                     </div>
 
                     <div>

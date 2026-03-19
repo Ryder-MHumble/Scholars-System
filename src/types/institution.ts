@@ -1,7 +1,7 @@
 export interface InstitutionDepartmentListItem {
   name: string;
   scholar_count: number;
-  org_name: string;
+  org_name?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,14 +40,14 @@ export interface InstitutionTreeResponse {
 export interface InstitutionListItem {
   id: string;
   name: string;
-  type: string;
-  entity_type: string;
-  region: string;
-  org_type: string;
+  type?: string | null;
+  entity_type?: string | null;
+  region?: string | null;
+  org_type?: string | null;
   classification: string | null;
   sub_classification: string | null;
-  group: string | null;
-  category: string | null;
+  group?: string | null;
+  category?: string | null;
   priority: string | null;
   scholar_count: number;
   student_count_total: number | null;
@@ -55,7 +55,7 @@ export interface InstitutionListItem {
   parent_id: string | null;
   avatar?: string | null;
   departments?: InstitutionDepartmentListItem[];
-  org_name?: string;
+  org_name?: string | null;
 }
 
 export interface InstitutionListResponse {
@@ -86,17 +86,22 @@ export interface InstitutionDepartmentDetail {
   name: string;
   scholar_count: number;
   sources: DepartmentSource[];
-  org_name: string;
+  org_name?: string | null;
+  parent_id?: string | null;
 }
 
 export interface InstitutionDetail {
   id: string;
   name: string;
   type: string | null;
-  org_name: string;
+  entity_type?: string | null;
+  region?: string | null;
+  org_type?: string | null;
+  org_name?: string | null;
   avatar?: string | null;
   category: string | null;
   classification: string | null;
+  sub_classification?: string | null;
   priority: string | null;
   student_count_24: number | null;
   student_count_25: number | null;
@@ -119,16 +124,29 @@ export interface InstitutionDetail {
   parent_id: string | null;
   departments: InstitutionDepartmentDetail[];
   scholar_count: number;
+  custom_fields?: Record<string, string>;
   sources: unknown[];
   last_updated: string | null;
 }
 
+export interface DepartmentPatchRequest {
+  id?: string;
+  name: string;
+  org_name?: string | null;
+}
+
 export interface InstitutionPatchRequest {
   name?: string;
+  org_name?: string | null;
   avatar?: string | null;
+  entity_type?: "organization" | "department";
+  parent_id?: string | null;
+  region?: string | null;
+  org_type?: string | null;
   category?: string;
-  classification?: string;
-  priority?: string;
+  classification?: string | null;
+  sub_classification?: string | null;
+  priority?: string | null;
   student_count_24?: number | null;
   student_count_25?: number | null;
   mentor_count?: number | null;
@@ -145,4 +163,6 @@ export interface InstitutionPatchRequest {
   recruitment_events?: string[];
   visit_exchanges?: string[];
   cooperation_focus?: string[];
+  departments?: DepartmentPatchRequest[];
+  custom_fields?: Record<string, string | null>;
 }

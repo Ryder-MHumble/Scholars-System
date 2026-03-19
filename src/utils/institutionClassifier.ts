@@ -292,7 +292,7 @@ export function filterInstitutionsByRegionAndType(
 }
 
 // ---------------------------------------------------------------------------
-// 业务分类体系（按照业务方提供的分类表，基于机构 ID 映射）
+// 业务分类体系（基于机构字段动态判断，不依赖静态 ID 映射）
 // ---------------------------------------------------------------------------
 
 export type InstitutionBusinessGroup =
@@ -305,7 +305,7 @@ export type InstitutionBusinessGroup =
 
 export type JointSubcategory =
   | "示范性合作伙伴"
-  | "京内高校"
+  | "境内高校"
   | "京外C9高校"
   | "综合强校"
   | "工科强校"
@@ -317,123 +317,60 @@ export type OverseasSubcategory =
   | "欧美高校"
   | "其他地区高校";
 
-/** 共建高校各子分类的机构 ID 集合 */
-const JOINT_SUBCATEGORY_IDS: Record<JointSubcategory, string[]> = {
-  示范性合作伙伴: ["tsinghua", "pku"],
-  京内高校: [
-    "中国科学院大学",
-    "buaa",
-    "bit",
-    "bupt",
-    "bnu",
-    "ruc",
-    "bjtu",
-    "cau",
-  ],
-  京外C9高校: ["ustc", "sjtu", "fudan", "zju", "nju", "hit", "xjtu"],
-  综合强校: [
-    "tongji",
-    "ecnu",
-    "seu",
-    "nku",
-    "tju",
-    "sdu",
-    "sysu",
-    "xmu",
-    "whu",
-    "jlu",
-  ],
-  工科强校: ["nwpu", "xidian", "hust", "uestc", "sustech"],
-  特色高校: ["westlake"],
-};
+type InstitutionClassifierInput = Pick<
+  InstitutionListItem,
+  "org_type" | "classification" | "sub_classification"
+>;
 
-/** 所有共建高校 ID 的扁平集合 */
-const ALL_JOINT_IDS = new Set(Object.values(JOINT_SUBCATEGORY_IDS).flat());
+function normalizeClassification(value?: string | null): string | null {
+  if (!value) return null;
+  if (value === "科研院所" || value === "研究机构") return "新研机构";
+  return value;
+}
 
-/** 海外高校各子分类的机构 ID 集合 */
-const OVERSEAS_SUBCATEGORY_IDS: Record<OverseasSubcategory, string[]> = {
-  香港高校: ["香港", "香港中文", "香港科技", "香港城市", "hkbu", "polyu"],
-  亚太高校: [
-    "nus",
-    "ntu_sg",
-    "早稻田大学",
-    "澳门城市大学",
-    "马来亚大学（qs_58)",
-  ],
-  欧美高校: [
-    "stanford_university",
-    "ucla",
-    "剑桥大学",
-    "牛津大学",
-    "美国麻省理工学院",
-    "耶鲁大学",
-    "康奈尔大学",
-    "帝国理工学院",
-    "爱丁堡大学",
-    "纽约大学",
-    "苏黎世联邦理工学院",
-    "范德比尔特大学",
-    "卡尔斯鲁厄理工学院",
-    "图宾根大学",
-    "乌普萨拉大学",
-    "格罗宁根大学",
-    "比利时根特大学",
-    "于默奥大学",
-    "北卡罗来纳大学教堂山分校",
-    "伦敦玛丽女王大学",
-    "匹兹堡大学",
-    "利物浦大学",
-    "贝尔法斯特女王大学",
-    "米兰理工大学",
-    "费德里科圣玛利亚理工大学",
-    "加州大学默塞德分校",
-  ],
-  其他地区高校: [
-    "悉尼大学",
-    "昆士兰大学",
-    "阿德莱德大学",
-    "新西兰坎特伯雷大学",
-    "阿卜杜拉国王科技大学",
-    "渥太华大学",
-    "曼尼托巴大学",
-    "迪肯大学",
-    "莱顿大学",
-  ],
-};
-
-const ALL_OVERSEAS_IDS = new Set(
-  Object.values(OVERSEAS_SUBCATEGORY_IDS).flat(),
-);
-
-/** 兄弟院校 */
-const SISTER_IDS = new Set<string>(["sii", "slai"]);
-
-/** 科研院所 */
-const RESEARCH_IDS = new Set<string>([]);
-
-/** 行业学会 */
-const ASSOCIATION_IDS = new Set<string>([]);
+function normalizeSubClassification(value?: string | null): string | null {
+  if (!value) return null;
+  if (value === "京内高校") return "境内高校";
+  if (value === "京外C9") return "京外C9高校";
+  if (value === "同行业机构") return "同行机构";
+  if (value === "其他高校") return "其他";
+  return value;
+}
 
 /**
- * 根据机构 ID 判断业务分组
+ * 根据机构字段动态判断业务分组
  */
 export function getInstitutionBusinessGroup(
-  id: string,
+  institution: InstitutionClassifierInput,
 ): InstitutionBusinessGroup {
-  if (SISTER_IDS.has(id)) return "sister_universities";
-  if (RESEARCH_IDS.has(id)) return "research_institutes";
-  if (ASSOCIATION_IDS.has(id)) return "industry_associations";
-  if (ALL_JOINT_IDS.has(id)) return "joint_universities";
-  if (ALL_OVERSEAS_IDS.has(id)) return "overseas_universities";
+  const orgType = institution.org_type ?? null;
+  const classification = normalizeClassification(institution.classification);
+
+  if (orgType === "研究机构" || classification === "新研机构") {
+    return "research_institutes";
+  }
+  if (orgType === "行业学会" || classification === "行业学会") {
+    return "industry_associations";
+  }
+  if (classification === "共建高校") return "joint_universities";
+  if (classification === "兄弟院校") return "sister_universities";
+  if (classification === "海外高校") return "overseas_universities";
   return "other_universities";
 }
 
 /**
  * 获取共建高校所属子分类
  */
-export function getJointSubcategory(id: string): JointSubcategory | null {
-  for (const [cat, ids] of Object.entries(JOINT_SUBCATEGORY_IDS)) {
-    if (ids.includes(id)) return cat as JointSubcategory;
+export function getJointSubcategory(
+  institution: InstitutionClassifierInput,
+): JointSubcategory | null {
+  if (getInstitutionBusinessGroup(institution) !== "joint_universities") {
+    return null;
+  }
+  const sub = normalizeSubClassification(institution.sub_classification);
+  if (!sub) return null;
+  if ((JOINT_SUBCATEGORY_ORDER as string[]).includes(sub)) {
+    return sub as JointSubcategory;
   }
   return null;
 }
@@ -441,9 +378,15 @@ export function getJointSubcategory(id: string): JointSubcategory | null {
 /**
  * 获取海外高校所属子分类
  */
-export function getOverseasSubcategory(id: string): OverseasSubcategory {
-  for (const [cat, ids] of Object.entries(OVERSEAS_SUBCATEGORY_IDS)) {
-    if (ids.includes(id)) return cat as OverseasSubcategory;
+export function getOverseasSubcategory(
+  institution: InstitutionClassifierInput,
+): OverseasSubcategory {
+  if (getInstitutionBusinessGroup(institution) !== "overseas_universities") {
+    return "其他地区高校";
+  }
+  const sub = normalizeSubClassification(institution.sub_classification);
+  if (sub && (OVERSEAS_SUBCATEGORY_ORDER as string[]).includes(sub)) {
+    return sub as OverseasSubcategory;
   }
   return "其他地区高校";
 }
@@ -451,7 +394,7 @@ export function getOverseasSubcategory(id: string): OverseasSubcategory {
 /** 共建高校子分类顺序 */
 export const JOINT_SUBCATEGORY_ORDER: JointSubcategory[] = [
   "示范性合作伙伴",
-  "京内高校",
+  "境内高校",
   "京外C9高校",
   "综合强校",
   "工科强校",
@@ -475,7 +418,7 @@ export function filterByBusinessGroup(
 ): InstitutionListItem[] {
   if (!group) return institutions;
   return institutions.filter(
-    (inst) => getInstitutionBusinessGroup(inst.id) === group,
+    (inst) => getInstitutionBusinessGroup(inst) === group,
   );
 }
 

@@ -32,6 +32,7 @@ import {
   getCategoryByType,
   getAllCategories,
 } from "@/constants/activityCategories";
+import { SelectInput } from "@/components/ui/SelectInput";
 
 interface ActivityFormModalProps {
   isOpen: boolean;
@@ -389,20 +390,18 @@ export function ActivityFormModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       一级分类 <span className="text-red-500">*</span>
                     </label>
-                    <select
+                    <SelectInput
                       value={selectedCategory}
-                      onChange={(e) => handleCategoryChange(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white ${
-                        errors.category ? "border-red-300" : "border-gray-200"
-                      }`}
+                      onChange={handleCategoryChange}
+                      placeholder="请选择分类"
+                      error={Boolean(errors.category)}
                     >
-                      <option value="">请选择分类</option>
                       {getAllCategories().map((cat) => (
                         <option key={cat.id} value={cat.id}>
                           {cat.name}
                         </option>
                       ))}
-                    </select>
+                    </SelectInput>
                     {errors.category && (
                       <p className="mt-1 text-xs text-red-600">
                         {errors.category}
@@ -413,41 +412,37 @@ export function ActivityFormModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       二级分类 <span className="text-red-500">*</span>
                     </label>
-                    <select
+                    <SelectInput
                       value={selectedSubcategory}
-                      onChange={(e) => handleSubcategoryChange(e.target.value)}
+                      onChange={handleSubcategoryChange}
                       disabled={!selectedCategory}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white disabled:bg-gray-50 disabled:cursor-not-allowed ${
-                        errors.event_type ? "border-red-300" : "border-gray-200"
-                      }`}
+                      placeholder="请选择二级分类"
+                      error={Boolean(errors.event_type)}
                     >
-                      <option value="">请选择二级分类</option>
                       {availableSubcategories.map((sub) => (
                         <option key={sub.id} value={sub.id}>
                           {sub.name}
                         </option>
                       ))}
-                    </select>
+                    </SelectInput>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       活动类型 <span className="text-red-500">*</span>
                     </label>
-                    <select
+                    <SelectInput
                       value={formData.event_type}
-                      onChange={(e) => handleEventTypeChange(e.target.value)}
+                      onChange={handleEventTypeChange}
                       disabled={!selectedSubcategory}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white disabled:bg-gray-50 disabled:cursor-not-allowed ${
-                        errors.event_type ? "border-red-300" : "border-gray-200"
-                      }`}
+                      placeholder="请选择活动类型"
+                      error={Boolean(errors.event_type)}
                     >
-                      <option value="">请选择活动类型</option>
                       {availableTypes.map((type) => (
                         <option key={type} value={type}>
                           {type}
                         </option>
                       ))}
-                    </select>
+                    </SelectInput>
                     {errors.event_type && (
                       <p className="mt-1 text-xs text-red-600">
                         {errors.event_type}
@@ -461,10 +456,9 @@ export function ActivityFormModal({
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     活动系列
                   </label>
-                  <select
+                  <SelectInput
                     value={formData.series ?? ""}
-                    onChange={(e) => set("series", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                    onChange={(v) => set("series", v)}
                   >
                     <option value="">无（独立活动）</option>
                     {SERIES_OPTIONS.map((s) => (
@@ -472,7 +466,7 @@ export function ActivityFormModal({
                         {s}
                       </option>
                     ))}
-                  </select>
+                  </SelectInput>
                 </div>
 
                 {/* Title */}
@@ -897,17 +891,16 @@ export function ActivityFormModal({
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         审核状态
                       </label>
-                      <select
+                      <SelectInput
                         value={formData.audit_status ?? "pending"}
-                        onChange={(e) => set("audit_status", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                        onChange={(v) => set("audit_status", v)}
                       >
                         {AUDIT_STATUSES.map((s) => (
                           <option key={s.value} value={s.value}>
                             {s.label}
                           </option>
                         ))}
-                      </select>
+                      </SelectInput>
                     </div>
                   </div>
                 </div>

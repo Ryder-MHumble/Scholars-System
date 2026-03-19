@@ -1,53 +1,63 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
-  Users,
-  GraduationCap,
-  UserCheck,
-  Layers,
-  Handshake,
+  BookOpen,
+  Building2,
   CalendarDays,
   Edit2,
+  GraduationCap,
+  Handshake,
+  Landmark,
   Trash2,
-  BookOpen,
-  FlaskConical,
+  UserCheck,
   UserCog,
+  Users,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import {
-  fetchInstitutionDetail,
-  deleteInstitution,
-} from "@/services/institutionApi";
-import type { InstitutionDetail } from "@/types/institution";
-import { UniversityLogo } from "@/components/institution/detail/UniversityLogo";
+import { DeleteConfirmDialog } from "@/components/institution/detail/DeleteConfirmDialog";
+import { EditInstitutionModal } from "@/components/institution/detail/EditInstitutionModal";
 import {
   CategoryBadge,
   PriorityBadge,
+  Tag,
 } from "@/components/institution/detail/InstitutionBadges";
-import { StatCard } from "@/components/institution/detail/StatCard";
-import { CollapsibleSection } from "@/components/institution/detail/CollapsibleSection";
-import {
-  TagList,
-  PersonList,
-} from "@/components/institution/detail/PersonComponents";
-import { EditInstitutionModal } from "@/components/institution/detail/EditInstitutionModal";
-import { DeleteConfirmDialog } from "@/components/institution/detail/DeleteConfirmDialog";
+import { PersonList } from "@/components/institution/detail/PersonComponents";
+import { UniversityLogo } from "@/components/institution/detail/UniversityLogo";
+import { deleteInstitution, fetchInstitutionDetail } from "@/services/institutionApi";
+import type { InstitutionDetail } from "@/types/institution";
 
 export default function InstitutionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
-  const [institution, setInstitution] = useState<InstitutionDetail | null>(
-    null,
-  );
+  const [institution, setInstitution] = useState<InstitutionDetail | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  const from = (location.state as { from?: { pathname?: string; search?: string } })
+    ?.from;
+  const restoreInstitutionListState = (
+    location.state as { restoreInstitutionListState?: unknown }
+  )?.restoreInstitutionListState;
+
+  const backHref =
+    from?.pathname && from.pathname !== ""
+      ? `${from.pathname}${from.search ?? ""}`
+      : "/?tab=institutions";
+
+  const goBackToList = () => {
+    if (restoreInstitutionListState) {
+      navigate(backHref, { state: { restoreInstitutionListState } });
+      return;
+    }
+    navigate(backHref);
+  };
+
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
     fetchInstitutionDetail(id)
       .then(setInstitution)
       .catch(() => setInstitution(null))
@@ -57,7 +67,7 @@ export default function InstitutionDetailPage() {
   async function handleDelete() {
     if (!institution) return;
     await deleteInstitution(institution.id);
-    navigate("/?tab=institutions");
+    goBackToList();
   }
 
   if (loading) {
@@ -72,11 +82,9 @@ export default function InstitutionDetailPage() {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <p className="text-slate-500 mb-3 font-medium">
-            机构不存在或加载失败
-          </p>
+          <p className="text-slate-500 mb-3 font-medium">机构不存在或加载失败</p>
           <button
-            onClick={() => navigate("/?tab=institutions")}
+            onClick={goBackToList}
             className="text-blue-600 hover:underline text-sm"
           >
             ← 返回机构库
@@ -104,327 +112,150 @@ export default function InstitutionDetailPage() {
     (institution.cooperation_focus?.length ?? 0) > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* ── Hero header ── */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700">
-        <div className="max-w-6xl mx-auto px-6 md:px-8">
-          <div className="py-3 border-b border-slate-700/50">
-            <button
-              onClick={() => navigate("/?tab=institutions")}
-              className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              机构库
-            </button>
-          </div>
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_#f8fafc_0%,_#f1f5f9_45%,_#eef2ff_100%)]">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 space-y-5">
+        <HeroHeader
+          institution={institution}
+          onBack={goBackToList}
+          onEdit={() => setEditOpen(true)}
+          onDelete={() => setDeleteOpen(true)}
+        />
 
-          <div className="py-7 flex items-start justify-between gap-6">
-            <div className="flex items-center gap-6 flex-1 min-w-0">
-              <UniversityLogo
-                name={institution.name}
-                id={institution.id}
-                avatar={institution.avatar}
-                onEditAvatar={() => setEditOpen(true)}
-              />
-              <div className="flex-1 min-w-0 pt-1">
-                <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
-                  {institution.name}
-                </h1>
-                <div className="flex flex-wrap items-center gap-2.5 mt-3">
-                  {institution.org_name && (
-                    <span className="text-xs text-slate-300 font-medium">
-                      {institution.org_name}
-                    </span>
-                  )}
-                  {institution.category && (
-                    <CategoryBadge label={institution.category} />
-                  )}
-                  {institution.priority && (
-                    <PriorityBadge label={institution.priority} />
-                  )}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-5">
+          <main className="xl:col-span-8 space-y-4">
+            <SectionCard title="负责人与治理团队" icon={UserCheck}>
+              {!hasLeadership ? (
+                <EmptyState text="暂无负责人与委员会数据" />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <SubBlock title="驻校负责人" items={institution.resident_leaders || []} />
+                  <SubBlock title="学位委员会" items={institution.degree_committee || []} />
+                  <SubBlock title="教学委员会" items={institution.teaching_committee || []} />
+                </div>
+              )}
+            </SectionCard>
+
+            {(institution.university_leaders?.length ?? 0) > 0 && (
+              <SectionCard
+                title="大学领导"
+                icon={Landmark}
+                count={institution.university_leaders?.length ?? 0}
+              >
+                <PersonList items={institution.university_leaders || []} />
+              </SectionCard>
+            )}
+
+            <SectionCard
+              title="院系结构"
+              icon={Building2}
+              count={institution.departments?.length ?? 0}
+            >
+              {(institution.departments?.length ?? 0) > 0 ? (
+                <DepartmentList departments={institution.departments || []} />
+              ) : (
+                <EmptyState text="暂无院系数据" />
+              )}
+            </SectionCard>
+
+            {hasCooperation && (
+              <SectionCard title="合作网络" icon={Handshake}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <SubBlock title="重点合作院系" items={institution.key_departments || []} />
+                  <SubBlock title="联合实验室" items={institution.joint_labs || []} />
+                  <SubBlock title="培养合作" items={institution.training_cooperation || []} />
+                  <SubBlock title="学术合作" items={institution.academic_cooperation || []} />
+                  <div className="md:col-span-2">
+                    <SubBlock title="人才双聘" items={institution.talent_dual_appointment || []} />
+                  </div>
+                </div>
+              </SectionCard>
+            )}
+
+            {hasActivities && (
+              <SectionCard title="合作动态" icon={CalendarDays}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <ParagraphList title="招募活动" items={institution.recruitment_events || []} />
+                  <ParagraphList title="访问交流" items={institution.visit_exchanges || []} />
+                </div>
+                {(institution.cooperation_focus?.length ?? 0) > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      合作重点
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(institution.cooperation_focus || []).map((item, idx) => (
+                        <Tag key={`${item}-${idx}`}>{item}</Tag>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </SectionCard>
+            )}
+          </main>
+
+          <aside className="xl:col-span-4 space-y-4 xl:sticky xl:top-4 self-start">
+            <SectionCard title="核心数据" icon={BookOpen} compact>
+              <div className="grid grid-cols-2 gap-2.5">
+                <MetricCard icon={Users} label="学者总数" value={institution.scholar_count} />
+                <MetricCard
+                  icon={GraduationCap}
+                  label="24级学生"
+                  value={institution.student_count_24}
+                />
+                <MetricCard
+                  icon={GraduationCap}
+                  label="25级学生"
+                  value={institution.student_count_25}
+                />
+                <MetricCard
+                  icon={BookOpen}
+                  label="学生总数"
+                  value={institution.student_count_total}
+                />
+                <div className="col-span-2">
+                  <MetricCard icon={UserCog} label="导师数" value={institution.mentor_count} />
                 </div>
               </div>
-            </div>
+            </SectionCard>
 
-            <div className="flex items-center gap-2.5 shrink-0">
-              <button
-                onClick={() => setEditOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-white bg-white/10 hover:bg-white/20 rounded-xl border border-white/10 transition-all"
+            {(institution.notable_scholars?.length ?? 0) > 0 && (
+              <SectionCard
+                title="知名学者"
+                icon={Users}
+                count={institution.notable_scholars?.length ?? 0}
+                compact
               >
-                <Edit2 className="w-4 h-4" />
-                编辑
-              </button>
+                <PersonList items={institution.notable_scholars || []} />
+              </SectionCard>
+            )}
+
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: 0.12 }}
+              className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-4 border border-blue-500/20 shadow-lg"
+            >
+              <p className="text-sm font-bold text-white">学者数据库</p>
+              <p className="mt-1 text-xs text-blue-100 leading-relaxed">
+                该机构当前收录
+                <span className="mx-1 text-white font-extrabold text-base">
+                  {institution.scholar_count ?? 0}
+                </span>
+                位学者，可进入学者库查看详情。
+              </p>
               <button
-                onClick={() => setDeleteOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-xl border border-red-500/20 transition-all"
+                onClick={() =>
+                  navigate(`/?tab=scholars&university=${encodeURIComponent(institution.name)}`)
+                }
+                className="mt-3 w-full px-3 py-2 bg-white text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors"
               >
-                <Trash2 className="w-4 h-4" />
-                删除
+                查看全部学者
               </button>
-            </div>
-          </div>
+            </motion.div>
+          </aside>
         </div>
       </div>
 
-      {/* ── Content ── */}
-      <div className="max-w-6xl mx-auto px-6 md:px-8 py-8 space-y-5">
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
-          <StatCard
-            label="学者总数"
-            value={institution.scholar_count}
-            icon={Users}
-            styleIdx={0}
-          />
-          <StatCard
-            label="24 级学生"
-            value={institution.student_count_24}
-            icon={GraduationCap}
-            styleIdx={1}
-          />
-          <StatCard
-            label="25 级学生"
-            value={institution.student_count_25}
-            icon={GraduationCap}
-            styleIdx={2}
-          />
-          <StatCard
-            label="学生总数"
-            value={institution.student_count_total}
-            icon={BookOpen}
-            styleIdx={3}
-          />
-          <StatCard
-            label="导师数"
-            value={institution.mentor_count}
-            icon={UserCog}
-            styleIdx={4}
-          />
-        </div>
-
-        {/* Leadership */}
-        <CollapsibleSection
-          title="负责人 & 委员会"
-          icon={UserCheck}
-          styleIdx={0}
-          count={
-            (institution.resident_leaders?.length ?? 0) +
-            (institution.degree_committee?.length ?? 0) +
-            (institution.teaching_committee?.length ?? 0)
-          }
-        >
-          {!hasLeadership ? (
-            <p className="text-sm text-slate-400 italic">暂无数据</p>
-          ) : (
-            <div className="space-y-4">
-              {(institution.resident_leaders?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    驻校负责人
-                  </p>
-                  <TagList items={institution.resident_leaders || []} />
-                </div>
-              )}
-              {(institution.degree_committee?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    学位委员会
-                  </p>
-                  <TagList items={institution.degree_committee || []} />
-                </div>
-              )}
-              {(institution.teaching_committee?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    教学委员会
-                  </p>
-                  <TagList items={institution.teaching_committee || []} />
-                </div>
-              )}
-            </div>
-          )}
-        </CollapsibleSection>
-
-        {/* University leaders */}
-        {(institution.university_leaders?.length ?? 0) > 0 && (
-          <CollapsibleSection
-            title="大学领导"
-            icon={GraduationCap}
-            styleIdx={1}
-            count={institution.university_leaders?.length ?? 0}
-          >
-            <PersonList items={institution.university_leaders || []} />
-          </CollapsibleSection>
-        )}
-
-        {/* Notable scholars */}
-        {(institution.notable_scholars?.length ?? 0) > 0 && (
-          <CollapsibleSection
-            title="知名学者"
-            icon={Users}
-            styleIdx={2}
-            count={institution.notable_scholars?.length ?? 0}
-          >
-            <PersonList items={institution.notable_scholars || []} />
-          </CollapsibleSection>
-        )}
-
-        {/* Departments */}
-        <CollapsibleSection
-          title="院系信息"
-          icon={Layers}
-          styleIdx={3}
-          count={institution.departments?.length ?? 0}
-        >
-          {(institution.departments?.length ?? 0) === 0 ? (
-            <p className="text-sm text-slate-400 italic">暂无院系数据</p>
-          ) : (
-            <DepartmentList departments={institution.departments || []} />
-          )}
-        </CollapsibleSection>
-
-        {/* Cooperation */}
-        {hasCooperation && (
-          <CollapsibleSection title="合作项目" icon={Handshake} styleIdx={4}>
-            <div className="space-y-4">
-              {(institution.key_departments?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    重点合作院系
-                  </p>
-                  <TagList items={institution.key_departments || []} />
-                </div>
-              )}
-              {(institution.joint_labs?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    联合实验室
-                  </p>
-                  <TagList items={institution.joint_labs || []} />
-                </div>
-              )}
-              {(institution.training_cooperation?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    培养合作
-                  </p>
-                  <TagList items={institution.training_cooperation || []} />
-                </div>
-              )}
-              {(institution.academic_cooperation?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    学术合作
-                  </p>
-                  <TagList items={institution.academic_cooperation || []} />
-                </div>
-              )}
-              {(institution.talent_dual_appointment?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    人才双聘
-                  </p>
-                  <TagList items={institution.talent_dual_appointment || []} />
-                </div>
-              )}
-            </div>
-          </CollapsibleSection>
-        )}
-
-        {/* Activities */}
-        {hasActivities && (
-          <CollapsibleSection
-            title="合作动态"
-            icon={CalendarDays}
-            styleIdx={5}
-            defaultOpen={false}
-          >
-            <div className="space-y-4">
-              {(institution.recruitment_events?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    招募活动
-                  </p>
-                  <div className="space-y-1.5">
-                    {(institution.recruitment_events || []).map((event, i) => (
-                      <p
-                        key={i}
-                        className="text-sm text-slate-700 bg-slate-50 rounded-xl px-4 py-2.5 leading-relaxed"
-                      >
-                        {event}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {(institution.visit_exchanges?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    访问交流
-                  </p>
-                  <div className="space-y-1.5">
-                    {(institution.visit_exchanges || []).map((event, i) => (
-                      <p
-                        key={i}
-                        className="text-sm text-slate-700 bg-slate-50 rounded-xl px-4 py-2.5 leading-relaxed"
-                      >
-                        {event}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {(institution.cooperation_focus?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    合作重点
-                  </p>
-                  <TagList items={institution.cooperation_focus || []} />
-                </div>
-              )}
-            </div>
-          </CollapsibleSection>
-        )}
-
-        {/* View all scholars CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl shadow-lg p-6"
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <FlaskConical className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-base font-bold text-white">学者数据库</p>
-                <p className="text-sm text-blue-100 mt-0.5">
-                  该机构收录{" "}
-                  <span className="font-bold text-white">
-                    {institution.scholar_count}
-                  </span>{" "}
-                  位学者的详细信息
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() =>
-                navigate(
-                  `/?tab=scholars&university=${encodeURIComponent(institution.name)}`,
-                )
-              }
-              className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-blue-50 text-blue-600 font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl flex-shrink-0"
-            >
-              <Users className="w-5 h-5" />
-              查看全部
-            </button>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Modals */}
       <AnimatePresence>
         {editOpen && (
           <EditInstitutionModal
@@ -448,63 +279,227 @@ export default function InstitutionDetailPage() {
   );
 }
 
-// ── Department list (local to this page) ───────────────────────────────────
-
-function DepartmentList({
-  departments,
+function HeroHeader({
+  institution,
+  onBack,
+  onEdit,
+  onDelete,
 }: {
-  departments: InstitutionDetail["departments"];
+  institution: InstitutionDetail;
+  onBack: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
-  const maxCount = Math.max(...departments.map((d) => d.scholar_count), 1);
   return (
-    <div className="space-y-3">
+    <motion.header
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="relative overflow-hidden rounded-2xl border border-slate-800/60 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 text-white"
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(59,130,246,0.28),transparent_45%)]" />
+      <div className="relative p-4 md:p-5">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-sm text-slate-300 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            机构库
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-white/10 hover:bg-white/20 border border-white/10 transition-colors"
+            >
+              <Edit2 className="w-4 h-4" /> 编辑
+            </button>
+            <button
+              onClick={onDelete}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-500/15 hover:bg-red-500/25 text-red-200 border border-red-400/20 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" /> 删除
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-4">
+          <UniversityLogo
+            name={institution.name}
+            id={institution.id}
+            avatar={institution.avatar}
+            onEditAvatar={onEdit}
+          />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
+              {institution.name}
+            </h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-sm text-slate-300">
+              {institution.org_name && <span className="font-medium">{institution.org_name}</span>}
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/10 text-xs border border-white/10">
+                ID: {institution.id}
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {institution.category && <CategoryBadge label={institution.category} />}
+              {institution.priority && <PriorityBadge label={institution.priority} />}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.header>
+  );
+}
+
+function SectionCard({
+  title,
+  icon: Icon,
+  children,
+  count,
+  compact = false,
+}: {
+  title: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+  count?: number;
+  compact?: boolean;
+}) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22 }}
+      className="rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div className={`flex items-center gap-3 border-b border-slate-100 ${compact ? "px-4 py-3" : "px-4 py-3.5"}`}>
+        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+          <Icon className="w-4 h-4" />
+        </div>
+        <h2 className="text-sm font-bold text-slate-800">{title}</h2>
+        {count != null && (
+          <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+            {count}
+          </span>
+        )}
+      </div>
+      <div className={compact ? "p-3.5" : "p-4"}>{children}</div>
+    </motion.section>
+  );
+}
+
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number | null | undefined;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] text-slate-500 font-medium">{label}</span>
+        <Icon className="w-3.5 h-3.5 text-slate-400" />
+      </div>
+      <p className={`mt-1 text-xl font-extrabold ${value != null ? "text-slate-800" : "text-slate-300"}`}>
+        {value ?? "—"}
+      </p>
+    </div>
+  );
+}
+
+function SubBlock({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{title}</p>
+      {items.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {items.map((item, idx) => (
+            <Tag key={`${item}-${idx}`}>{item}</Tag>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400">暂无数据</p>
+      )}
+    </div>
+  );
+}
+
+function ParagraphList({ title, items }: { title: string; items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{title}</p>
+      <div className="space-y-1.5">
+        {items.map((item, idx) => (
+          <p
+            key={`${item}-${idx}`}
+            className="text-sm text-slate-700 bg-white rounded-lg px-2.5 py-2 border border-slate-100"
+          >
+            {item}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DepartmentList({ departments }: { departments: InstitutionDetail["departments"] }) {
+  const maxCount = Math.max(...departments.map((d) => d.scholar_count), 1);
+
+  return (
+    <div className="space-y-2.5">
       {departments.map((dept) => (
         <motion.div
           key={dept.id}
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-all hover:shadow-sm"
+          className="rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2.5"
         >
-          <div className="w-1 h-auto min-h-[60px] rounded-full bg-gradient-to-b from-blue-500 to-blue-300 flex-shrink-0 mt-1" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline justify-between gap-2 mb-2">
-              <p className="text-sm font-bold text-slate-800">{dept.name}</p>
-              <p className="text-xl font-black text-blue-600 flex-shrink-0">
-                {dept.scholar_count}
-              </p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-800 leading-snug truncate">{dept.name}</p>
+              {dept.org_name && dept.org_name !== dept.name && (
+                <p className="text-xs text-slate-500 truncate mt-0.5">{dept.org_name}</p>
+              )}
             </div>
-            {dept.org_name && dept.org_name !== dept.name && (
-              <p className="text-xs text-slate-400 mb-2 truncate">
-                {dept.org_name}
-              </p>
-            )}
-            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2.5">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-300"
-                style={{ width: `${(dept.scholar_count / maxCount) * 100}%` }}
-              />
-            </div>
-            {(dept.sources?.length ?? 0) > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {(dept.sources || []).map((src) => (
-                  <span
-                    key={src.source_id}
-                    className={`text-[10px] px-2 py-1 rounded-full font-medium ${
-                      src.is_enabled
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {src.source_name}
-                    {src.scholar_count > 0 && ` · ${src.scholar_count}`}
-                  </span>
-                ))}
-              </div>
-            )}
+            <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+              {dept.scholar_count} 学者
+            </span>
           </div>
+
+          <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
+              style={{ width: `${(dept.scholar_count / maxCount) * 100}%` }}
+            />
+          </div>
+
+          {(dept.sources?.length ?? 0) > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(dept.sources || []).map((src) => (
+                <span
+                  key={src.source_id}
+                  className={
+                    src.is_enabled
+                      ? "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700"
+                      : "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-200 text-slate-600"
+                  }
+                >
+                  {src.source_name}
+                  {src.scholar_count > 0 && ` · ${src.scholar_count}`}
+                </span>
+              ))}
+            </div>
+          )}
         </motion.div>
       ))}
     </div>
   );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <p className="text-sm text-slate-400 italic">{text}</p>;
 }

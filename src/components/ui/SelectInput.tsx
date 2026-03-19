@@ -11,6 +11,7 @@ interface SelectInputProps {
   placeholder?: string;
   error?: boolean;
   disabled?: boolean;
+  className?: string;
 }
 
 export function SelectInput({
@@ -20,6 +21,7 @@ export function SelectInput({
   placeholder,
   error,
   disabled,
+  className,
 }: SelectInputProps) {
   return (
     <select
@@ -30,6 +32,7 @@ export function SelectInput({
         "w-full px-3 py-2.5 text-sm bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
         error ? "border-red-300 ring-1 ring-red-300" : "border-gray-200",
         !value ? "text-gray-300" : "text-gray-800",
+        className,
       )}
     >
       {placeholder && (

@@ -220,9 +220,14 @@ function UniversityLogo({
 interface InstitutionCardProps {
   institution: InstitutionListItem;
   index: number;
+  onOpen?: (institution: InstitutionListItem) => void;
 }
 
-export function InstitutionCard({ institution, index }: InstitutionCardProps) {
+export function InstitutionCard({
+  institution,
+  index,
+  onOpen,
+}: InstitutionCardProps) {
   const navigate = useNavigate();
 
   return (
@@ -230,7 +235,13 @@ export function InstitutionCard({ institution, index }: InstitutionCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.04, ease: "easeOut" }}
-      onClick={() => navigate(`/institutions/${institution.id}`)}
+      onClick={() => {
+        if (onOpen) {
+          onOpen(institution);
+          return;
+        }
+        navigate(`/institutions/${institution.id}`);
+      }}
       className="group relative bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-slate-200 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
     >
       {/* Top accent line */}

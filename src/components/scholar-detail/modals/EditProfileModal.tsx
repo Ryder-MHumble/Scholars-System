@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, ChevronDown } from "lucide-react";
+import { X } from "lucide-react";
 import type {
   ScholarDetail,
   ScholarDetailPatch,
-  UniversityOption,
 } from "@/services/scholarApi";
-import { fetchUniversities } from "@/services/scholarApi";
-import { cn } from "@/utils/cn";
+import { InstitutionAutocomplete } from "@/components/common/InstitutionAutocomplete";
+import { DepartmentAutocomplete } from "@/components/common/DepartmentAutocomplete";
 
 interface EditProfileModalProps {
   scholar: ScholarDetail;
@@ -46,19 +45,6 @@ export function EditProfileModal({
 
   const set = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
-
-  // Universities autocomplete
-  const [universities, setUniversities] = useState<UniversityOption[]>([]);
-  useEffect(() => {
-    fetchUniversities()
-      .then(setUniversities)
-      .catch(() => {});
-  }, []);
-
-  const universityNames = universities.map((u) => u.university);
-  const departmentsForCurrent =
-    universities.find((u) => u.university === form.university)?.departments ??
-    [];
 
   // Build patch: only changed fields
   const buildPatch = (): ScholarDetailPatch => {
@@ -112,12 +98,6 @@ export function EditProfileModal({
     }
     if (!form.university.trim()) {
       return "院校为必填项";
-    }
-    if (!form.department.trim()) {
-      return "院系为必填项";
-    }
-    if (!form.email.trim() && !form.phone.trim()) {
-      return "邮箱和电话至少需要填写一个";
     }
     return null;
   };
@@ -222,19 +202,19 @@ export function EditProfileModal({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <AutocompleteField
+              <InstitutionAutocomplete
                 label="院校"
                 value={form.university}
                 onChange={(v) => set("university", v)}
-                options={universityNames}
                 required
+                placeholder="输入院校名称搜索..."
               />
-              <AutocompleteField
+              <DepartmentAutocomplete
                 label="院系"
                 value={form.department}
                 onChange={(v) => set("department", v)}
-                options={departmentsForCurrent}
-                required
+                university={form.university}
+                placeholder="输入院系名称..."
               />
             </div>
             <Field
@@ -246,7 +226,7 @@ export function EditProfileModal({
           </Section>
 
           {/* Contact */}
-          <Section title="联系方式（至少填写一项）">
+          <Section title="联系方式">
             <div className="grid grid-cols-2 gap-3">
               <Field
                 label="邮箱"
@@ -424,109 +404,6 @@ function TextareaField({
         rows={rows}
         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 transition-colors resize-none"
       />
-    </div>
-  );
-}
-
-function AutocompleteField({
-  label,
-  value,
-  onChange,
-  options,
-  required,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-  required?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [highlightIdx, setHighlightIdx] = useState(-1);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const filtered = value
-    ? options.filter((o) => o.toLowerCase().includes(value.toLowerCase()))
-    : options;
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  return (
-    <div ref={containerRef} className="relative">
-      <label className="block text-xs text-gray-500 mb-1">
-        {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      <div className="relative">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setOpen(true);
-            setHighlightIdx(-1);
-          }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown") {
-              e.preventDefault();
-              setHighlightIdx((i) => Math.min(i + 1, filtered.length - 1));
-            } else if (e.key === "ArrowUp") {
-              e.preventDefault();
-              setHighlightIdx((i) => Math.max(i - 1, -1));
-            } else if (
-              e.key === "Enter" &&
-              highlightIdx >= 0 &&
-              filtered[highlightIdx]
-            ) {
-              e.preventDefault();
-              onChange(filtered[highlightIdx]);
-              setOpen(false);
-            } else if (e.key === "Escape") {
-              setOpen(false);
-            }
-          }}
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 transition-colors"
-        />
-        {options.length > 0 && (
-          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-        )}
-      </div>
-      {open && filtered.length > 0 && (
-        <ul className="absolute z-50 left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg text-sm">
-          {filtered.slice(0, 30).map((opt, i) => (
-            <li
-              key={opt}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onChange(opt);
-                setOpen(false);
-              }}
-              onMouseEnter={() => setHighlightIdx(i)}
-              className={cn(
-                "px-3 py-1.5 cursor-pointer truncate",
-                i === highlightIdx
-                  ? "bg-primary-50 text-primary-700"
-                  : "hover:bg-gray-50 text-gray-700",
-              )}
-            >
-              {opt}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

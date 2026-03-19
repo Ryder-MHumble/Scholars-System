@@ -164,16 +164,8 @@ export default function AddScholarDetailPage() {
       setError("学者姓名不能为空");
       return;
     }
-    if (!scholar.position) {
-      setError("职称不能为空");
-      return;
-    }
     if (!scholar.university) {
       setError("所属院校不能为空");
-      return;
-    }
-    if (!scholar.department) {
-      setError("所属部门不能为空");
       return;
     }
 
@@ -185,9 +177,9 @@ export default function AddScholarDetailPage() {
       const submitData = {
         name: scholar.name,
         name_en: scholar.name_en || undefined,
-        position: scholar.position,
+        position: scholar.position || undefined,
         university: scholar.university,
-        department: scholar.department,
+        department: scholar.department || undefined,
         email: scholar.email || undefined,
         phone: scholar.phone || undefined,
         profile_url: scholar.profile_url || undefined,

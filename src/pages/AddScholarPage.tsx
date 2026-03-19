@@ -142,9 +142,7 @@ export default function AddScholarPage() {
   const validate = () => {
     const errs: Partial<Record<keyof FormData, boolean>> = {};
     if (!form.name.trim()) errs.name = true;
-    if (!form.title) errs.title = true;
     if (!form.universityId) errs.universityId = true;
-    if (!form.departmentId) errs.departmentId = true;
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -160,9 +158,9 @@ export default function AddScholarPage() {
       await createScholar({
         name: form.name,
         name_en: form.nameEn || undefined,
-        position: form.title,
+        position: form.title || undefined,
         university: form.universityId,
-        department: form.departmentId,
+        department: form.departmentId || undefined,
         email: form.email || undefined,
         phone: form.phone || undefined,
         profile_url: form.homepage || undefined,
@@ -435,7 +433,7 @@ export default function AddScholarPage() {
                     <p className="mt-1 text-xs text-red-500">请选择所属院校</p>
                   )}
                 </Field>
-                <Field label="所属院系" required>
+                <Field label="所属院系">
                   <ComboboxInput
                     value={form.departmentId}
                     onChange={(v) => set("departmentId", v)}
@@ -443,19 +441,14 @@ export default function AddScholarPage() {
                     placeholder={
                       form.universityId ? "搜索并选择院系" : "请先选择院校"
                     }
-                    error={errors.departmentId}
                     disabled={!form.universityId || uniLoading}
                   />
-                  {errors.departmentId && (
-                    <p className="mt-1 text-xs text-red-500">请选择所属院系</p>
-                  )}
                 </Field>
-                <Field label="职称" required>
+                <Field label="职称">
                   <SelectInput
                     value={form.title}
                     onChange={(v) => set("title", v as AcademicTitle)}
                     placeholder="请选择职称"
-                    error={errors.title}
                   >
                     {ALL_TITLES.map((t) => (
                       <option key={t} value={t}>
@@ -463,9 +456,6 @@ export default function AddScholarPage() {
                       </option>
                     ))}
                   </SelectInput>
-                  {errors.title && (
-                    <p className="mt-1 text-xs text-red-500">请选择职称</p>
-                  )}
                 </Field>
               </div>
             </FormSection>

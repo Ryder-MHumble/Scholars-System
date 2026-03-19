@@ -15,13 +15,18 @@ interface InstitutionFilters {
   view?: "flat" | "hierarchical";
 }
 
-export function useInstitutions(pageSize = 20, filters?: InstitutionFilters) {
+export function useInstitutions(
+  pageSize = 50,
+  filters?: InstitutionFilters,
+  initialPage = 1,
+  enabled = true,
+) {
   const [institutions, setInstitutions] = useState<InstitutionListItem[]>([]);
   const [pagination, setPagination] = useState<
     Omit<InstitutionListResponse, "items">
   >({
     total: 0,
-    page: 1,
+    page: initialPage,
     page_size: pageSize,
     total_pages: 1,
   });
@@ -30,6 +35,7 @@ export function useInstitutions(pageSize = 20, filters?: InstitutionFilters) {
 
   const loadPage = useCallback(
     async (page: number) => {
+      if (!enabled) return;
       try {
         setLoading(true);
         setError(null);
@@ -52,12 +58,24 @@ export function useInstitutions(pageSize = 20, filters?: InstitutionFilters) {
         setLoading(false);
       }
     },
-    [pageSize, filters],
+    [pageSize, filters, enabled],
   );
 
   useEffect(() => {
-    loadPage(1);
-  }, [loadPage]);
+    if (!enabled) {
+      setLoading(false);
+      setError(null);
+      setInstitutions([]);
+      setPagination({
+        total: 0,
+        page: 1,
+        page_size: pageSize,
+        total_pages: 1,
+      });
+      return;
+    }
+    loadPage(initialPage);
+  }, [enabled, initialPage, loadPage, pageSize]);
 
   return { institutions, pagination, loading, error, loadPage };
 }

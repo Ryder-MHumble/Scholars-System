@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import type { NewScholarUpdate } from "@/services/scholarApi";
+import { SelectInput } from "@/components/ui/SelectInput";
 
 interface AddUpdateModalProps {
   onClose: () => void;
@@ -90,19 +91,17 @@ export function AddUpdateModal({ onClose, onSubmit }: AddUpdateModalProps) {
             <div className="space-y-2">
               {!useCustomType ? (
                 <>
-                  <select
+                  <SelectInput
                     value={form.update_type}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, update_type: e.target.value }))
-                    }
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                    onChange={(v) => setForm((f) => ({ ...f, update_type: v }))}
+                    className="focus:ring-1 focus:ring-primary-400"
                   >
                     {presetTypes.map((type) => (
                       <option key={type.value} value={type.value}>
                         {type.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectInput>
                   <button
                     type="button"
                     onClick={() => setUseCustomType(true)}

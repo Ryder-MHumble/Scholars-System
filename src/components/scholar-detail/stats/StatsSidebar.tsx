@@ -19,6 +19,7 @@ import {
   type StudentCreate,
   type StudentPatch,
 } from "@/services/scholarApi";
+import { SelectInput } from "@/components/ui/SelectInput";
 
 interface Props {
   urlHash: string;
@@ -213,15 +214,15 @@ export function StatsSidebar({ urlHash }: Props) {
                         className="w-full text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
                       />
                       <div className="flex gap-1">
-                        <select
+                        <SelectInput
                           value={editForm.degree_type ?? ""}
-                          onChange={(e) =>
+                          onChange={(v) =>
                             setEditForm((p) => ({
                               ...p,
-                              degree_type: e.target.value,
+                              degree_type: v,
                             }))
                           }
-                          className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                          className="flex-1 px-2 py-1 text-sm border-gray-200 rounded focus:ring-1 focus:ring-primary-400"
                         >
                           <option value="">学位</option>
                           {["博士", "硕士", "博士后"].map((d) => (
@@ -229,23 +230,23 @@ export function StatsSidebar({ urlHash }: Props) {
                               {d}
                             </option>
                           ))}
-                        </select>
-                        <select
+                        </SelectInput>
+                        <SelectInput
                           value={editForm.status ?? "在读"}
-                          onChange={(e) =>
+                          onChange={(v) =>
                             setEditForm((p) => ({
                               ...p,
-                              status: e.target.value,
+                              status: v,
                             }))
                           }
-                          className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                          className="flex-1 px-2 py-1 text-sm border-gray-200 rounded focus:ring-1 focus:ring-primary-400"
                         >
                           {STATUS_OPTIONS.map((s) => (
                             <option key={s} value={s}>
                               {s}
                             </option>
                           ))}
-                        </select>
+                        </SelectInput>
                       </div>
                       <div className="flex gap-1">
                         <input
@@ -440,12 +441,12 @@ export function StatsSidebar({ urlHash }: Props) {
                 className="w-full text-sm border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
               />
               <div className="flex gap-1">
-                <select
+                <SelectInput
                   value={addForm.degree_type ?? "博士"}
-                  onChange={(e) =>
-                    setAddForm((p) => ({ ...p, degree_type: e.target.value }))
+                  onChange={(v) =>
+                    setAddForm((p) => ({ ...p, degree_type: v }))
                   }
-                  className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                  className="flex-1 px-2 py-1 text-sm border-gray-200 rounded focus:ring-1 focus:ring-primary-400"
                 >
                   <option value="">学位</option>
                   {["博士", "硕士", "博士后"].map((d) => (
@@ -453,20 +454,18 @@ export function StatsSidebar({ urlHash }: Props) {
                       {d}
                     </option>
                   ))}
-                </select>
-                <select
+                </SelectInput>
+                <SelectInput
                   value={addForm.status ?? "在读"}
-                  onChange={(e) =>
-                    setAddForm((p) => ({ ...p, status: e.target.value }))
-                  }
-                  className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                  onChange={(v) => setAddForm((p) => ({ ...p, status: v }))}
+                  className="flex-1 px-2 py-1 text-sm border-gray-200 rounded focus:ring-1 focus:ring-primary-400"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>
                   ))}
-                </select>
+                </SelectInput>
               </div>
               <div className="flex gap-1">
                 <input

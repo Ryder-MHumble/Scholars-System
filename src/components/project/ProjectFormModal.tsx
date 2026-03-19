@@ -7,6 +7,7 @@ import type {
   RelatedScholar,
   ProjectOutput,
 } from "@/types/project";
+import { SelectInput } from "@/components/ui/SelectInput";
 
 interface ProjectFormModalProps {
   isOpen: boolean;
@@ -323,17 +324,17 @@ export function ProjectFormModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       项目状态
                     </label>
-                    <select
+                    <SelectInput
                       value={form.status}
-                      onChange={(e) => set("status", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                      onChange={(v) => set("status", v)}
+                      className="border-gray-300"
                     >
                       {STATUS_OPTIONS.map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>
                       ))}
-                    </select>
+                    </SelectInput>
                   </div>
                 </div>
                 <div>
