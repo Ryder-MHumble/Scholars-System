@@ -309,8 +309,11 @@ show_dashboard() {
         # Endpoints
         printf "\n"
         printf "   ${BOLD}ENDPOINTS${NC}\n"
+        api_base_url=$(grep -E '^VITE_API_BASE_URL=' "$PROJECT_DIR/.env.production" 2>/dev/null | tail -1 | cut -d= -f2-)
+        [[ -z "$api_base_url" ]] && api_base_url=$(grep -E '^VITE_API_BASE_URL=' "$PROJECT_DIR/.env.local" 2>/dev/null | tail -1 | cut -d= -f2-)
+        [[ -z "$api_base_url" ]] && api_base_url="http://127.0.0.1:8001"
         printf "   ${D}Frontend${NC} http://localhost:%s\n" "$PORT"
-        printf "   ${D}API${NC}      http://43.98.254.243:8001\n"
+        printf "   ${D}API${NC}      %s\n" "$api_base_url"
     else
         printf "\n"
         printf "   ${BOLD}SERVICE${NC}\n"

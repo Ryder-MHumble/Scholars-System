@@ -37,7 +37,7 @@ export function InstitutionAutocomplete({
   const [results, setResults] = useState<InstitutionSearchResult[]>([]);
   const [highlightIdx, setHighlightIdx] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounced search
   useEffect(() => {
