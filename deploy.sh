@@ -249,7 +249,7 @@ _start_serve() {
     rm -f "$PID_FILE"
 
     cd "$PROJECT_DIR"
-    nohup npx serve -s "$DIST_DIR" -l "tcp://0.0.0.0:$PROD_PORT" >> "$LOG_FILE" 2>&1 &
+    nohup setsid npm run preview -- --host 0.0.0.0 --port "$PROD_PORT" >> "$LOG_FILE" 2>&1 < /dev/null &
 
     echo $! > "$PID_FILE"
     sleep 2
@@ -311,7 +311,7 @@ show_dashboard() {
         printf "   ${BOLD}ENDPOINTS${NC}\n"
         api_base_url=$(grep -E '^VITE_API_BASE_URL=' "$PROJECT_DIR/.env.production" 2>/dev/null | tail -1 | cut -d= -f2-)
         [[ -z "$api_base_url" ]] && api_base_url=$(grep -E '^VITE_API_BASE_URL=' "$PROJECT_DIR/.env.local" 2>/dev/null | tail -1 | cut -d= -f2-)
-        [[ -z "$api_base_url" ]] && api_base_url="http://127.0.0.1:8001"
+        [[ -z "$api_base_url" ]] && api_base_url="http://10.1.132.21:8001"
         printf "   ${D}Frontend${NC} http://localhost:%s\n" "$PORT"
         printf "   ${D}API${NC}      %s\n" "$api_base_url"
     else
