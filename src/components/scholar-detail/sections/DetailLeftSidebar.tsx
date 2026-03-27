@@ -168,6 +168,11 @@ export function DetailLeftSidebar({
           onClose={() => setShowManagementRolesModal(false)}
           onSubmit={async (records) => {
             await onManagementRolesSave(records);
+            setEditedManagementRoles([...records]);
+            // Batch import modal save should be final save to avoid stale draft overwrite.
+            setIsManagementRoleEditMode(false);
+            setShowManagementRoleForm(false);
+            setEditingManagementRoleIdx(null);
             setShowManagementRolesModal(false);
           }}
         />

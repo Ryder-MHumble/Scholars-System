@@ -24,6 +24,10 @@ import {
   fetchActivities,
   fetchActivityStats,
 } from "@/services/activityApi";
+import {
+  fetchAllScholars,
+  type ScholarListItem,
+} from "@/services/scholarApi";
 import type {
   ActivityEvent,
   ActivityCreateRequest,
@@ -46,6 +50,8 @@ export default function ActivityListPage() {
   const [activeType, setActiveType] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [allActivities, setAllActivities] = useState<ActivityEvent[]>([]);
+  const [allScholars, setAllScholars] = useState<ScholarListItem[]>([]);
+  const [scholarLoading, setScholarLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<ActivityStats | null>(null);
   const [formModalOpen, setFormModalOpen] = useState(false);
@@ -143,6 +149,16 @@ export default function ActivityListPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    setScholarLoading(true);
+    fetchAllScholars(undefined, controller.signal)
+      .then((items) => setAllScholars(items))
+      .catch(() => setAllScholars([]))
+      .finally(() => setScholarLoading(false));
+    return () => controller.abort();
+  }, []);
+
   const dayActivities = useMemo<Record<number, ActivityEvent[]>>(() => {
     const map: Record<number, ActivityEvent[]> = {};
     for (const a of allActivities) {
@@ -199,6 +215,43 @@ export default function ActivityListPage() {
     });
     return list;
   }, [allActivities, searchQuery, sortOrder]);
+
+  const taggedScholars = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    return allScholars.filter((scholar) => {
+      const tags = scholar.event_tags ?? [];
+      if (tags.length === 0) return false;
+      if (activeType) {
+        const hit = tags.some(
+          (tag) =>
+            tag.event_type === activeType ||
+            tag.series === activeType ||
+            tag.category === activeType,
+        );
+        if (!hit) return false;
+      }
+      if (activeSeries) {
+        const hit = tags.some(
+          (tag) =>
+            tag.event_type === activeSeries ||
+            tag.series === activeSeries ||
+            tag.category === activeSeries,
+        );
+        if (!hit) return false;
+      }
+      if (!keyword) return true;
+      const fields = [
+        scholar.name,
+        scholar.university,
+        scholar.department,
+        scholar.position,
+        ...(scholar.research_areas ?? []),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return fields.includes(keyword);
+    });
+  }, [allScholars, activeType, activeSeries, searchQuery]);
 
   const panelTitle = selectedDay
     ? `${currentYear}年${currentMonth + 1}月${selectedDay}日`
@@ -299,6 +352,49 @@ export default function ActivityListPage() {
               添加活动
             </button>
           </div>
+        </div>
+
+        {/* Tagged scholars in current activity category */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">分类关联学者</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {scholarLoading ? "加载中..." : `当前条件下 ${taggedScholars.length} 位`}
+              </p>
+            </div>
+          </div>
+          {scholarLoading ? (
+            <p className="text-xs text-gray-400">正在加载学者数据...</p>
+          ) : taggedScholars.length === 0 ? (
+            <p className="text-xs text-gray-400">当前活动分类下暂无关联学者</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {taggedScholars.slice(0, 12).map((scholar) => (
+                <button
+                  key={scholar.url_hash}
+                  onClick={() => navigate(`/scholars/${scholar.url_hash}`)}
+                  className="text-left border border-gray-200 rounded-lg p-3 hover:border-primary-300 hover:bg-primary-50/30 transition-colors"
+                >
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {scholar.name}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 truncate">
+                    {scholar.university || "未知机构"}
+                  </p>
+                  {(scholar.event_tags ?? []).length > 0 && (
+                    <p className="text-[11px] text-primary-600 mt-1 truncate">
+                      {(scholar.event_tags ?? [])
+                        .map((tag) => tag.event_type || tag.series || tag.category)
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .join(" · ")}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Type filter + Search */}

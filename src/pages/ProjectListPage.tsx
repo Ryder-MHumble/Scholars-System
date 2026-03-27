@@ -21,6 +21,8 @@ const SUBTAB_TO_PROJECT_FILTER: Record<
   academic_committee: { category: "教育培养", subcategory: "学术委员会" },
   teaching_committee: { category: "教育培养", subcategory: "教学委员会" },
   student_mentor: { category: "教育培养", subcategory: "学院学生高校导师" },
+  fulltime_mentor: { category: "教育培养", subcategory: "全职导师" },
+  industry_mentor: { category: "教育培养", subcategory: "产业导师" },
   parttime_mentor: { category: "教育培养", subcategory: "兼职导师" },
   research: { category: "科研学术" },
   research_project: { category: "科研学术", subcategory: "科研立项" },

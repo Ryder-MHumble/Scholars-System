@@ -137,12 +137,12 @@ export default function InstitutionDetailPage() {
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-5">
           <main className="xl:col-span-8 space-y-4">
             <SectionCard
-              title="院领导信息"
+              title="领导信息"
               icon={Landmark}
               count={leadership?.leader_count ?? undefined}
             >
               {leadershipLoading ? (
-                <EmptyState text="院领导信息加载中..." />
+                <EmptyState text="领导信息加载中..." />
               ) : !hasLeadership ? (
                 <EmptyState text="暂无院领导数据" />
               ) : (

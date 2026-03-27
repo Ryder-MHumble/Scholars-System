@@ -1,16 +1,62 @@
 import { lazy, Suspense, useState, useEffect } from "react";
+import type { ComponentType } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { NavTreeItem } from "@/components/nav/NavTreeItem";
 import { NAV_TREE, getAncestorIds } from "@/constants/navTree";
 import type { TabId } from "@/constants/navTree";
 
-const ScholarListPage = lazy(() => import("./ScholarListPage"));
-const StudentListPage = lazy(() => import("./StudentListPage"));
-const InstitutionListPage = lazy(() => import("./InstitutionListPage"));
-const ProjectListPage = lazy(() => import("./ProjectListPage"));
-const ActivityListPage = lazy(() => import("./ActivityListPage"));
-const VenueListPage = lazy(() => import("./VenueListPage"));
+function lazyWithRetry<T extends { default: ComponentType<any> }>(
+  importer: () => Promise<T>,
+  retryKey: string,
+) {
+  return lazy(async () => {
+    try {
+      return await importer();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isChunkLoadError =
+        message.includes("Failed to fetch dynamically imported module") ||
+        message.includes("Importing a module script failed");
+      if (isChunkLoadError) {
+        const storageKey = `lazy-reload-once:${retryKey}`;
+        const alreadyReloaded = window.sessionStorage.getItem(storageKey);
+        if (!alreadyReloaded) {
+          window.sessionStorage.setItem(storageKey, "1");
+          window.location.reload();
+          return new Promise<never>(() => {});
+        }
+        window.sessionStorage.removeItem(storageKey);
+      }
+      throw error;
+    }
+  });
+}
+
+const ScholarListPage = lazyWithRetry(
+  () => import("./ScholarListPage"),
+  "ScholarListPage",
+);
+const StudentListPage = lazyWithRetry(
+  () => import("./StudentListPage"),
+  "StudentListPage",
+);
+const InstitutionListPage = lazyWithRetry(
+  () => import("./InstitutionListPage"),
+  "InstitutionListPage",
+);
+const ProjectListPage = lazyWithRetry(
+  () => import("./ProjectListPage"),
+  "ProjectListPage",
+);
+const ActivityListPage = lazyWithRetry(
+  () => import("./ActivityListPage"),
+  "ActivityListPage",
+);
+const VenueListPage = lazyWithRetry(
+  () => import("./VenueListPage"),
+  "VenueListPage",
+);
 
 const topLevelIds = NAV_TREE.map((n) => n.id);
 

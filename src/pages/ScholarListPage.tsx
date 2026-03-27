@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -61,6 +61,11 @@ export default function ScholarListPage() {
     [filteredUniNodes],
   );
 
+  useEffect(() => {
+    const returnTo = `${location.pathname}${location.search || "?tab=scholars"}`;
+    window.sessionStorage.setItem("scholar_list_return_to", returnTo);
+  }, [location.pathname, location.search]);
+
   return (
     <div className="h-full overflow-hidden flex bg-gray-50">
       {/* Institution filter sidebar */}
@@ -101,6 +106,7 @@ export default function ScholarListPage() {
 
               <Link
                 to="/scholars/add"
+                state={{ from: location }}
                 className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
               >
                 <Plus className="w-4 h-4" />

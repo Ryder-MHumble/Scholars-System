@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { BookOpen, Award, Trophy, ExternalLink, Edit3 } from "lucide-react";
 import type { ScholarDetail } from "@/services/scholarApi";
@@ -13,6 +14,30 @@ export function AchievementsDetailCard({
   scholar,
   onShowAchievementsModal,
 }: AchievementsDetailCardProps) {
+  const [activeTab, setActiveTab] = useState<"publications" | "patents" | "awards">(
+    "publications",
+  );
+  const tabs = [
+    {
+      key: "publications" as const,
+      label: "论文",
+      count: scholar.representative_publications?.length ?? 0,
+      icon: BookOpen,
+    },
+    {
+      key: "patents" as const,
+      label: "专利",
+      count: scholar.patents?.length ?? 0,
+      icon: Award,
+    },
+    {
+      key: "awards" as const,
+      label: "获奖",
+      count: scholar.awards?.length ?? 0,
+      icon: Trophy,
+    },
+  ];
+
   return (
     <motion.div
       variants={slideInUp}
@@ -31,9 +56,31 @@ export function AchievementsDetailCard({
         </button>
       </div>
 
-      <PublicationsSection scholar={scholar} />
-      <PatentsSection scholar={scholar} />
-      <AwardsSection scholar={scholar} />
+      <div className="mb-4 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-lg border-b-2 transition-colors",
+                activeTab === tab.key
+                  ? "text-primary-700 border-primary-600 bg-primary-50/40"
+                  : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
+              )}
+            >
+              <tab.icon className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+              <span className="text-xs text-gray-400">{tab.count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === "publications" && <PublicationsSection scholar={scholar} />}
+      {activeTab === "patents" && <PatentsSection scholar={scholar} />}
+      {activeTab === "awards" && <AwardsSection scholar={scholar} />}
     </motion.div>
   );
 }
@@ -137,7 +184,7 @@ function PublicationsSection({ scholar }: { scholar: ScholarDetail }) {
 function PatentsSection({ scholar }: { scholar: ScholarDetail }) {
   const patents = scholar.patents;
   return (
-    <div className="pt-4 border-t border-gray-100 mb-5">
+    <div className="mb-1">
       <div className="flex items-center gap-2 mb-3">
         <Award className="w-4 h-4 text-gray-400" />
         <h4 className="text-sm font-semibold text-gray-600">专利</h4>
@@ -207,7 +254,7 @@ function PatentsSection({ scholar }: { scholar: ScholarDetail }) {
 function AwardsSection({ scholar }: { scholar: ScholarDetail }) {
   const awards = scholar.awards;
   return (
-    <div className="pt-4 border-t border-gray-100">
+    <div className="mb-1">
       <div className="flex items-center gap-2 mb-3">
         <Trophy className="w-4 h-4 text-gray-400" />
         <h4 className="text-sm font-semibold text-gray-600">荣誉奖项</h4>

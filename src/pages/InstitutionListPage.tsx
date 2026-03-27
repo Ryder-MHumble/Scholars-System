@@ -20,7 +20,6 @@ import type { ExcelColumn } from "@/types/import";
 import type { InstitutionListItem } from "@/types/institution";
 import { Pagination } from "@/components/common/Pagination";
 
-const LIST_STATE_KEY = "institution_list_view_state_v1";
 const MODULE_PAGE_SIZE = 30;
 
 type JointSubcategory =
@@ -127,17 +126,7 @@ export default function InstitutionListPage() {
   const restoreStateFromLocation =
     (location.state as { restoreInstitutionListState?: InstitutionListViewState })
       ?.restoreInstitutionListState ?? null;
-  const restoreState =
-    restoreStateFromLocation ??
-    (() => {
-      try {
-        const raw = sessionStorage.getItem(LIST_STATE_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw) as InstitutionListViewState;
-      } catch {
-        return null;
-      }
-    })();
+  const restoreState = restoreStateFromLocation;
 
   const apiFilters = useMemo(() => mapSubtabToFilters(subtab), [subtab]);
   const [searchQuery, setSearchQuery] = useState(
@@ -316,12 +305,6 @@ export default function InstitutionListPage() {
     scrollY: window.scrollY,
   });
 
-  useEffect(() => {
-    const state = buildListState();
-    sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify(state));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, searchInput, viewMode, subtab, currentPageForState]);
-
   const filteredInstitutions = useMemo<InstitutionListItem[]>(() => {
     if (isModuleSubtab) return moduleInstitutions;
     if (!Array.isArray(institutions)) return [];
@@ -396,7 +379,6 @@ export default function InstitutionListPage() {
 
   const handleOpenInstitution = (institution: InstitutionListItem) => {
     const listState = buildListState();
-    sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify(listState));
     navigate(`/institutions/${institution.id}`, {
       state: {
         from: location,

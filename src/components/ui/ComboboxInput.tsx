@@ -12,6 +12,7 @@ interface ComboboxInputProps {
   clearable?: boolean;
   maxHeight?: string;
   onSearch?: (query: string) => void;
+  className?: string;
 }
 
 export function ComboboxInput({
@@ -23,6 +24,7 @@ export function ComboboxInput({
   disabled,
   clearable = true,
   maxHeight = "300px",
+  className,
 }: ComboboxInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -121,7 +123,7 @@ export function ComboboxInput({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full">
+    <div ref={containerRef} className={cn("relative w-full", className)}>
       {/* Input Field */}
       <div
         className={cn(

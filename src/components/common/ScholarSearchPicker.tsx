@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, UserPlus, Loader2, X, ExternalLink } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { fetchScholarList, type ScholarListItem } from "@/services/scholarApi";
 import { cn } from "@/utils/cn";
 
@@ -31,6 +31,7 @@ export function ScholarSearchPicker({
   compact = false,
 }: ScholarSearchPickerProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ScholarListItem[]>([]);
@@ -199,7 +200,7 @@ export function ScholarSearchPicker({
           {/* Add new scholar button */}
           <div className="border-t border-gray-100 p-2">
             <button
-              onClick={() => navigate("/scholars/add")}
+              onClick={() => navigate("/scholars/add", { state: { from: location } })}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors font-medium"
             >
               <UserPlus className="w-4 h-4" />

@@ -2,7 +2,8 @@
  * 选择框组件
  * 从 AddScholarPage:193-224 提取
  */
-import { cn } from "@/utils/cn";
+import { Children, isValidElement, type ReactNode } from "react";
+import { ComboboxInput } from "@/components/ui/ComboboxInput";
 
 interface SelectInputProps {
   value: string;
@@ -23,24 +24,32 @@ export function SelectInput({
   disabled,
   className,
 }: SelectInputProps) {
+  const options: Array<{ value: string; label: string }> = [];
+  Children.forEach(children, (child) => {
+    if (
+      !isValidElement<{ value?: string; children?: ReactNode }>(child) ||
+      child.type !== "option"
+    )
+      return;
+    const optionValue = String(child.props.value ?? "");
+    const label = String(child.props.children ?? "");
+    options.push({ value: optionValue, label });
+  });
+
+  const valueToLabel = new Map(options.map((item) => [item.value, item.label]));
+  const labelToValue = new Map(options.map((item) => [item.label, item.value]));
+  const selectedLabel = value ? (valueToLabel.get(value) ?? value) : "";
+
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
+    <ComboboxInput
+      value={selectedLabel}
+      onChange={(nextLabel) => onChange(labelToValue.get(nextLabel) ?? "")}
+      options={options.map((item) => item.label)}
+      placeholder={placeholder || "请选择"}
+      error={error}
       disabled={disabled}
-      className={cn(
-        "w-full px-3 py-2.5 text-sm bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
-        error ? "border-red-300 ring-1 ring-red-300" : "border-gray-200",
-        !value ? "text-gray-300" : "text-gray-800",
-        className,
-      )}
-    >
-      {placeholder && (
-        <option value="" disabled>
-          {placeholder}
-        </option>
-      )}
-      {children}
-    </select>
+      className={className}
+      clearable={Boolean(placeholder)}
+    />
   );
 }

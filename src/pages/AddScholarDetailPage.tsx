@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Save } from "lucide-react";
 import type {
@@ -10,17 +10,19 @@ import type {
   ScholarProjectTag,
   ScholarEventTag,
 } from "@/services/scholarApi";
-import { createScholar, patchScholarAchievements } from "@/services/scholarApi";
+import {
+  createScholar,
+  patchScholarAchievements,
+  patchScholarRelation,
+} from "@/services/scholarApi";
 import type { ScholarDetailPatch } from "@/services/scholarApi";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
-import { RelationCard } from "@/components/scholar-detail/sections/RelationCard";
-import { ProjectsCard } from "@/components/scholar-detail/sections/ProjectsCard";
+import { ProjectCategorySelector } from "@/components/scholar-detail/sections/ProjectCategorySelector";
 import { AchievementsDetailCard } from "@/components/scholar-detail/sections/AchievementsDetailCard";
 import { EditAchievementsModal } from "@/components/scholar-detail/modals/EditAchievementsModal";
 import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfileModal";
 import { staggerContainer, slideInLeft } from "@/utils/animations";
 import { cn } from "@/utils/cn";
-import { getPrimaryCategoryForSubcategory } from "@/constants/projectCategories";
 import { getAllCategories, getCategoryByType } from "@/constants/activityCategories";
 
 const emptyScholar: ScholarDetail = {
@@ -87,6 +89,7 @@ const emptyScholar: ScholarDetail = {
 
 export default function AddScholarDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [scholar, setScholar] = useState<ScholarDetail>(emptyScholar);
   const [isSaving, setIsSaving] = useState(false);
@@ -94,10 +97,13 @@ export default function AddScholarDetailPage() {
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const projectCategory =
-    scholar.project_tags?.[0]?.subcategory ?? "";
-  const activityCategory =
-    scholar.event_tags?.[0]?.event_type ?? "";
+  const returnTo =
+    ((location.state as { from?: { pathname?: string; search?: string } } | null)
+      ?.from?.pathname
+      ? `${(location.state as { from: { pathname: string; search?: string } }).from.pathname}${(location.state as { from: { pathname: string; search?: string } }).from.search ?? ""}`
+      : null) ??
+    window.sessionStorage.getItem("scholar_list_return_to") ??
+    "/?tab=scholars";
 
   // Basic field save handler
   const handleFieldSave = async (patch: ScholarDetailPatch) => {
@@ -158,36 +164,16 @@ export default function AddScholarDetailPage() {
     }
   };
 
-  // Relation handlers (no-op for new scholar)
-  const handleRelationToggle = async () => {
-    // No relations for new scholar yet
-  };
-
-  const handleSaveExchangeRecords = async () => {
-    // No exchange records for new scholar yet
-  };
-
-  const handleRelationNotesSave = async () => {
-    // No relation notes for new scholar yet
-  };
-
-  const handleProjectCategoryChange = (subcategory: string) => {
-    const trimmed = subcategory.trim();
-    const primary = trimmed
-      ? getPrimaryCategoryForSubcategory(trimmed as any) ?? ""
-      : "";
-    const nextTags: ScholarProjectTag[] = trimmed
-      ? [{ category: primary, subcategory: trimmed, project_id: "", project_title: "" }]
-      : [];
-    setScholar((prev) => ({
-      ...prev,
-      project_tags: nextTags,
-      is_cobuild_scholar: nextTags.length > 0 || (prev.event_tags?.length ?? 0) > 0,
-    }));
-  };
-
-  const handleEventCategoryChange = (eventType: string) => {
-    const trimmed = eventType.trim();
+  const handleProjectCategorySave = async (
+    primary: string,
+    sub: string,
+    activityType: string,
+  ) => {
+    const projectTags: ScholarProjectTag[] =
+      primary || sub
+        ? [{ category: primary.trim(), subcategory: sub.trim(), project_id: "", project_title: "" }]
+        : [];
+    const trimmed = activityType.trim();
     const allCategories = getAllCategories();
     const categoryMap = new Map(allCategories.map((item) => [item.id, item.name]));
     const matched = trimmed ? getCategoryByType(trimmed) : null;
@@ -205,8 +191,9 @@ export default function AddScholarDetailPage() {
       : [];
     setScholar((prev) => ({
       ...prev,
+      project_tags: projectTags,
       event_tags: nextTags,
-      is_cobuild_scholar: (prev.project_tags?.length ?? 0) > 0 || nextTags.length > 0,
+      is_cobuild_scholar: projectTags.length > 0 || nextTags.length > 0,
     }));
   };
 
@@ -240,6 +227,7 @@ export default function AddScholarDetailPage() {
         dblp_url: scholar.dblp_url || undefined,
         research_areas: scholar.research_areas || [],
         academic_titles: scholar.academic_titles || [],
+        education: scholar.education || [],
         bio: scholar.bio || undefined,
         project_tags: scholar.project_tags || [],
         event_tags: scholar.event_tags || [],
@@ -266,7 +254,13 @@ export default function AddScholarDetailPage() {
         });
       }
 
-      navigate("/?tab=scholars");
+      if ((scholar.joint_management_roles?.length ?? 0) > 0) {
+        await patchScholarRelation(created.url_hash, {
+          joint_management_roles: scholar.joint_management_roles,
+        });
+      }
+
+      navigate(returnTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存学者失败，请重试");
     } finally {
@@ -297,6 +291,9 @@ export default function AddScholarDetailPage() {
               await handleFieldSave(patch);
               setShowProfileModal(false);
             }}
+            onSubmitManagementRoles={async (roles) => {
+              await handleManagementRolesSave(roles);
+            }}
           />
         )}
       </AnimatePresence>
@@ -311,7 +308,7 @@ export default function AddScholarDetailPage() {
             className="flex items-center justify-between mb-6"
           >
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(returnTo)}
               className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-primary-600 transition-colors group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -369,23 +366,12 @@ export default function AddScholarDetailPage() {
               initial="hidden"
               animate="visible"
             >
-              <RelationCard
-                scholar={scholar}
-                mode="category"
-                projectCategory={projectCategory}
-                activityCategory={activityCategory}
-                onProjectCategoryChange={(value) =>
-                  handleProjectCategoryChange(value)
-                }
-                onActivityCategoryChange={(value) =>
-                  handleEventCategoryChange(value)
-                }
-                onRelationToggle={handleRelationToggle}
-                onRelationNotesSave={handleRelationNotesSave}
-                onSaveExchangeRecords={handleSaveExchangeRecords}
+              <ProjectCategorySelector
+                primaryCategory={scholar.project_tags?.[0]?.category ?? ""}
+                subcategory={scholar.project_tags?.[0]?.subcategory ?? ""}
+                activityType={scholar.event_tags?.[0]?.event_type ?? ""}
+                onSave={handleProjectCategorySave}
               />
-
-              <ProjectsCard projects={scholar.joint_research_projects} />
 
               <AchievementsDetailCard
                 scholar={scholar}

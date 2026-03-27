@@ -11,60 +11,6 @@ interface ScholarTableProps {
   onDelete: (urlHash: string, name: string) => void;
 }
 
-function RelationBadges({ s }: { s: ScholarListItem }) {
-  const isCAS =
-    s.is_academician ||
-    s.academic_titles.some(
-      (t) => t.includes("中国科学院") || t.includes("科学院院士"),
-    );
-  const isCAE = s.academic_titles.some(
-    (t) => t.includes("中国工程院") || t.includes("工程院院士"),
-  );
-
-  const badges: { label: string; cls: string }[] = [];
-  if (isCAS)
-    badges.push({
-      label: "中科院院士",
-      cls: "bg-red-50 text-red-600 border-red-200",
-    });
-  if (isCAE)
-    badges.push({
-      label: "工程院院士",
-      cls: "bg-orange-50 text-orange-600 border-orange-200",
-    });
-  if (s.adjunct_supervisor?.status)
-    badges.push({
-      label: "共建导师",
-      cls: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    });
-  if (s.is_advisor_committee)
-    badges.push({
-      label: "学术委员会",
-      cls: "bg-blue-50 text-blue-600 border-blue-200",
-    });
-  if (s.is_potential_recruit)
-    badges.push({
-      label: "潜在引进",
-      cls: "bg-emerald-50 text-emerald-600 border-emerald-200",
-    });
-
-  if (badges.length === 0)
-    return <span className="text-xs text-gray-300">—</span>;
-
-  return (
-    <div className="flex flex-wrap gap-1 max-w-[180px]">
-      {badges.map((b) => (
-        <span
-          key={b.label}
-          className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold border ${b.cls}`}
-        >
-          {b.label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 export function ScholarTable({
   items,
   locationState,
@@ -85,9 +31,6 @@ export function ScholarTable({
               </th>
               <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
                 研究方向
-              </th>
-              <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
-                与两院的关系
               </th>
               <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
                 职称
@@ -169,11 +112,6 @@ export function ScholarTable({
                       <span className="text-xs text-gray-300">—</span>
                     )}
                   </div>
-                </td>
-
-                {/* 与两院的关系 */}
-                <td className="px-5 py-3.5">
-                  <RelationBadges s={s} />
                 </td>
 
                 {/* 职称 */}

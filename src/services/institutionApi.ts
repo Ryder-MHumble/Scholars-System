@@ -149,7 +149,7 @@ export async function fetchInstitutionLeadership(
   institutionId: string,
 ): Promise<LeadershipDetailResponse> {
   const res = await fetch(`${BASE_URL}/api/v1/leadership/${institutionId}`);
-  if (!res.ok) throw new Error(`院领导信息加载失败: ${res.status}`);
+  if (!res.ok) throw new Error(`领导信息加载失败: ${res.status}`);
   return res.json();
 }
 

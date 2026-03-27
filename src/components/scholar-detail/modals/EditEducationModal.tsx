@@ -135,6 +135,8 @@ export function EditEducationModal({
                   支持直接粘贴简历中的教育经历，自动识别以下格式：
                 </p>
                 <p className="text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded leading-relaxed text-[11px]">
+                  2015-02至2018-04, 美国明尼苏达大学, 电子与计算机工程, 博士
+                  <br />
                   2006/11 to 2009/10 Bonn University PhD in Mathematical Physics
                   <br />
                   2001/10 to 2006/10 Bonn University Bachelor and Master in
@@ -150,7 +152,7 @@ export function EditEducationModal({
                 autoFocus
                 rows={6}
                 placeholder={
-                  "2006/11 to 2009/10  Bonn University  PhD in\nMathematical Physics\n2001/10 to 2006/10  Bonn University  Bachelor and\nMaster degree in Physics"
+                  "2015-02至2018-04, 美国明尼苏达大学, 电子与计算机工程, 博士\n2011-09至2018-03, 北京理工大学, 控制科学与工程, 博士\n2007-09至2011-06, 北京理工大学, 电气工程及其自动化, 学士"
                 }
                 className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono resize-none"
               />

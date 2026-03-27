@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
@@ -9,9 +9,7 @@ import { EditAchievementsModal } from "@/components/scholar-detail/modals/EditAc
 import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfileModal";
 import { ContactModal } from "@/components/scholar-detail/modals/ContactModal";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
-import { RelationCard } from "@/components/scholar-detail/sections/RelationCard";
 import { ProjectCategorySelector } from "@/components/scholar-detail/sections/ProjectCategorySelector";
-import { ProjectsCard } from "@/components/scholar-detail/sections/ProjectsCard";
 import { AchievementsDetailCard } from "@/components/scholar-detail/sections/AchievementsDetailCard";
 import { RightSidebar } from "@/components/scholar-detail/sections/RightSidebar";
 import { slideInRight, staggerContainer } from "@/utils/animations";
@@ -28,13 +26,10 @@ export default function ScholarDetailPageDemo() {
     handleFieldSave,
     handleEducationSave,
     handleManagementRolesSave,
-    handleRelationToggle,
     handleAddUpdate,
     handleDeleteUpdate,
     handleAchievementsSave,
-    handleSaveExchangeRecords,
     handleSaveManagementRolesInline,
-    handleRelationNotesSave,
     handleProjectCategorySave,
   } = useScholarDetail(scholarId);
 
@@ -44,13 +39,15 @@ export default function ScholarDetailPageDemo() {
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const getBackLink = () => {
-    const prevLocation = location.state?.from;
-    if (prevLocation?.search) {
-      return prevLocation.pathname + prevLocation.search;
+  const backLink = useMemo(() => {
+    const prevLocation = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
+    if (prevLocation?.pathname) {
+      return `${prevLocation.pathname}${prevLocation.search ?? ""}`;
     }
-    return "/scholars";
-  };
+    const cached = window.sessionStorage.getItem("scholar_list_return_to");
+    if (cached) return cached;
+    return "/?tab=scholars";
+  }, [location.state]);
 
   if (isLoading) return <PageSkeleton />;
 
@@ -59,7 +56,7 @@ export default function ScholarDetailPageDemo() {
       <div className="h-screen flex flex-col items-center justify-center gap-3">
         <p className="text-gray-500">{error ?? "未找到该学者"}</p>
         <Link
-          to={getBackLink()}
+          to={backLink}
           className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> 返回列表
@@ -111,6 +108,7 @@ export default function ScholarDetailPageDemo() {
             onSubmit={async (patch) => {
               await handleFieldSave(patch);
             }}
+            onSubmitManagementRoles={handleManagementRolesSave}
           />
         )}
       </AnimatePresence>
@@ -124,7 +122,7 @@ export default function ScholarDetailPageDemo() {
             className="mb-6"
           >
             <Link
-              to={getBackLink()}
+              to={backLink}
               className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-primary-600 transition-colors group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -151,20 +149,12 @@ export default function ScholarDetailPageDemo() {
               initial="hidden"
               animate="visible"
             >
-              <RelationCard
-                scholar={scholar}
-                onRelationToggle={handleRelationToggle}
-                onRelationNotesSave={handleRelationNotesSave}
-                onSaveExchangeRecords={handleSaveExchangeRecords}
-              />
-
               <ProjectCategorySelector
                 primaryCategory={scholar.project_tags?.[0]?.category ?? ""}
                 subcategory={scholar.project_tags?.[0]?.subcategory ?? ""}
+                activityType={scholar.event_tags?.[0]?.event_type ?? ""}
                 onSave={handleProjectCategorySave}
               />
-
-              <ProjectsCard projects={scholar.joint_research_projects} />
 
               <AchievementsDetailCard
                 scholar={scholar}

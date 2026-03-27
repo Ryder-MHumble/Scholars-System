@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import type {
   ScholarDetail,
   ScholarDetailPatch,
+  EducationRecord,
 } from "@/services/scholarApi";
 import {
   ensureDepartmentExists,
@@ -11,20 +12,34 @@ import {
 } from "@/services/institutionApi";
 import { InstitutionAutocomplete } from "@/components/common/InstitutionAutocomplete";
 import { DepartmentAutocomplete } from "@/components/common/DepartmentAutocomplete";
+import {
+  parseEducationFromText,
+  parseManagementRolesFromText,
+} from "@/utils/textParsers";
 
 interface EditProfileModalProps {
   scholar: ScholarDetail;
   onClose: () => void;
   onSubmit: (patch: ScholarDetailPatch) => Promise<void>;
+  onSubmitManagementRoles?: (roles: string[]) => Promise<void>;
 }
 
 export function EditProfileModal({
   scholar,
   onClose,
   onSubmit,
+  onSubmitManagementRoles,
 }: EditProfileModalProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [photoImgFailed, setPhotoImgFailed] = useState(false);
+  const [educationBatchText, setEducationBatchText] = useState("");
+  const [rolesBatchText, setRolesBatchText] = useState("");
+  const [editedEducation, setEditedEducation] = useState<EducationRecord[]>(
+    scholar.education ?? [],
+  );
+  const [editedManagementRoles, setEditedManagementRoles] = useState<string[]>(
+    scholar.joint_management_roles ?? [],
+  );
 
   // Form state
   const [form, setForm] = useState({
@@ -93,6 +108,10 @@ export function EditProfileModal({
       patch.research_areas = newAreas;
     }
 
+    if (JSON.stringify(editedEducation) !== JSON.stringify(scholar.education ?? [])) {
+      patch.education = editedEducation;
+    }
+
     return patch;
   };
 
@@ -114,19 +133,40 @@ export function EditProfileModal({
     }
 
     const patch = buildPatch();
-    if (Object.keys(patch).length === 0) {
+    const managementRolesChanged =
+      JSON.stringify(editedManagementRoles) !==
+      JSON.stringify(scholar.joint_management_roles ?? []);
+
+    if (Object.keys(patch).length === 0 && !managementRolesChanged) {
       onClose();
       return;
     }
     setIsSaving(true);
     try {
-      await onSubmit(patch);
+      if (Object.keys(patch).length > 0) {
+        await onSubmit(patch);
+      }
+      if (managementRolesChanged && onSubmitManagementRoles) {
+        await onSubmitManagementRoles(editedManagementRoles);
+      }
       onClose();
     } catch {
       // stay open on error
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleImportEducation = () => {
+    const parsed = parseEducationFromText(educationBatchText.trim());
+    if (parsed.length === 0) return;
+    setEditedEducation(parsed);
+  };
+
+  const handleImportManagementRoles = () => {
+    const parsed = parseManagementRolesFromText(rolesBatchText.trim());
+    if (parsed.length === 0) return;
+    setEditedManagementRoles(parsed);
   };
 
   return (
@@ -326,6 +366,52 @@ export function EditProfileModal({
               onChange={(v) => set("research_areas", v)}
               placeholder="多个方向用英文逗号分隔"
             />
+          </Section>
+
+          <Section title="经历批量导入">
+            <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+              <p className="text-xs font-medium text-gray-600 mb-2">教育经历</p>
+              <textarea
+                value={educationBatchText}
+                onChange={(e) => setEducationBatchText(e.target.value)}
+                rows={3}
+                placeholder={"示例：\n2015-2019 清华大学 本科\n2019-2024 北京大学 博士"}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 resize-none"
+              />
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-xs text-gray-500">当前 {editedEducation.length} 条</p>
+                <button
+                  type="button"
+                  onClick={handleImportEducation}
+                  className="text-xs px-2.5 py-1 rounded-md border border-primary-200 text-primary-700 hover:bg-primary-50"
+                >
+                  导入教育经历
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+              <p className="text-xs font-medium text-gray-600 mb-2">任职经历</p>
+              <textarea
+                value={rolesBatchText}
+                onChange={(e) => setRolesBatchText(e.target.value)}
+                rows={3}
+                placeholder={"示例：\n顾问委员会委员\n教学委员会委员"}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 resize-none"
+              />
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-xs text-gray-500">
+                  当前 {editedManagementRoles.length} 条
+                </p>
+                <button
+                  type="button"
+                  onClick={handleImportManagementRoles}
+                  className="text-xs px-2.5 py-1 rounded-md border border-primary-200 text-primary-700 hover:bg-primary-50"
+                >
+                  导入任职经历
+                </button>
+              </div>
+            </div>
           </Section>
         </div>
 

@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Save, Upload, BookOpen, Award, Trophy } from "lucide-react";
 import { cn } from "@/utils/cn";
 import type {
   PublicationRecord,
   PatentRecord,
   AwardRecord,
 } from "@/services/scholarApi";
-import { parsePublicationsFromText } from "@/utils/textParsers";
+import {
+  parsePublicationsFromText,
+  parsePatentsFromText,
+  parseAwardsFromText,
+} from "@/utils/textParsers";
 
 interface EditAchievementsModalProps {
   publications: PublicationRecord[];
@@ -18,8 +22,10 @@ interface EditAchievementsModalProps {
     publications: PublicationRecord[];
     patents: PatentRecord[];
     awards: AwardRecord[];
-  }) => void;
+  }) => void | Promise<void>;
 }
+
+type AchievementsTab = "publications" | "patents" | "awards";
 
 export function EditAchievementsModal({
   publications,
@@ -28,79 +34,76 @@ export function EditAchievementsModal({
   onClose,
   onSubmit,
 }: EditAchievementsModalProps) {
-  const [activeTab, setActiveTab] = useState<
-    "publications" | "patents" | "awards"
-  >("publications");
+  const [activeTab, setActiveTab] = useState<AchievementsTab>("publications");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showBatchPanel, setShowBatchPanel] = useState(false);
+
   const [editedPublications, setEditedPublications] =
     useState<PublicationRecord[]>(publications);
   const [editedPatents, setEditedPatents] = useState<PatentRecord[]>(patents);
   const [editedAwards, setEditedAwards] = useState<AwardRecord[]>(awards);
-  const [batchMode, setBatchMode] = useState<
-    "publications" | "patents" | "awards" | null
-  >(null);
-  const [batchText, setBatchText] = useState("");
 
-  const applyBatchPublications = () => {
-    const newItems = parsePublicationsFromText(batchText);
-    setEditedPublications((prev) => [...prev, ...newItems]);
-    setBatchMode(null);
-    setBatchText("");
+  const [batchInputs, setBatchInputs] = useState({
+    publications: "",
+    patents: "",
+    awards: "",
+  });
+
+  const parsedBatchCounts = useMemo(
+    () => ({
+      publications: parsePublicationsFromText(batchInputs.publications).length,
+      patents: parsePatentsFromText(batchInputs.patents).length,
+      awards: parseAwardsFromText(batchInputs.awards).length,
+    }),
+    [batchInputs],
+  );
+
+  const handleBatchChange = (field: AchievementsTab, value: string) => {
+    setBatchInputs((prev) => ({ ...prev, [field]: value }));
   };
 
-  const applyBatchPatents = () => {
-    const newItems = batchText
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const p = line.split("|").map((s) => s.trim());
-        return {
-          title: p[0] || "",
-          patent_no: p[1] || "",
-          year: p[2] || "",
-          inventors: p[3] || "",
-          patent_type: p[4] || "",
-          status: p[5] || "",
-          added_by: "user",
-        } as PatentRecord;
+  const applyBatchFor = (field: AchievementsTab) => {
+    if (field === "publications") {
+      const parsed = parsePublicationsFromText(batchInputs.publications);
+      if (parsed.length > 0) {
+        setEditedPublications((prev) => [...prev, ...parsed]);
+      }
+    } else if (field === "patents") {
+      const parsed = parsePatentsFromText(batchInputs.patents);
+      if (parsed.length > 0) {
+        setEditedPatents((prev) => [...prev, ...parsed]);
+      }
+    } else {
+      const parsed = parseAwardsFromText(batchInputs.awards);
+      if (parsed.length > 0) {
+        setEditedAwards((prev) => [...prev, ...parsed]);
+      }
+    }
+    setBatchInputs((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const applyAllBatches = () => {
+    applyBatchFor("publications");
+    applyBatchFor("patents");
+    applyBatchFor("awards");
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        publications: editedPublications,
+        patents: editedPatents,
+        awards: editedAwards,
       });
-    setEditedPatents((prev) => [...prev, ...newItems]);
-    setBatchMode(null);
-    setBatchText("");
-  };
-
-  const applyBatchAwards = () => {
-    const newItems = batchText
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const p = line.split("|").map((s) => s.trim());
-        return {
-          title: p[0] || "",
-          year: p[1] || "",
-          level: p[2] || "",
-          grantor: p[3] || "",
-          description: p[4] || "",
-          added_by: "user",
-        } as AwardRecord;
-      });
-    setEditedAwards((prev) => [...prev, ...newItems]);
-    setBatchMode(null);
-    setBatchText("");
-  };
-
-  const handleSubmit = () => {
-    onSubmit({
-      publications: editedPublications,
-      patents: editedPatents,
-      awards: editedAwards,
-    });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const addPublication = () => {
-    setEditedPublications([
-      ...editedPublications,
+    setEditedPublications((prev) => [
+      ...prev,
       {
         title: "",
         venue: "",
@@ -115,22 +118,24 @@ export function EditAchievementsModal({
   };
 
   const removePublication = (index: number) => {
-    setEditedPublications(editedPublications.filter((_, i) => i !== index));
+    setEditedPublications((prev) => prev.filter((_, i) => i !== index));
   };
 
   const updatePublication = (
     index: number,
     field: keyof PublicationRecord,
-    value: any,
+    value: unknown,
   ) => {
-    const updated = [...editedPublications];
-    updated[index] = { ...updated[index], [field]: value };
-    setEditedPublications(updated);
+    setEditedPublications((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
   const addPatent = () => {
-    setEditedPatents([
-      ...editedPatents,
+    setEditedPatents((prev) => [
+      ...prev,
       {
         title: "",
         patent_no: "",
@@ -144,22 +149,24 @@ export function EditAchievementsModal({
   };
 
   const removePatent = (index: number) => {
-    setEditedPatents(editedPatents.filter((_, i) => i !== index));
+    setEditedPatents((prev) => prev.filter((_, i) => i !== index));
   };
 
   const updatePatent = (
     index: number,
     field: keyof PatentRecord,
-    value: any,
+    value: unknown,
   ) => {
-    const updated = [...editedPatents];
-    updated[index] = { ...updated[index], [field]: value };
-    setEditedPatents(updated);
+    setEditedPatents((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
   const addAward = () => {
-    setEditedAwards([
-      ...editedAwards,
+    setEditedAwards((prev) => [
+      ...prev,
       {
         title: "",
         year: "",
@@ -172,13 +179,19 @@ export function EditAchievementsModal({
   };
 
   const removeAward = (index: number) => {
-    setEditedAwards(editedAwards.filter((_, i) => i !== index));
+    setEditedAwards((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updateAward = (index: number, field: keyof AwardRecord, value: any) => {
-    const updated = [...editedAwards];
-    updated[index] = { ...updated[index], [field]: value };
-    setEditedAwards(updated);
+  const updateAward = (
+    index: number,
+    field: keyof AwardRecord,
+    value: unknown,
+  ) => {
+    setEditedAwards((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
   return (
@@ -193,475 +206,410 @@ export function EditAchievementsModal({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 max-h-[88vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-gray-900">
-            编辑学术成就
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* 标签页 */}
-        <div className="flex gap-3 mb-4 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab("publications")}
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors",
-              activeTab === "publications"
-                ? "text-primary-600 border-b-2 border-primary-600 -mb-px"
-                : "text-gray-600 hover:text-gray-800",
-            )}
-          >
-            代表性论文 ({editedPublications.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("patents")}
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors",
-              activeTab === "patents"
-                ? "text-primary-600 border-b-2 border-primary-600 -mb-px"
-                : "text-gray-600 hover:text-gray-800",
-            )}
-          >
-            专利 ({editedPatents.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("awards")}
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors",
-              activeTab === "awards"
-                ? "text-primary-600 border-b-2 border-primary-600 -mb-px"
-                : "text-gray-600 hover:text-gray-800",
-            )}
-          >
-            奖项 ({editedAwards.length})
-          </button>
-        </div>
-
-        {/* 论文编辑 */}
-        {activeTab === "publications" && (
-          <div className="space-y-3 mb-4">
-            {editedPublications.map((pub, i) => (
-              <div
-                key={i}
-                className="p-3 border border-gray-200 rounded-lg space-y-2"
+        <div className="shrink-0 px-6 py-4 border-b border-gray-100 bg-white">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold text-gray-900">编辑学术成就</h3>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowBatchPanel((prev) => !prev)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors",
+                  showBatchPanel
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50",
+                )}
               >
-                <div className="flex justify-between items-start gap-2">
-                  <span className="text-xs font-medium text-gray-500">
-                    论文 {i + 1}
-                  </span>
-                  <button
-                    onClick={() => removePublication(i)}
-                    className="text-red-600 hover:text-red-700 text-xs"
-                  >
-                    删除
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={pub.title || ""}
-                  onChange={(e) =>
-                    updatePublication(i, "title", e.target.value)
-                  }
-                  placeholder="论文标题"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                <Upload className="w-3.5 h-3.5" />
+                {showBatchPanel ? "收起批量导入" : "批量导入"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60"
+              >
+                <Save className="w-3.5 h-3.5" />
+                {isSubmitting ? "保存中..." : "保存全部"}
+              </button>
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            支持同时导入论文、专利、奖项，点击顶部“保存全部”后一次性提交三类数据。
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {showBatchPanel && (
+            <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-4 space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <BatchImportCard
+                  title="论文批量导入"
+                  value={batchInputs.publications}
+                  count={parsedBatchCounts.publications}
+                  placeholder={'[1] Authors, "Title", Venue (2025)\n[2] ...'}
+                  onChange={(v) => handleBatchChange("publications", v)}
+                  onApply={() => applyBatchFor("publications")}
                 />
-                <input
-                  type="text"
-                  value={pub.venue || ""}
-                  onChange={(e) =>
-                    updatePublication(i, "venue", e.target.value)
-                  }
-                  placeholder="会议/期刊"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                <BatchImportCard
+                  title="专利批量导入"
+                  value={batchInputs.patents}
+                  count={parsedBatchCounts.patents}
+                  placeholder={"[1] 发明人.专利标题, ZL202511129049.1\n[2] ..."}
+                  onChange={(v) => handleBatchChange("patents", v)}
+                  onApply={() => applyBatchFor("patents")}
                 />
-                <input
-                  type="text"
-                  value={pub.year || ""}
-                  onChange={(e) => updatePublication(i, "year", e.target.value)}
-                  placeholder="年份"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                <BatchImportCard
+                  title="奖项批量导入"
+                  value={batchInputs.awards}
+                  count={parsedBatchCounts.awards}
+                  placeholder={"[1] 2025年度XX一等奖\n[2] ..."}
+                  onChange={(v) => handleBatchChange("awards", v)}
+                  onApply={() => applyBatchFor("awards")}
                 />
-                <input
-                  type="text"
-                  value={pub.authors || ""}
-                  onChange={(e) =>
-                    updatePublication(i, "authors", e.target.value)
-                  }
-                  placeholder="作者"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  type="text"
-                  value={pub.url || ""}
-                  onChange={(e) => updatePublication(i, "url", e.target.value)}
-                  placeholder="URL"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <div className="flex gap-2">
+              </div>
+              <div className="flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={applyAllBatches}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-blue-200 text-blue-700 bg-white hover:bg-blue-50"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  一键导入全部（{parsedBatchCounts.publications}/
+                  {parsedBatchCounts.patents}/{parsedBatchCounts.awards}）
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 border-b border-gray-200">
+            <TabButton
+              active={activeTab === "publications"}
+              onClick={() => setActiveTab("publications")}
+              icon={BookOpen}
+              label={`代表性论文 (${editedPublications.length})`}
+            />
+            <TabButton
+              active={activeTab === "patents"}
+              onClick={() => setActiveTab("patents")}
+              icon={Award}
+              label={`专利 (${editedPatents.length})`}
+            />
+            <TabButton
+              active={activeTab === "awards"}
+              onClick={() => setActiveTab("awards")}
+              icon={Trophy}
+              label={`奖项 (${editedAwards.length})`}
+            />
+          </div>
+
+          {activeTab === "publications" && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={addPublication}
+                className="px-3 py-1.5 border border-dashed border-primary-300 text-primary-600 rounded-lg text-sm hover:bg-primary-50 transition-colors"
+              >
+                <Plus className="w-4 h-4 inline mr-1" />
+                添加论文
+              </button>
+              {editedPublications.map((pub, i) => (
+                <div key={i} className="p-3 border border-gray-200 rounded-lg space-y-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-xs font-medium text-gray-500">论文 {i + 1}</span>
+                    <button
+                      onClick={() => removePublication(i)}
+                      className="text-red-600 hover:text-red-700 text-xs"
+                    >
+                      删除
+                    </button>
+                  </div>
                   <input
-                    type="number"
-                    value={pub.citation_count || 0}
-                    onChange={(e) =>
-                      updatePublication(
-                        i,
-                        "citation_count",
-                        parseInt(e.target.value),
-                      )
-                    }
-                    placeholder="被引数"
-                    className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                    type="text"
+                    value={pub.title || ""}
+                    onChange={(e) => updatePublication(i, "title", e.target.value)}
+                    placeholder="论文标题"
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1"
                   />
-                  <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="text"
+                    value={pub.venue || ""}
+                    onChange={(e) => updatePublication(i, "venue", e.target.value)}
+                    placeholder="会议/期刊"
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <input
-                      type="checkbox"
-                      checked={pub.is_corresponding || false}
+                      type="text"
+                      value={pub.year || ""}
+                      onChange={(e) => updatePublication(i, "year", e.target.value)}
+                      placeholder="年份"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      value={pub.url || ""}
+                      onChange={(e) => updatePublication(i, "url", e.target.value)}
+                      placeholder="URL"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={pub.authors || ""}
+                    onChange={(e) => updatePublication(i, "authors", e.target.value)}
+                    placeholder="作者"
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={pub.citation_count || 0}
                       onChange={(e) =>
                         updatePublication(
                           i,
-                          "is_corresponding",
-                          e.target.checked,
+                          "citation_count",
+                          Number.parseInt(e.target.value || "0", 10),
                         )
                       }
-                      className="rounded"
+                      placeholder="被引数"
+                      className="flex-1 text-sm border border-gray-200 rounded px-2 py-1"
                     />
-                    <span>通讯作者</span>
-                  </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={pub.is_corresponding || false}
+                        onChange={(e) =>
+                          updatePublication(i, "is_corresponding", e.target.checked)
+                        }
+                        className="rounded"
+                      />
+                      <span>通讯作者</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {batchMode === "publications" ? (
-              <div className="p-3 border border-blue-200 rounded-lg bg-blue-50/30 space-y-2">
-                <div className="text-xs text-gray-600 space-y-1">
-                  <p className="font-medium">
-                    支持直接粘贴文献列表，自动识别以下格式：
-                  </p>
-                  <p className="text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded leading-relaxed">
-                    [1] B. Haghighat and A. Klemm, &quot;Topological Strings on
-                    K3,&quot; JHEP 1001 (2010)
-                    <br />
-                    [2] Authors, &quot;Title,&quot; Venue, Vol (Year)
-                  </p>
-                  <p className="text-gray-400">
-                    也支持：标题 | 期刊 | 年份 | 作者（旧格式）
-                  </p>
-                </div>
-                <textarea
-                  value={batchText}
-                  onChange={(e) => setBatchText(e.target.value)}
-                  autoFocus
-                  rows={6}
-                  placeholder={`[1] B. Haghighat and A. Klemm, "Topological Strings on Grassmannian Calabi-Yau manifolds," JHEP 0901, 029 (2009)\n[2] B. Haghighat, A. Klemm and M. Rauch, "Integrability of the holomorphic anomaly equation," JHEP 0810, 097 (2008)`}
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono resize-none"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={applyBatchPublications}
-                    className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                  >
-                    确认导入 ({parsePublicationsFromText(batchText).length} 条)
-                  </button>
-                  <button
-                    onClick={() => {
-                      setBatchMode(null);
-                      setBatchText("");
-                    }}
-                    className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded text-sm hover:bg-gray-50 transition-colors"
-                  >
-                    取消
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={addPublication}
-                  className="flex-1 px-4 py-2 border border-dashed border-primary-300 text-primary-600 rounded-lg text-sm hover:bg-primary-50 transition-colors"
-                >
-                  <Plus className="w-4 h-4 inline mr-1" /> 逐条添加
-                </button>
-                <button
-                  onClick={() => {
-                    setBatchMode("publications");
-                    setBatchText("");
-                  }}
-                  className="flex-1 px-4 py-2 border border-dashed border-blue-300 text-blue-600 rounded-lg text-sm hover:bg-blue-50 transition-colors"
-                >
-                  批量导入
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
 
-        {/* 专利编辑 */}
-        {activeTab === "patents" && (
-          <div className="space-y-3 mb-4">
-            {editedPatents.map((patent, i) => (
-              <div
-                key={i}
-                className="p-3 border border-gray-200 rounded-lg space-y-2"
+          {activeTab === "patents" && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={addPatent}
+                className="px-3 py-1.5 border border-dashed border-primary-300 text-primary-600 rounded-lg text-sm hover:bg-primary-50 transition-colors"
               >
-                <div className="flex justify-between items-start gap-2">
-                  <span className="text-xs font-medium text-gray-500">
-                    专利 {i + 1}
-                  </span>
-                  <button
-                    onClick={() => removePatent(i)}
-                    className="text-red-600 hover:text-red-700 text-xs"
-                  >
-                    删除
-                  </button>
+                <Plus className="w-4 h-4 inline mr-1" />
+                添加专利
+              </button>
+              {editedPatents.map((patent, i) => (
+                <div key={i} className="p-3 border border-gray-200 rounded-lg space-y-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-xs font-medium text-gray-500">专利 {i + 1}</span>
+                    <button
+                      onClick={() => removePatent(i)}
+                      className="text-red-600 hover:text-red-700 text-xs"
+                    >
+                      删除
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={patent.title || ""}
+                    onChange={(e) => updatePatent(i, "title", e.target.value)}
+                    placeholder="专利名称"
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={patent.patent_no || ""}
+                      onChange={(e) => updatePatent(i, "patent_no", e.target.value)}
+                      placeholder="专利号"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      value={patent.year || ""}
+                      onChange={(e) => updatePatent(i, "year", e.target.value)}
+                      placeholder="年份"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={patent.inventors || ""}
+                    onChange={(e) => updatePatent(i, "inventors", e.target.value)}
+                    placeholder="发明人"
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={patent.patent_type || ""}
+                      onChange={(e) => updatePatent(i, "patent_type", e.target.value)}
+                      placeholder="专利类型"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      value={patent.status || ""}
+                      onChange={(e) => updatePatent(i, "status", e.target.value)}
+                      placeholder="状态"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  value={patent.title || ""}
-                  onChange={(e) => updatePatent(i, "title", e.target.value)}
-                  placeholder="专利名称"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  type="text"
-                  value={patent.patent_no || ""}
-                  onChange={(e) => updatePatent(i, "patent_no", e.target.value)}
-                  placeholder="专利号"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  type="text"
-                  value={patent.year || ""}
-                  onChange={(e) => updatePatent(i, "year", e.target.value)}
-                  placeholder="年份"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  type="text"
-                  value={patent.inventors || ""}
-                  onChange={(e) => updatePatent(i, "inventors", e.target.value)}
-                  placeholder="发明人"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  type="text"
-                  value={patent.patent_type || ""}
-                  onChange={(e) =>
-                    updatePatent(i, "patent_type", e.target.value)
-                  }
-                  placeholder="专利类型"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  type="text"
-                  value={patent.status || ""}
-                  onChange={(e) => updatePatent(i, "status", e.target.value)}
-                  placeholder="状态"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-              </div>
-            ))}
-            {batchMode === "patents" ? (
-              <div className="p-3 border border-blue-200 rounded-lg bg-blue-50/30 space-y-2">
-                <p className="text-xs text-gray-500">
-                  每行一条，字段用{" "}
-                  <code className="bg-gray-100 px-1 rounded font-mono">|</code>{" "}
-                  分隔：
-                  <code className="bg-gray-100 px-1 rounded font-mono text-xs">
-                    专利名称 | 专利号 | 年份 | 发明人 | 类型 | 状态
-                  </code>
-                </p>
-                <textarea
-                  value={batchText}
-                  onChange={(e) => setBatchText(e.target.value)}
-                  autoFocus
-                  rows={5}
-                  placeholder={
-                    "一种AI方法 | CN123456789A | 2022 | 张三; 李四 | 发明专利 | 已授权\n另一专利名称 | CN987654321B | 2021"
-                  }
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono resize-none"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={applyBatchPatents}
-                    className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                  >
-                    确认导入 (
-                    {batchText.split("\n").filter((l) => l.trim()).length} 条)
-                  </button>
-                  <button
-                    onClick={() => {
-                      setBatchMode(null);
-                      setBatchText("");
-                    }}
-                    className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded text-sm hover:bg-gray-50 transition-colors"
-                  >
-                    取消
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={addPatent}
-                  className="flex-1 px-4 py-2 border border-dashed border-primary-300 text-primary-600 rounded-lg text-sm hover:bg-primary-50 transition-colors"
-                >
-                  <Plus className="w-4 h-4 inline mr-1" /> 逐条添加
-                </button>
-                <button
-                  onClick={() => {
-                    setBatchMode("patents");
-                    setBatchText("");
-                  }}
-                  className="flex-1 px-4 py-2 border border-dashed border-blue-300 text-blue-600 rounded-lg text-sm hover:bg-blue-50 transition-colors"
-                >
-                  批量导入
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
 
-        {/* 奖项编辑 */}
-        {activeTab === "awards" && (
-          <div className="space-y-3 mb-4">
-            {editedAwards.map((award, i) => (
-              <div
-                key={i}
-                className="p-3 border border-gray-200 rounded-lg space-y-2"
+          {activeTab === "awards" && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={addAward}
+                className="px-3 py-1.5 border border-dashed border-primary-300 text-primary-600 rounded-lg text-sm hover:bg-primary-50 transition-colors"
               >
-                <div className="flex justify-between items-start gap-2">
-                  <span className="text-xs font-medium text-gray-500">
-                    奖项 {i + 1}
-                  </span>
-                  <button
-                    onClick={() => removeAward(i)}
-                    className="text-red-600 hover:text-red-700 text-xs"
-                  >
-                    删除
-                  </button>
+                <Plus className="w-4 h-4 inline mr-1" />
+                添加奖项
+              </button>
+              {editedAwards.map((award, i) => (
+                <div key={i} className="p-3 border border-gray-200 rounded-lg space-y-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-xs font-medium text-gray-500">奖项 {i + 1}</span>
+                    <button
+                      onClick={() => removeAward(i)}
+                      className="text-red-600 hover:text-red-700 text-xs"
+                    >
+                      删除
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={award.title || ""}
+                    onChange={(e) => updateAward(i, "title", e.target.value)}
+                    placeholder="奖项名称"
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      value={award.year || ""}
+                      onChange={(e) => updateAward(i, "year", e.target.value)}
+                      placeholder="年份"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      value={award.level || ""}
+                      onChange={(e) => updateAward(i, "level", e.target.value)}
+                      placeholder="等级"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      value={award.grantor || ""}
+                      onChange={(e) => updateAward(i, "grantor", e.target.value)}
+                      placeholder="颁发单位"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                  </div>
+                  <textarea
+                    value={award.description || ""}
+                    onChange={(e) => updateAward(i, "description", e.target.value)}
+                    placeholder="描述"
+                    rows={2}
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1 resize-none"
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={award.title || ""}
-                  onChange={(e) => updateAward(i, "title", e.target.value)}
-                  placeholder="奖项名称"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  type="text"
-                  value={award.year || ""}
-                  onChange={(e) => updateAward(i, "year", e.target.value)}
-                  placeholder="年份"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  type="text"
-                  value={award.level || ""}
-                  onChange={(e) => updateAward(i, "level", e.target.value)}
-                  placeholder="等级"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <input
-                  type="text"
-                  value={award.grantor || ""}
-                  onChange={(e) => updateAward(i, "grantor", e.target.value)}
-                  placeholder="颁发单位"
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
-                />
-                <textarea
-                  value={award.description || ""}
-                  onChange={(e) =>
-                    updateAward(i, "description", e.target.value)
-                  }
-                  placeholder="描述"
-                  rows={2}
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-none"
-                />
-              </div>
-            ))}
-            {batchMode === "awards" ? (
-              <div className="p-3 border border-blue-200 rounded-lg bg-blue-50/30 space-y-2">
-                <p className="text-xs text-gray-500">
-                  每行一条，字段用{" "}
-                  <code className="bg-gray-100 px-1 rounded font-mono">|</code>{" "}
-                  分隔：
-                  <code className="bg-gray-100 px-1 rounded font-mono text-xs">
-                    奖项名称 | 年份 | 等级 | 颁发单位 | 描述
-                  </code>
-                  （仅名称也可）
-                </p>
-                <textarea
-                  value={batchText}
-                  onChange={(e) => setBatchText(e.target.value)}
-                  autoFocus
-                  rows={5}
-                  placeholder={
-                    "国家科学技术进步奖 | 2022 | 一等奖 | 国务院\n吴文俊人工智能科技奖 | 2021 | 自然科学奖\n省级优秀青年教师"
-                  }
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono resize-none"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={applyBatchAwards}
-                    className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                  >
-                    确认导入 (
-                    {batchText.split("\n").filter((l) => l.trim()).length} 条)
-                  </button>
-                  <button
-                    onClick={() => {
-                      setBatchMode(null);
-                      setBatchText("");
-                    }}
-                    className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded text-sm hover:bg-gray-50 transition-colors"
-                  >
-                    取消
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={addAward}
-                  className="flex-1 px-4 py-2 border border-dashed border-primary-300 text-primary-600 rounded-lg text-sm hover:bg-primary-50 transition-colors"
-                >
-                  <Plus className="w-4 h-4 inline mr-1" /> 逐条添加
-                </button>
-                <button
-                  onClick={() => {
-                    setBatchMode("awards");
-                    setBatchText("");
-                  }}
-                  className="flex-1 px-4 py-2 border border-dashed border-blue-300 text-blue-600 rounded-lg text-sm hover:bg-blue-50 transition-colors"
-                >
-                  批量导入
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
 
-        <div className="flex gap-2 mt-4">
+        <div className="shrink-0 px-6 py-3 border-t border-gray-100 bg-white flex justify-end">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
           >
-            取消
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors"
-          >
-            保存
+            关闭
           </button>
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px inline-flex items-center gap-1.5",
+        active
+          ? "text-primary-600 border-primary-600"
+          : "text-gray-600 border-transparent hover:text-gray-800",
+      )}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+    </button>
+  );
+}
+
+function BatchImportCard({
+  title,
+  value,
+  count,
+  placeholder,
+  onChange,
+  onApply,
+}: {
+  title: string;
+  value: string;
+  count: number;
+  placeholder: string;
+  onChange: (value: string) => void;
+  onApply: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-blue-100 bg-white p-3 space-y-2">
+      <p className="text-xs font-semibold text-gray-600">{title}</p>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={4}
+        placeholder={placeholder}
+        className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none font-mono"
+      />
+      <button
+        type="button"
+        onClick={onApply}
+        className="w-full px-2.5 py-1.5 text-xs rounded border border-blue-200 text-blue-700 hover:bg-blue-50"
+      >
+        导入 {count} 条
+      </button>
+    </div>
   );
 }

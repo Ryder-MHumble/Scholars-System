@@ -14,6 +14,7 @@ import {
   type AwardRecord,
   type EducationRecord,
 } from "@/services/scholarApi";
+import { getAllCategories, getCategoryByType } from "@/constants/activityCategories";
 
 export function useScholarDetail(scholarId: string | undefined) {
   const [scholar, setScholar] = useState<ScholarDetail | null>(null);
@@ -143,15 +144,38 @@ export function useScholarDetail(scholarId: string | undefined) {
   };
 
   // -- Project category save --
-  const handleProjectCategorySave = async (primary: string, sub: string) => {
+  const handleProjectCategorySave = async (
+    primary: string,
+    sub: string,
+    activityType?: string,
+  ) => {
     if (!scholar) return;
     const projectTags =
       primary || sub
         ? [{ category: primary.trim(), subcategory: sub.trim() }]
         : [];
+    const trimmedActivity = activityType?.trim();
+    const categoryMap = new Map(getAllCategories().map((item) => [item.id, item.name]));
+    const matched = trimmedActivity ? getCategoryByType(trimmedActivity) : null;
+    const activityCategory = matched ? categoryMap.get(matched.categoryId) ?? "" : "";
+    const eventTags =
+      activityType === undefined
+        ? scholar.event_tags ?? []
+        : trimmedActivity
+          ? [
+              {
+                category: activityCategory,
+                series: "",
+                event_type: trimmedActivity,
+                event_id: "",
+                event_title: "",
+              },
+            ]
+          : [];
     const updated = await patchScholarRelation(scholar.url_hash, {
       project_tags: projectTags,
-      is_cobuild_scholar: projectTags.length > 0,
+      event_tags: eventTags,
+      is_cobuild_scholar: projectTags.length > 0 || eventTags.length > 0,
     });
     setScholar(updated);
   };

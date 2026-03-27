@@ -4,6 +4,7 @@ import {
   fetchScholarList,
   fetchAllScholars,
   deleteScholar,
+  type ScholarListItem,
   type ScholarListResponse,
 } from "@/services/scholarApi";
 import { useUniversityCounts } from "@/hooks/useUniversityCounts";
@@ -22,11 +23,35 @@ const PROJECT_SUBTAB_FILTER: Record<
   academic_committee: { category: "教育培养", subcategory: "学术委员会" },
   teaching_committee: { category: "教育培养", subcategory: "教学委员会" },
   student_mentor: { category: "教育培养", subcategory: "学院学生高校导师" },
+  fulltime_mentor: { category: "教育培养", subcategory: "全职导师" },
+  industry_mentor: { category: "教育培养", subcategory: "产业导师" },
   parttime_mentor: { category: "教育培养", subcategory: "兼职导师" },
   research: { category: "科研学术" },
   research_project: { category: "科研学术", subcategory: "科研立项" },
   talent: { category: "人才引育" },
   zhuogong: { category: "人才引育", subcategory: "卓工公派" },
+};
+
+const PROJECT_PARENT_SUBCATEGORY_FILTERS: Record<string, string[]> = {
+  education: [
+    "科技教育委员会",
+    "科技育青委员会",
+    "学术委员会",
+    "教学委员会",
+    "学院学生高校导师",
+    "学院学生事务导师",
+    "全职导师",
+    "产业导师",
+    "兼职导师",
+  ],
+  research: ["科研立项"],
+  talent: ["卓工公派"],
+};
+
+const PROJECT_PARENT_CATEGORY_MAP: Record<string, string> = {
+  education: "教育培养",
+  research: "科研学术",
+  talent: "人才引育",
 };
 
 export function useScholarList() {
@@ -75,6 +100,12 @@ export function useScholarList() {
     () => (activeTab === "projects" ? PROJECT_SUBTAB_FILTER[activeSubTab ?? ""] ?? {} : {}),
     [activeTab, activeSubTab],
   );
+  const isProjectParentSubtab = useMemo(
+    () =>
+      activeTab === "projects" &&
+      Boolean(activeSubTab && PROJECT_PARENT_SUBCATEGORY_FILTERS[activeSubTab]),
+    [activeTab, activeSubTab],
+  );
 
   /* University counts — filtered by current subtab */
   const {
@@ -106,6 +137,61 @@ export function useScholarList() {
     const controller = new AbortController();
     setIsLoading(true);
     setError(null);
+    if (isProjectParentSubtab && activeSubTab) {
+      const subcategorySet = new Set(PROJECT_PARENT_SUBCATEGORY_FILTERS[activeSubTab]);
+      const parentCategory = PROJECT_PARENT_CATEGORY_MAP[activeSubTab];
+      const matchProjectParent = (item: ScholarListItem): boolean => {
+        const tags = item.project_tags ?? [];
+        const hasCategoryMatch = tags.some((tag) => tag.category === parentCategory);
+        const hasSubcategoryMatch = tags.some((tag) =>
+          subcategorySet.has((tag.subcategory ?? "").trim()),
+        );
+        const legacySubMatch = subcategorySet.has(
+          String(item.project_subcategory ?? "").trim(),
+        );
+        return hasCategoryMatch || hasSubcategoryMatch || legacySubMatch;
+      };
+
+      fetchAllScholars(
+        {
+          university: activeUni ?? undefined,
+          department: activeDept ?? undefined,
+          search: query.trim() || undefined,
+          is_adjunct_supervisor: isJointMentor || undefined,
+          region: apiRegion,
+          affiliation_type: apiAffiliationType,
+        },
+        controller.signal,
+      )
+        .then((allItems) => {
+          const filtered = allItems.filter(matchProjectParent);
+          const total = filtered.length;
+          const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+          const safePage = Math.min(Math.max(page, 1), totalPages);
+          const start = (safePage - 1) * PAGE_SIZE;
+          const items = filtered.slice(start, start + PAGE_SIZE);
+          setApiData({
+            total,
+            page: safePage,
+            page_size: PAGE_SIZE,
+            total_pages: totalPages,
+            items,
+          });
+          if (safePage !== page) {
+            setPage(safePage);
+          }
+          setIsLoading(false);
+        })
+        .catch((err) => {
+          if (err.name !== "AbortError") {
+            setError(err.message ?? "加载失败");
+            setIsLoading(false);
+          }
+        });
+
+      return () => controller.abort();
+    }
+
     fetchScholarList(
       page,
       PAGE_SIZE,
@@ -140,6 +226,8 @@ export function useScholarList() {
     isJointMentor,
     apiRegion,
     apiAffiliationType,
+    isProjectParentSubtab,
+    activeSubTab,
     projectFilter.category,
     projectFilter.subcategory,
   ]);
@@ -200,6 +288,10 @@ export function useScholarList() {
   };
 
   const handleDeleteScholar = async (urlHash: string, name: string) => {
+    if (!urlHash?.trim()) {
+      setError(`删除失败：学者 ${name} 缺少有效ID`);
+      return;
+    }
     if (!window.confirm(`确定要删除 ${name} 吗？此操作不可撤销。`)) {
       return;
     }

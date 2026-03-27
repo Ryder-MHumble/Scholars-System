@@ -402,7 +402,7 @@ function normalizeScholarProjectFields<T extends ScholarProjectFields>(
       scholar.participated_event_ids,
     ),
     is_cobuild_scholar: Boolean(
-      scholar.is_cobuild_scholar ?? (mergedTags.length > 0 || eventTags.length > 0),
+      mergedTags.length > 0 || eventTags.length > 0 || scholar.is_cobuild_scholar,
     ),
     project_category: first.category,
     project_subcategory: first.subcategory,
