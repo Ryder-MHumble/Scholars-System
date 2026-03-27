@@ -9,14 +9,38 @@ import type { PublicationRecord, EducationRecord } from "@/services/scholarApi";
 //   4. Plain line                            — treated as title only
 //
 export function parsePublicationsFromText(text: string): PublicationRecord[] {
+  const extractYear = (input: string): string | undefined => {
+    const matches = Array.from(input.matchAll(/\b(19|20)\d{2}\b/g));
+    if (matches.length === 0) return undefined;
+    return matches[matches.length - 1][0];
+  };
+
+  const buildPublication = (data: {
+    title?: string;
+    authors?: string;
+    venue?: string;
+    year?: string;
+  }): PublicationRecord => ({
+    title: data.title?.trim() || "",
+    authors: data.authors?.trim() || undefined,
+    venue: data.venue?.trim() || undefined,
+    year: data.year?.trim() || undefined,
+    citation_count: 0,
+    is_corresponding: false,
+    added_by: "user",
+  });
+
   const lines = text
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
 
   return lines.map((line): PublicationRecord => {
-    // Remove citation index [1], [2] …
-    const raw = line.replace(/^\[\d+\]\s*/, "");
+    // Remove citation index [1], [2] / 1. / •
+    const raw = line
+      .replace(/^\[\d+\]\s*/, "")
+      .replace(/^\d+[.)]\s+/, "")
+      .replace(/^[•·]\s*/, "");
 
     // Extract title in quotes — handle ASCII " " and Unicode " "
     const titleMatch = raw.match(/[\u201c""]([^\u201d""]+)[\u201d""]/);
@@ -42,39 +66,89 @@ export function parsePublicationsFromText(text: string): PublicationRecord[] {
         .replace(/[,.\s]+$/, "")
         .trim();
 
-      return {
+      return buildPublication({
         title,
-        authors: authors || undefined,
-        venue: venue || undefined,
-        year: year || undefined,
-        citation_count: 0,
-        is_corresponding: false,
-        added_by: "user",
-      } as PublicationRecord;
+        authors,
+        venue,
+        year: year || extractYear(raw),
+      });
     }
 
     // Pipe-delimited fallback
-    if (line.includes("|")) {
-      const p = line.split("|").map((s) => s.trim());
-      return {
+    if (raw.includes("|")) {
+      const p = raw.split("|").map((s) => s.trim());
+      return buildPublication({
         title: p[0] ?? "",
         venue: p[1] ?? "",
         year: p[2] ?? "",
         authors: p[3] ?? "",
-        citation_count: 0,
-        is_corresponding: false,
-        added_by: "user",
-      } as PublicationRecord;
+      });
+    }
+
+    // Sentence citation fallback:
+    // Authors. Title. Venue ... , 2022.
+    const sentenceParts = raw
+      .split(/\.\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (sentenceParts.length >= 3) {
+      const authors = sentenceParts[0].replace(/\.$/, "").trim();
+      const title = sentenceParts[1].replace(/\.$/, "").trim();
+      const venue = sentenceParts
+        .slice(2)
+        .join(". ")
+        .replace(/\.$/, "")
+        .trim();
+      if (title && venue) {
+        return buildPublication({
+          title,
+          authors,
+          venue,
+          year: extractYear(raw),
+        });
+      }
+    }
+
+    // Comma citation fallback:
+    // Title, Venue ... (2021) ...
+    const commaParts = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (commaParts.length >= 2) {
+      const last = commaParts[commaParts.length - 1];
+      const isYearOnlyTail = /^(19|20)\d{2}[.)]?$/i.test(
+        last.replace(/\s+/g, ""),
+      );
+
+      if (isYearOnlyTail && commaParts.length >= 3) {
+        const title = commaParts.slice(0, -2).join(", ");
+        const venue = commaParts.slice(-2).join(", ");
+        if (title && venue) {
+          return buildPublication({
+            title,
+            venue,
+            year: extractYear(raw),
+          });
+        }
+      } else {
+        const title = commaParts.slice(0, -1).join(", ");
+        const venue = commaParts[commaParts.length - 1];
+        if (title && venue) {
+          return buildPublication({
+            title,
+            venue,
+            year: extractYear(raw),
+          });
+        }
+      }
     }
 
     // Last resort: whole line is the title
-    return {
-      title: line,
-      year: year || undefined,
-      citation_count: 0,
-      is_corresponding: false,
-      added_by: "user",
-    } as PublicationRecord;
+    return buildPublication({
+      title: raw,
+      year: year || extractYear(raw),
+    });
   });
 }
 

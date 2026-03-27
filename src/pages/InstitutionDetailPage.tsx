@@ -11,7 +11,6 @@ import {
   Handshake,
   Landmark,
   Trash2,
-  UserCheck,
   UserCog,
   Users,
 } from "lucide-react";
@@ -23,10 +22,14 @@ import {
   PriorityBadge,
   Tag,
 } from "@/components/institution/detail/InstitutionBadges";
-import { PersonList } from "@/components/institution/detail/PersonComponents";
+import { LeadershipCardList, PersonList } from "@/components/institution/detail/PersonComponents";
 import { UniversityLogo } from "@/components/institution/detail/UniversityLogo";
-import { deleteInstitution, fetchInstitutionDetail } from "@/services/institutionApi";
-import type { InstitutionDetail } from "@/types/institution";
+import {
+  deleteInstitution,
+  fetchInstitutionDetail,
+  fetchInstitutionLeadership,
+} from "@/services/institutionApi";
+import type { InstitutionDetail, LeadershipDetailResponse } from "@/types/institution";
 
 export default function InstitutionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +37,8 @@ export default function InstitutionDetailPage() {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [institution, setInstitution] = useState<InstitutionDetail | null>(null);
+  const [leadership, setLeadership] = useState<LeadershipDetailResponse | null>(null);
+  const [leadershipLoading, setLeadershipLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -58,10 +63,21 @@ export default function InstitutionDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    fetchInstitutionDetail(id)
-      .then(setInstitution)
+    setLoading(true);
+    setLeadershipLoading(true);
+    Promise.all([
+      fetchInstitutionDetail(id),
+      fetchInstitutionLeadership(id).catch(() => null),
+    ])
+      .then(([institutionDetail, leadershipDetail]) => {
+        setInstitution(institutionDetail);
+        setLeadership(leadershipDetail);
+      })
       .catch(() => setInstitution(null))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setLeadershipLoading(false);
+      });
   }, [id]);
 
   async function handleDelete() {
@@ -94,10 +110,7 @@ export default function InstitutionDetailPage() {
     );
   }
 
-  const hasLeadership =
-    (institution.resident_leaders?.length ?? 0) > 0 ||
-    (institution.degree_committee?.length ?? 0) > 0 ||
-    (institution.teaching_committee?.length ?? 0) > 0;
+  const hasLeadership = (leadership?.leaders?.length ?? 0) > 0;
 
   const hasCooperation =
     (institution.key_departments?.length ?? 0) > 0 ||
@@ -123,27 +136,19 @@ export default function InstitutionDetailPage() {
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-5">
           <main className="xl:col-span-8 space-y-4">
-            <SectionCard title="负责人与治理团队" icon={UserCheck}>
-              {!hasLeadership ? (
-                <EmptyState text="暂无负责人与委员会数据" />
+            <SectionCard
+              title="院领导信息"
+              icon={Landmark}
+              count={leadership?.leader_count ?? undefined}
+            >
+              {leadershipLoading ? (
+                <EmptyState text="院领导信息加载中..." />
+              ) : !hasLeadership ? (
+                <EmptyState text="暂无院领导数据" />
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <SubBlock title="驻校负责人" items={institution.resident_leaders || []} />
-                  <SubBlock title="学位委员会" items={institution.degree_committee || []} />
-                  <SubBlock title="教学委员会" items={institution.teaching_committee || []} />
-                </div>
+                <LeadershipCardList leaders={leadership?.leaders || []} />
               )}
             </SectionCard>
-
-            {(institution.university_leaders?.length ?? 0) > 0 && (
-              <SectionCard
-                title="大学领导"
-                icon={Landmark}
-                count={institution.university_leaders?.length ?? 0}
-              >
-                <PersonList items={institution.university_leaders || []} />
-              </SectionCard>
-            )}
 
             <SectionCard
               title="院系结构"

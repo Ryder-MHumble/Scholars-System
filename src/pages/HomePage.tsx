@@ -6,6 +6,7 @@ import { NAV_TREE, getAncestorIds } from "@/constants/navTree";
 import type { TabId } from "@/constants/navTree";
 
 const ScholarListPage = lazy(() => import("./ScholarListPage"));
+const StudentListPage = lazy(() => import("./StudentListPage"));
 const InstitutionListPage = lazy(() => import("./InstitutionListPage"));
 const ProjectListPage = lazy(() => import("./ProjectListPage"));
 const ActivityListPage = lazy(() => import("./ActivityListPage"));
@@ -55,6 +56,8 @@ export default function HomePage() {
         return <InstitutionListPage />;
       case "scholars":
         return <ScholarListPage />;
+      case "students":
+        return <StudentListPage />;
       case "projects":
         return <ProjectListPage />;
       case "activities":

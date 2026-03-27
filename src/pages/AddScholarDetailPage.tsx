@@ -7,8 +7,10 @@ import type {
   PublicationRecord,
   PatentRecord,
   AwardRecord,
+  ScholarProjectTag,
+  ScholarEventTag,
 } from "@/services/scholarApi";
-import { createScholar } from "@/services/scholarApi";
+import { createScholar, patchScholarAchievements } from "@/services/scholarApi";
 import type { ScholarDetailPatch } from "@/services/scholarApi";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
 import { RelationCard } from "@/components/scholar-detail/sections/RelationCard";
@@ -18,6 +20,8 @@ import { EditAchievementsModal } from "@/components/scholar-detail/modals/EditAc
 import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfileModal";
 import { staggerContainer, slideInLeft } from "@/utils/animations";
 import { cn } from "@/utils/cn";
+import { getPrimaryCategoryForSubcategory } from "@/constants/projectCategories";
+import { getAllCategories, getCategoryByType } from "@/constants/activityCategories";
 
 const emptyScholar: ScholarDetail = {
   url_hash: "new",
@@ -64,6 +68,10 @@ const emptyScholar: ScholarDetail = {
   awards: [],
   url: "",
   content: "",
+  project_tags: [],
+  event_tags: [],
+  participated_event_ids: [],
+  is_cobuild_scholar: false,
   project_category: "",
   project_subcategory: "",
   keywords: [],
@@ -85,6 +93,11 @@ export default function AddScholarDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+
+  const projectCategory =
+    scholar.project_tags?.[0]?.subcategory ?? "";
+  const activityCategory =
+    scholar.event_tags?.[0]?.event_type ?? "";
 
   // Basic field save handler
   const handleFieldSave = async (patch: ScholarDetailPatch) => {
@@ -158,6 +171,45 @@ export default function AddScholarDetailPage() {
     // No relation notes for new scholar yet
   };
 
+  const handleProjectCategoryChange = (subcategory: string) => {
+    const trimmed = subcategory.trim();
+    const primary = trimmed
+      ? getPrimaryCategoryForSubcategory(trimmed as any) ?? ""
+      : "";
+    const nextTags: ScholarProjectTag[] = trimmed
+      ? [{ category: primary, subcategory: trimmed, project_id: "", project_title: "" }]
+      : [];
+    setScholar((prev) => ({
+      ...prev,
+      project_tags: nextTags,
+      is_cobuild_scholar: nextTags.length > 0 || (prev.event_tags?.length ?? 0) > 0,
+    }));
+  };
+
+  const handleEventCategoryChange = (eventType: string) => {
+    const trimmed = eventType.trim();
+    const allCategories = getAllCategories();
+    const categoryMap = new Map(allCategories.map((item) => [item.id, item.name]));
+    const matched = trimmed ? getCategoryByType(trimmed) : null;
+    const categoryName = matched ? categoryMap.get(matched.categoryId) ?? "" : "";
+    const nextTags: ScholarEventTag[] = trimmed
+      ? [
+          {
+            category: categoryName,
+            series: "",
+            event_type: trimmed,
+            event_id: "",
+            event_title: "",
+          },
+        ]
+      : [];
+    setScholar((prev) => ({
+      ...prev,
+      event_tags: nextTags,
+      is_cobuild_scholar: (prev.project_tags?.length ?? 0) > 0 || nextTags.length > 0,
+    }));
+  };
+
   // Save scholar
   const handleSaveScholar = async () => {
     if (!scholar.name.trim()) {
@@ -177,6 +229,7 @@ export default function AddScholarDetailPage() {
       const submitData = {
         name: scholar.name,
         name_en: scholar.name_en || undefined,
+        photo_url: scholar.photo_url || undefined,
         position: scholar.position || undefined,
         university: scholar.university,
         department: scholar.department || undefined,
@@ -188,10 +241,31 @@ export default function AddScholarDetailPage() {
         research_areas: scholar.research_areas || [],
         academic_titles: scholar.academic_titles || [],
         bio: scholar.bio || undefined,
+        project_tags: scholar.project_tags || [],
+        event_tags: scholar.event_tags || [],
+        is_cobuild_scholar:
+          (scholar.project_tags?.length ?? 0) > 0 ||
+          (scholar.event_tags?.length ?? 0) > 0,
         added_by: "user",
       };
 
-      await createScholar(submitData);
+      const created = await createScholar(submitData);
+
+      const publications = scholar.representative_publications || [];
+      const patents = scholar.patents || [];
+      const awards = scholar.awards || [];
+      const hasAchievements =
+        publications.length > 0 || patents.length > 0 || awards.length > 0;
+
+      if (hasAchievements) {
+        await patchScholarAchievements(created.url_hash, {
+          representative_publications: publications,
+          patents,
+          awards,
+          updated_by: "user",
+        });
+      }
+
       navigate("/?tab=scholars");
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存学者失败，请重试");
@@ -297,6 +371,15 @@ export default function AddScholarDetailPage() {
             >
               <RelationCard
                 scholar={scholar}
+                mode="category"
+                projectCategory={projectCategory}
+                activityCategory={activityCategory}
+                onProjectCategoryChange={(value) =>
+                  handleProjectCategoryChange(value)
+                }
+                onActivityCategoryChange={(value) =>
+                  handleEventCategoryChange(value)
+                }
                 onRelationToggle={handleRelationToggle}
                 onRelationNotesSave={handleRelationNotesSave}
                 onSaveExchangeRecords={handleSaveExchangeRecords}

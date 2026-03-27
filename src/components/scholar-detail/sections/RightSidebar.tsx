@@ -171,7 +171,7 @@ export function RightSidebar({
       >
         <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
           <ClipboardList className="w-4 h-4 text-primary-600" />
-          <h3 className="text-sm font-semibold text-gray-900">学者动态</h3>
+          <h3 className="text-sm font-semibold text-gray-900">学者活动</h3>
           <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
             {scholar.recent_updates.length} 条
           </span>

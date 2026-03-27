@@ -1,6 +1,19 @@
-import { Building2, Users, FolderKanban, Calendar, BookOpen } from "lucide-react";
+import {
+  Building2,
+  Users,
+  FolderKanban,
+  Calendar,
+  BookOpen,
+  GraduationCap,
+} from "lucide-react";
 
-export type TabId = "institutions" | "scholars" | "projects" | "activities" | "venues";
+export type TabId =
+  | "institutions"
+  | "scholars"
+  | "students"
+  | "projects"
+  | "activities"
+  | "venues";
 
 export interface NavNode {
   id: string;
@@ -64,6 +77,18 @@ export const NAV_TREE: NavNode[] = [
           { id: "intl_other", label: "其他", tab: "scholars", subtab: "intl_other" },
         ],
       },
+    ],
+  },
+  {
+    id: "students",
+    label: "学生-Student",
+    icon: GraduationCap,
+    tab: "students",
+    children: [
+      { id: "student_all", label: "全部学生", tab: "students", subtab: "student_all" },
+      { id: "student_2024", label: "2024级", tab: "students", subtab: "student_grade_2024" },
+      { id: "student_2025", label: "2025级", tab: "students", subtab: "student_grade_2025" },
+      { id: "student_2026", label: "2026级", tab: "students", subtab: "student_grade_2026" },
     ],
   },
   {

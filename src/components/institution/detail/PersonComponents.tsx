@@ -1,4 +1,7 @@
 import { motion } from "framer-motion";
+import { ExternalLink } from "lucide-react";
+import { useState } from "react";
+import type { LeadershipMember } from "@/types/institution";
 import { Tag } from "./InstitutionBadges";
 
 const AVATAR_COLORS = [
@@ -22,6 +25,35 @@ export function PersonAvatar({ name }: { name: string }) {
     >
       <span className="text-white text-sm font-bold leading-none">{char}</span>
     </div>
+  );
+}
+
+function getLeaderSnippet(leader: LeadershipMember): string {
+  const intro = (leader.intro_lines || []).map((line) => line.trim()).find((line) => line);
+  const raw = (intro || leader.bio || "").replace(/\s+/g, " ").trim();
+  if (!raw) return "暂无简介";
+  if (raw.length <= 92) return raw;
+  return `${raw.slice(0, 92)}...`;
+}
+
+function LeaderAvatar({
+  name,
+  avatarUrl,
+}: {
+  name: string;
+  avatarUrl: string | null;
+}) {
+  const [errored, setErrored] = useState(false);
+  if (!avatarUrl || errored) return <PersonAvatar name={name} />;
+  return (
+    <img
+      src={avatarUrl}
+      alt={name}
+      className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-200 bg-white"
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setErrored(true)}
+    />
   );
 }
 
@@ -77,6 +109,47 @@ export function PersonList({
             )}
           </div>
         </motion.div>
+      ))}
+    </div>
+  );
+}
+
+export function LeadershipCardList({ leaders }: { leaders: LeadershipMember[] }) {
+  if (!leaders.length) {
+    return <p className="text-sm text-slate-400 italic">暂无院领导数据</p>;
+  }
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {leaders.map((leader, i) => (
+        <motion.article
+          key={`${leader.name}-${leader.role}-${i}`}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, delay: i * 0.04 }}
+          className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 hover:bg-white hover:shadow-sm transition-all"
+        >
+          <div className="flex items-start gap-3">
+            <LeaderAvatar name={leader.name} avatarUrl={leader.avatar_url} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-slate-800 leading-tight">{leader.name}</p>
+              <p className="mt-0.5 text-xs font-medium text-blue-700">{leader.role}</p>
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs leading-5 text-slate-600">{getLeaderSnippet(leader)}</p>
+
+          {leader.profile_url && (
+            <a
+              href={leader.profile_url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+            >
+              个人主页
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
+        </motion.article>
       ))}
     </div>
   );

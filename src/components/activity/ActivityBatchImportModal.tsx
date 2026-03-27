@@ -15,7 +15,11 @@ import {
 } from "lucide-react";
 import { createActivity } from "@/services/activityApi";
 import type { ActivityCreateRequest } from "@/services/activityApi";
-import { getCategoryByType } from "@/constants/activityCategories";
+import {
+  getAllCategories,
+  getCategoryByType,
+  getSubcategoriesByCategory,
+} from "@/constants/activityCategories";
 
 interface ActivityBatchImportModalProps {
   isOpen: boolean;
@@ -61,19 +65,18 @@ function StepIndicator({ current }: { current: ModalStep }) {
 }
 
 const ACTIVITY_FIELDS = [
-  { label: "活动类型", required: true, hint: "前沿沙龙 / 学科前沿讲座 / 学术带头人论坛" },
+  { label: "一级分类", required: true, hint: "教育培养 / 科研学术 / 人才引育" },
+  { label: "二级分类", required: true, hint: "如 论坛讲座 / 学术会议 / 人才论坛" },
+  { label: "活动类型", required: true, hint: "如 学科前沿讲座 / 国际AI科学家大会 / 青年论坛" },
   { label: "活动系列", required: false, hint: "如 XAI智汇讲坛，可留空" },
   { label: "系列编号", required: false, hint: "如 42，可留空" },
   { label: "活动标题", required: true, hint: "完整活动名称" },
   { label: "摘要", required: false, hint: "活动内容简介，可留空" },
-  { label: "主讲人姓名", required: true, hint: "主讲嘉宾全名" },
-  { label: "主讲人单位", required: true, hint: "主讲人所属机构" },
-  { label: "主讲人职务", required: false, hint: "如 教授、研究员，可留空" },
   { label: "活动日期", required: true, hint: "格式：2024-03-15T14:00" },
   { label: "时长", required: false, hint: "小时数，如 2，可留空" },
-  { label: "地点", required: true, hint: "活动举办地点" },
-  { label: "需要邮件邀请", required: false, hint: "填：是 或 否" },
-  { label: "证书编号", required: false, hint: "如 XAI-D2642-001，可留空" },
+  { label: "活动地点", required: true, hint: "活动举办地点" },
+  { label: "活动照片URL", required: false, hint: "活动照片 URL，可留空" },
+  { label: "关联学者IDs", required: false, hint: "学者 url_hash，多个用 | 分隔" },
 ];
 
 function parseCSV(text: string): string[][] {
@@ -109,6 +112,23 @@ export function ActivityBatchImportModal({
   onClose,
   onSuccess,
 }: ActivityBatchImportModalProps) {
+  const categoryNameToId = new Map(
+    getAllCategories().map((cat) => [cat.name, cat.id]),
+  );
+  const categoryIdToName = new Map(
+    getAllCategories().map((cat) => [cat.id, cat.name]),
+  );
+  const subcategoryNameToId = new Map(
+    getAllCategories().flatMap((cat) =>
+      getSubcategoriesByCategory(cat.id).map((sub) => [sub.name, sub.id]),
+    ),
+  );
+  const subcategoryIdToName = new Map(
+    getAllCategories().flatMap((cat) =>
+      getSubcategoriesByCategory(cat.id).map((sub) => [sub.id, sub.name]),
+    ),
+  );
+
   const [step, setStep] = useState<ModalStep>(1);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -151,15 +171,53 @@ export function ActivityBatchImportModal({
       const errors: string[] = [];
       const parsed: ParsedRow[] = dataRows.map((data, i) => {
         const rowNum = i + 2;
-        const [eventType, , , title, , speakerName, speakerOrg, , , , eventDate, , location] = data;
+        const [
+          categoryName,
+          subcategoryName,
+          eventType,
+          ,
+          ,
+          title,
+          ,
+          eventDate,
+          ,
+          location,
+          ,
+          ,
+        ] = data;
+        if (!categoryName?.trim()) return { row: rowNum, data, error: "一级分类不能为空" };
+        if (!subcategoryName?.trim()) return { row: rowNum, data, error: "二级分类不能为空" };
         if (!eventType?.trim()) return { row: rowNum, data, error: "活动类型不能为空" };
         if (!title?.trim()) return { row: rowNum, data, error: "活动标题不能为空" };
-        if (!speakerName?.trim()) return { row: rowNum, data, error: "主讲人姓名不能为空" };
-        if (!speakerOrg?.trim()) return { row: rowNum, data, error: "主讲人单位不能为空" };
         if (!eventDate?.trim()) return { row: rowNum, data, error: "活动日期不能为空" };
-        if (!location?.trim()) return { row: rowNum, data, error: "地点不能为空" };
+        if (!location?.trim()) return { row: rowNum, data, error: "活动地点不能为空" };
+        const inputCategoryId = categoryNameToId.get(categoryName.trim());
+        if (!inputCategoryId) {
+          return { row: rowNum, data, error: `未知一级分类"${categoryName}"` };
+        }
+        const inputSubcategoryId = subcategoryNameToId.get(subcategoryName.trim());
+        if (!inputSubcategoryId) {
+          return { row: rowNum, data, error: `未知二级分类"${subcategoryName}"` };
+        }
         const cat = getCategoryByType(eventType.trim());
         if (!cat) return { row: rowNum, data, error: `未知活动类型"${eventType}"` };
+        if (cat.categoryId !== inputCategoryId) {
+          const expectedCategoryName = categoryIdToName.get(cat.categoryId) ?? cat.categoryId;
+          return {
+            row: rowNum,
+            data,
+            error: `活动类型"${eventType}"应属于一级分类"${expectedCategoryName}"`,
+          };
+        }
+        if (cat.subcategoryId !== inputSubcategoryId) {
+          const expectedSubcategoryName =
+            subcategoryIdToName.get(cat.subcategoryId) ?? cat.subcategoryId;
+          return {
+            row: rowNum,
+            data,
+            error: `活动类型"${eventType}"应属于二级分类"${expectedSubcategoryName}"`,
+          };
+        }
         return { row: rowNum, data };
       });
       setParsedRows(parsed);
@@ -183,31 +241,41 @@ export function ActivityBatchImportModal({
     let success = 0;
     const errors: string[] = [];
     for (const pr of validRows) {
-      const [eventType, series, seriesNumber, title, abstract, speakerName, speakerOrg,
-        speakerPosition, speakerBio, speakerPhoto, eventDate, duration, location,
-        publicity, needsEmail, certificateNumber, createdBy] = pr.data;
+      const [
+        ,
+        ,
+        eventType,
+        series,
+        seriesNumber,
+        title,
+        abstract,
+        eventDate,
+        duration,
+        location,
+        photoUrl,
+        scholarIds,
+      ] = pr.data;
       try {
         const cat = getCategoryByType(eventType.trim())!;
         const data: ActivityCreateRequest = {
-          category: cat.categoryId,
+          category:
+            categoryIdToName.get(cat.categoryId) ??
+            cat.categoryId,
           event_type: eventType.trim(),
           series: series?.trim() || undefined,
           series_number: seriesNumber?.trim() || undefined,
           title: title.trim(),
           abstract: abstract?.trim() || undefined,
-          speaker_name: speakerName.trim(),
-          speaker_organization: speakerOrg.trim(),
-          speaker_position: speakerPosition?.trim() || undefined,
-          speaker_bio: speakerBio?.trim() || undefined,
-          speaker_photo_url: speakerPhoto?.trim() || undefined,
           event_date: eventDate.trim(),
           duration: duration ? parseFloat(duration) : 1,
           location: location.trim(),
-          publicity: publicity?.trim() || undefined,
-          needs_email_invitation: needsEmail?.toLowerCase() === "是" || needsEmail?.toLowerCase() === "true",
-          certificate_number: certificateNumber?.trim() || undefined,
-          created_by: createdBy?.trim() || undefined,
-          audit_status: "pending",
+          photo_url: photoUrl?.trim() || undefined,
+          scholar_ids: scholarIds
+            ? scholarIds
+                .split("|")
+                .map((id) => id.trim())
+                .filter(Boolean)
+            : undefined,
         };
         await createActivity(data);
         success++;
@@ -227,8 +295,8 @@ export function ActivityBatchImportModal({
   };
 
   const downloadTemplate = () => {
-    const template = `活动类型,活动系列,系列编号,活动标题,摘要,主讲人姓名,主讲人单位,主讲人职务,主讲人简介,主讲人照片,活动日期,时长,地点,宣传方式,需要邮件邀请,证书编号,录入人
-学科前沿讲座,XAI智汇讲坛,42,人工智能前沿技术探讨,探讨最新的AI技术发展趋势,张三,清华大学,教授,人工智能领域专家,zhang-san.jpg,2024-03-15T14:00,2,清华大学主楼,可摄影摄像,是,XAI-D2642-001,管理员`;
+    const template = `一级分类,二级分类,活动类型,活动系列,系列编号,活动标题,摘要,活动日期,时长,活动地点,活动照片URL,关联学者IDs
+科研学术,论坛讲座,学科前沿讲座,XAI智汇讲坛,42,人工智能前沿技术探讨,探讨最新的AI技术发展趋势,2024-03-15T14:00,2,清华大学主楼,https://example.com/activity.jpg,scholar_001|scholar_002`;
     const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -384,8 +452,9 @@ export function ActivityBatchImportModal({
                       <ul className="space-y-2">
                         {[
                           "列顺序需与模板完全一致",
-                          "活动类型须与系统已有类型匹配",
+                          "一级/二级分类与活动类型必须匹配",
                           "日期格式：2024-03-15T14:00",
+                          "关联学者IDs 填学者 url_hash，多个用 | 分隔",
                           "导入后不可撤销，请核对后再提交",
                         ].map((text, i) => (
                           <li key={i} className="flex items-start gap-2 text-xs text-amber-800">
@@ -577,7 +646,7 @@ export function ActivityBatchImportModal({
                             <table className="min-w-full text-xs">
                               <thead>
                                 <tr className="bg-gray-50 border-b border-gray-200">
-                                  {["活动类型", "活动标题", "主讲人", "日期", "地点"].map((h) => (
+                                  {["活动类型", "活动标题", "日期", "地点", "关联学者数"].map((h) => (
                                     <th key={h} className="px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap">{h}</th>
                                   ))}
                                 </tr>
@@ -585,11 +654,18 @@ export function ActivityBatchImportModal({
                               <tbody className="divide-y divide-gray-100">
                                 {validRows.slice(0, 5).map((pr, idx) => (
                                   <tr key={idx} className="hover:bg-blue-50/30">
-                                    <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">{pr.data[0]}</td>
-                                    <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{pr.data[3]}</td>
-                                    <td className="px-3 py-2 text-gray-700 max-w-[80px] truncate">{pr.data[5]}</td>
-                                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{pr.data[10]?.slice(0, 10)}</td>
-                                    <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">{pr.data[12]}</td>
+                                    <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">{pr.data[2]}</td>
+                                    <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{pr.data[5]}</td>
+                                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{pr.data[7]?.slice(0, 10)}</td>
+                                    <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">{pr.data[9]}</td>
+                                    <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">
+                                      {pr.data[11]
+                                        ? pr.data[11]
+                                            .split("|")
+                                            .map((id) => id.trim())
+                                            .filter(Boolean).length
+                                        : 0}
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>

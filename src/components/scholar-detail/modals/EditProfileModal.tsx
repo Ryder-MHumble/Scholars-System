@@ -5,6 +5,10 @@ import type {
   ScholarDetail,
   ScholarDetailPatch,
 } from "@/services/scholarApi";
+import {
+  ensureDepartmentExists,
+  ensureOrganizationExists,
+} from "@/services/institutionApi";
 import { InstitutionAutocomplete } from "@/components/common/InstitutionAutocomplete";
 import { DepartmentAutocomplete } from "@/components/common/DepartmentAutocomplete";
 
@@ -206,6 +210,10 @@ export function EditProfileModal({
                 label="院校"
                 value={form.university}
                 onChange={(v) => set("university", v)}
+                onCreateNew={async (institutionName) => {
+                  const created = await ensureOrganizationExists(institutionName);
+                  return created.name;
+                }}
                 required
                 placeholder="输入院校名称搜索..."
               />
@@ -213,6 +221,13 @@ export function EditProfileModal({
                 label="院系"
                 value={form.department}
                 onChange={(v) => set("department", v)}
+                onCreateNew={async (departmentName, universityName) => {
+                  const created = await ensureDepartmentExists(
+                    universityName,
+                    departmentName,
+                  );
+                  return created.name;
+                }}
                 university={form.university}
                 placeholder="输入院系名称..."
               />

@@ -56,10 +56,10 @@ export function ActivityListItem({ activity, onClick }: ActivityListItemProps) {
           )}
         </div>
         <p className="text-xs text-gray-500 mt-1 truncate">
-          {activity.speaker_name}
-          {activity.speaker_organization && (
-            <span className="text-gray-400"> · {activity.speaker_organization}</span>
-          )}
+          {activity.category || "未分类"}
+          {activity.series ? (
+            <span className="text-gray-400"> · {activity.series}</span>
+          ) : null}
         </p>
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
           <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${badgeClass}`}>

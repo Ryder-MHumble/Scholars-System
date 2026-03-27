@@ -3,10 +3,6 @@ import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus,
-  Calendar,
-  Users,
-  BarChart2,
-  Clock,
   Search,
   CalendarDays,
   LayoutGrid,
@@ -24,6 +20,7 @@ import { ActivityCalendarPanel } from "@/components/activity/ActivityCalendarPan
 import { SUBTAB_TO_SERIES } from "@/constants/activityTypes";
 import {
   createActivity,
+  deleteActivity,
   fetchActivities,
   fetchActivityStats,
 } from "@/services/activityApi";
@@ -56,6 +53,14 @@ export default function ActivityListPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const autoJumped = useRef(false);
+  const shouldDeleteUntitledActivity = (activity: ActivityEvent) => {
+    const title = activity.title.trim();
+    return title === "无标题" || title === "（无标题）";
+  };
+  const isUntitledActivity = (activity: ActivityEvent) => {
+    const title = activity.title.trim();
+    return title === "" || title === "无标题" || title === "（无标题）";
+  };
 
   const loadActivities = async (
     eventType?: string,
@@ -83,7 +88,14 @@ export default function ActivityListPage() {
         );
         allItems.push(...pageData.items);
       }
-      setAllActivities(allItems);
+      const untitledItems = allItems.filter(shouldDeleteUntitledActivity);
+      if (untitledItems.length > 0) {
+        await Promise.allSettled(untitledItems.map((item) => deleteActivity(item.id)));
+        fetchActivityStats()
+          .then(setStats)
+          .catch(() => {});
+      }
+      setAllActivities(allItems.filter((item) => !isUntitledActivity(item)));
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "加载活动失败");
     } finally {
@@ -164,8 +176,8 @@ export default function ActivityListPage() {
     return list.filter(
       (a) =>
         a.title.toLowerCase().includes(q) ||
-        a.speaker_name.toLowerCase().includes(q) ||
-        a.speaker_organization.toLowerCase().includes(q),
+        a.event_type.toLowerCase().includes(q) ||
+        a.location.toLowerCase().includes(q),
     );
   }, [dayActivities, selectedDay, searchQuery]);
 
@@ -176,8 +188,8 @@ export default function ActivityListPage() {
       list = list.filter(
         (a) =>
           a.title.toLowerCase().includes(q) ||
-          a.speaker_name.toLowerCase().includes(q) ||
-          a.speaker_organization.toLowerCase().includes(q),
+          a.event_type.toLowerCase().includes(q) ||
+          a.location.toLowerCase().includes(q),
       );
     }
     list.sort((a, b) => {
@@ -289,57 +301,6 @@ export default function ActivityListPage() {
           </div>
         </div>
 
-        {/* Stats */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              {
-                icon: Calendar,
-                iconBg: "bg-blue-50",
-                iconColor: "text-blue-600",
-                value: stats.total,
-                label: "总活动数",
-              },
-              {
-                icon: Users,
-                iconBg: "bg-purple-50",
-                iconColor: "text-purple-600",
-                value: stats.total_speakers,
-                label: "演讲嘉宾",
-              },
-              {
-                icon: BarChart2,
-                iconBg: "bg-emerald-50",
-                iconColor: "text-emerald-600",
-                value: stats.by_type.length,
-                label: "活动类型",
-              },
-              {
-                icon: Clock,
-                iconBg: "bg-amber-50",
-                iconColor: "text-amber-600",
-                value: `${stats.avg_duration.toFixed(1)}h`,
-                label: "平均时长",
-              },
-            ].map(({ icon: Icon, iconBg, iconColor, value, label }) => (
-              <div
-                key={label}
-                className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3"
-              >
-                <div
-                  className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}
-                >
-                  <Icon className={`w-4 h-4 ${iconColor}`} />
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-gray-900">{value}</p>
-                  <p className="text-xs text-gray-500">{label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Type filter + Search */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex flex-wrap gap-2 items-center flex-1">
@@ -397,7 +358,7 @@ export default function ActivityListPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索标题、主讲人..."
+              placeholder="搜索标题、类型、地点..."
               className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>

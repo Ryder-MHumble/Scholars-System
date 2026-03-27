@@ -13,9 +13,26 @@ import { exportScholarsToExcel } from "@/utils/scholarExporter";
 
 const PAGE_SIZE = 20;
 
+const PROJECT_SUBTAB_FILTER: Record<
+  string,
+  { category?: string; subcategory?: string }
+> = {
+  education: { category: "教育培养" },
+  sci_edu_committee: { category: "教育培养", subcategory: "科技教育委员会" },
+  academic_committee: { category: "教育培养", subcategory: "学术委员会" },
+  teaching_committee: { category: "教育培养", subcategory: "教学委员会" },
+  student_mentor: { category: "教育培养", subcategory: "学院学生高校导师" },
+  parttime_mentor: { category: "教育培养", subcategory: "兼职导师" },
+  research: { category: "科研学术" },
+  research_project: { category: "科研学术", subcategory: "科研立项" },
+  talent: { category: "人才引育" },
+  zhuogong: { category: "人才引育", subcategory: "卓工公派" },
+};
+
 export function useScholarList() {
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const activeTab = searchParams.get("tab");
   const activeUni = searchParams.get("university");
   const activeDept = searchParams.get("department");
   const pageParam = searchParams.get("page");
@@ -53,6 +70,11 @@ export function useScholarList() {
     if (subtabType === "other") return "其他";
     return undefined;
   }, [subtabType]);
+
+  const projectFilter = useMemo(
+    () => (activeTab === "projects" ? PROJECT_SUBTAB_FILTER[activeSubTab ?? ""] ?? {} : {}),
+    [activeTab, activeSubTab],
+  );
 
   /* University counts — filtered by current subtab */
   const {
@@ -94,6 +116,8 @@ export function useScholarList() {
         is_adjunct_supervisor: isJointMentor || undefined,
         region: apiRegion,
         affiliation_type: apiAffiliationType,
+        project_category: projectFilter.category,
+        project_subcategory: projectFilter.subcategory,
       },
       controller.signal,
     )
@@ -116,6 +140,8 @@ export function useScholarList() {
     isJointMentor,
     apiRegion,
     apiAffiliationType,
+    projectFilter.category,
+    projectFilter.subcategory,
   ]);
 
   /* Sync page to URL — only write when URL value actually differs */
@@ -129,7 +155,7 @@ export function useScholarList() {
       newParams.set("page", String(page));
     }
     setSearchParams(newParams, { replace: true });
-  }, [page, setSearchParams]);
+  }, [page, pageParam, searchParams, setSearchParams]);
 
   /* Reset page on query change */
   useEffect(() => {
@@ -189,6 +215,8 @@ export function useScholarList() {
         is_adjunct_supervisor: isJointMentor || undefined,
         region: apiRegion,
         affiliation_type: apiAffiliationType,
+        project_category: projectFilter.category,
+        project_subcategory: projectFilter.subcategory,
       })
         .then((res) => {
           setApiData(res);
@@ -216,6 +244,8 @@ export function useScholarList() {
       is_adjunct_supervisor: isJointMentor || undefined,
       region: apiRegion,
       affiliation_type: apiAffiliationType,
+      project_category: projectFilter.category,
+      project_subcategory: projectFilter.subcategory,
     })
       .then((res) => {
         setApiData(res);
@@ -237,6 +267,8 @@ export function useScholarList() {
         is_adjunct_supervisor: isJointMentor || undefined,
         region: apiRegion,
         affiliation_type: apiAffiliationType,
+        project_category: projectFilter.category,
+        project_subcategory: projectFilter.subcategory,
       });
       exportScholarsToExcel(allScholars);
     } catch (err) {

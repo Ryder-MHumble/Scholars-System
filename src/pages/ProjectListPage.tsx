@@ -7,24 +7,69 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Pagination } from "@/components/common/Pagination";
 import { ScholarCard } from "@/components/common/ScholarCard";
 import { ScholarTable } from "@/components/common/ScholarTable";
-import { ProjectCategoryTree } from "@/components/project/ProjectCategoryTree";
 import { useScholarList } from "@/hooks/useScholarList";
-import type {
-  ProjectCategory,
-  ProjectSubcategory,
-} from "@/constants/projectCategories";
+import type { ScholarListItem } from "@/services/scholarApi";
 
 type ViewMode = "list" | "grid";
 
+const SUBTAB_TO_PROJECT_FILTER: Record<
+  string,
+  { category?: string; subcategory?: string }
+> = {
+  education: { category: "教育培养" },
+  sci_edu_committee: { category: "教育培养", subcategory: "科技教育委员会" },
+  academic_committee: { category: "教育培养", subcategory: "学术委员会" },
+  teaching_committee: { category: "教育培养", subcategory: "教学委员会" },
+  student_mentor: { category: "教育培养", subcategory: "学院学生高校导师" },
+  parttime_mentor: { category: "教育培养", subcategory: "兼职导师" },
+  research: { category: "科研学术" },
+  research_project: { category: "科研学术", subcategory: "科研立项" },
+  talent: { category: "人才引育" },
+  zhuogong: { category: "人才引育", subcategory: "卓工公派" },
+};
+
+const SUBCATEGORY_ALIASES: Record<string, string[]> = {
+  科技教育委员会: ["科技育青委员会"],
+  科技育青委员会: ["科技教育委员会"],
+  学院学生高校导师: ["学院学生事务导师"],
+  学院学生事务导师: ["学院学生高校导师"],
+};
+
+function normalizeLabel(value: string) {
+  return value.trim().replace(/\s+/g, "");
+}
+
+function matchesCategory(scholar: ScholarListItem, category: string): boolean {
+  const target = normalizeLabel(category);
+  return (scholar.project_tags ?? []).some(
+    (tag) => normalizeLabel(tag.category) === target,
+  );
+}
+
+function matchesSubcategory(
+  scholar: ScholarListItem,
+  subcategory: string,
+): boolean {
+  const target = normalizeLabel(subcategory);
+  const aliasTargets = (SUBCATEGORY_ALIASES[subcategory] ?? []).map(
+    normalizeLabel,
+  );
+  return (scholar.project_tags ?? []).some((tag) => {
+    const current = normalizeLabel(tag.subcategory);
+    return current === target || aliasTargets.includes(current);
+  });
+}
+
 export default function ProjectListPage() {
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
-  const activeCategory = searchParams.get("category") as ProjectCategory | null;
-  const activeSubcategory = searchParams.get(
-    "subcategory",
-  ) as ProjectSubcategory | null;
+  const activeSubtab = searchParams.get("subtab") ?? "";
+  const subtabFilter = SUBTAB_TO_PROJECT_FILTER[activeSubtab] ?? {};
+  const activeCategory = subtabFilter.category ?? searchParams.get("category");
+  const activeSubcategory =
+    subtabFilter.subcategory ?? searchParams.get("subcategory");
 
   const {
     setQuery,
@@ -44,99 +89,32 @@ export default function ProjectListPage() {
   // Filter scholars by selected category/subcategory
   const filteredScholars = useMemo(() => {
     if (!activeCategory && !activeSubcategory) {
-      // Show all scholars with any project category
       return items.filter(
         (scholar) =>
-          scholar.project_category ||
-          scholar.project_subcategory ||
+          scholar.is_cobuild_scholar ||
+          (scholar.project_tags?.length ?? 0) > 0 ||
           scholar.adjunct_supervisor?.status,
       );
     }
 
     if (activeSubcategory) {
-      // Filter by specific subcategory
       return items.filter((scholar) => {
-        // Special handling for "兼职导师" - include scholars with adjunct_supervisor
         if (activeCategory === "教育培养" && activeSubcategory === "兼职导师") {
-          return (
-            scholar.project_subcategory === activeSubcategory ||
-            scholar.adjunct_supervisor?.status
-          );
+          return matchesSubcategory(scholar, activeSubcategory) || Boolean(scholar.adjunct_supervisor?.status);
         }
-        return scholar.project_subcategory === activeSubcategory;
+        return matchesSubcategory(scholar, activeSubcategory);
       });
     }
 
     if (activeCategory) {
-      // Filter by primary category
-      return items.filter(
-        (scholar) => scholar.project_category === activeCategory,
-      );
+      return items.filter((scholar) => matchesCategory(scholar, activeCategory));
     }
 
     return items;
   }, [items, activeCategory, activeSubcategory]);
 
-  // Calculate category counts
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-
-    items.forEach((scholar) => {
-      // Count scholars with adjunct_supervisor as "教育培养-兼职导师"
-      if (scholar.adjunct_supervisor?.status) {
-        const key = "教育培养-兼职导师";
-        counts[key] = (counts[key] || 0) + 1;
-      }
-
-      // Count scholars by their project category/subcategory
-      if (scholar.project_category && scholar.project_subcategory) {
-        const key = `${scholar.project_category}-${scholar.project_subcategory}`;
-        counts[key] = (counts[key] || 0) + 1;
-      }
-    });
-
-    return counts;
-  }, [items]);
-
-  const handleSelectCategory = (category: ProjectCategory | null) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (category) {
-      newParams.set("category", category);
-      newParams.delete("subcategory");
-    } else {
-      newParams.delete("category");
-      newParams.delete("subcategory");
-    }
-    newParams.set("page", "1");
-    setSearchParams(newParams);
-  };
-
-  const handleSelectSubcategory = (
-    category: ProjectCategory,
-    subcategory: ProjectSubcategory,
-  ) => {
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set("category", category);
-    newParams.set("subcategory", subcategory);
-    newParams.set("page", "1");
-    setSearchParams(newParams);
-  };
-
   return (
     <div className="h-full overflow-hidden flex bg-gray-50">
-      {/* Category tree sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col overflow-hidden">
-        <ProjectCategoryTree
-          activeCategory={activeCategory}
-          activeSubcategory={activeSubcategory}
-          onSelectCategory={handleSelectCategory}
-          onSelectSubcategory={handleSelectSubcategory}
-          categoryCounts={categoryCounts}
-          loading={isLoading}
-        />
-      </div>
-
-      {/* Scholar list */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -149,7 +127,7 @@ export default function ProjectListPage() {
             {/* Title Row */}
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">项目分类</h2>
+                <h2 className="text-2xl font-bold text-gray-900">项目所属导师</h2>
                 <p className="text-sm text-gray-500 mt-1">
                   共{" "}
                   <span className="font-semibold text-gray-700">

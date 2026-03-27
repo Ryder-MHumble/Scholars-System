@@ -1,38 +1,25 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { X, Calendar, MapPin, FileText, Clock, Hash, Image as ImageIcon, Users, Trash2 } from "lucide-react";
 import {
-  X,
-  Calendar,
-  MapPin,
-  User,
-  Building2,
-  Hash,
-  FileText,
-  Clock,
-  Megaphone,
-  Award,
-  ChevronDown,
-  ChevronUp,
-  Plus,
-  ExternalLink,
-} from "lucide-react";
-import { fetchActivityDetail } from "@/services/activityApi";
-import { fetchScholarList } from "@/services/scholarApi";
-import type { ScholarListItem } from "@/services/scholarApi";
-import type {
-  ActivityEvent,
-  ActivityEventDetail,
-  ActivityCreateRequest,
-  ActivityUpdateRequest,
+  fetchActivityDetail,
+  fetchActivityScholars,
+  type ActivityCreateRequest,
+  type ActivityEvent,
+  type ActivityEventDetail,
+  type ActivityUpdateRequest,
 } from "@/services/activityApi";
 import {
+  getAllCategories,
+  getCategoryByType,
   getSubcategoriesByCategory,
   getTypesBySubcategory,
-  getCategoryByType,
-  getAllCategories,
 } from "@/constants/activityCategories";
-import { SelectInput } from "@/components/ui/SelectInput";
+import { ComboboxInput } from "@/components/ui/ComboboxInput";
+import {
+  ScholarSearchPicker,
+  type ScholarPickResult,
+} from "@/components/common/ScholarSearchPicker";
 
 interface ActivityFormModalProps {
   isOpen: boolean;
@@ -55,13 +42,7 @@ const SERIES_OPTIONS = [
   "委员会会议",
 ];
 
-const AUDIT_STATUSES = [
-  { value: "pending", label: "待审核" },
-  { value: "approved", label: "已通过" },
-  { value: "rejected", label: "已拒绝" },
-];
-
-type FormData = Omit<ActivityCreateRequest, "scholar_ids">;
+type FormData = ActivityCreateRequest;
 
 const defaultForm: FormData = {
   category: "",
@@ -70,20 +51,24 @@ const defaultForm: FormData = {
   series_number: "",
   title: "",
   abstract: "",
-  speaker_name: "",
-  speaker_organization: "",
-  speaker_position: "",
-  speaker_bio: "",
-  speaker_photo_url: "",
   event_date: "",
   duration: 1,
   location: "",
-  publicity: "",
-  needs_email_invitation: false,
-  certificate_number: "",
-  created_by: "",
-  audit_status: "pending",
+  photo_url: "",
+  scholar_ids: [],
 };
+
+interface SelectedScholar {
+  scholar_id: string;
+  name: string;
+  institution?: string;
+}
+
+function toDateTimeInput(value: string): string {
+  if (!value) return "";
+  if (value.includes("T")) return value.slice(0, 16);
+  return `${value}T00:00`;
+}
 
 export function ActivityFormModal({
   isOpen,
@@ -92,15 +77,10 @@ export function ActivityFormModal({
   activity,
   mode,
 }: ActivityFormModalProps) {
-  const navigate = useNavigate();
-
   const [formData, setFormData] = useState<FormData>(defaultForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [speakerExpanded, setSpeakerExpanded] = useState(true);
-  const [adminExpanded, setAdminExpanded] = useState(false);
 
-  // Category cascade state
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
   const [availableSubcategories, setAvailableSubcategories] = useState<
@@ -108,23 +88,33 @@ export function ActivityFormModal({
   >([]);
   const [availableTypes, setAvailableTypes] = useState<string[]>([]);
 
-  // Scholar autocomplete
-  const [scholarResults, setScholarResults] = useState<ScholarListItem[]>([]);
-  const [scholarSearching, setScholarSearching] = useState(false);
-  const [showScholarDropdown, setShowScholarDropdown] = useState(false);
-  const speakerInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedScholars, setSelectedScholars] = useState<SelectedScholar[]>([]);
 
-  // When editing, load full detail to get all fields
+  const categoryOptions = useMemo(() => getAllCategories(), []);
+  const categoryNameToId = useMemo(
+    () => new Map(categoryOptions.map((cat) => [cat.name, cat.id])),
+    [categoryOptions],
+  );
+  const categoryIdToName = useMemo(
+    () => new Map(categoryOptions.map((cat) => [cat.id, cat.name])),
+    [categoryOptions],
+  );
+  const subcategoryNameToId = useMemo(
+    () => new Map(availableSubcategories.map((sub) => [sub.name, sub.id])),
+    [availableSubcategories],
+  );
+  const subcategoryIdToName = useMemo(
+    () => new Map(availableSubcategories.map((sub) => [sub.id, sub.name])),
+    [availableSubcategories],
+  );
+
   useEffect(() => {
     if (!isOpen) return;
 
-    if (mode === "edit" && activity) {
-      fetchActivityDetail(activity.id)
-        .then((detail: ActivityEventDetail) => {
-          const dateStr = detail.event_date
-            ? detail.event_date.slice(0, 16)
-            : "";
+    const load = async () => {
+      if (mode === "edit" && activity) {
+        try {
+          const detail: ActivityEventDetail = await fetchActivityDetail(activity.id);
           setFormData({
             category: detail.category ?? "",
             event_type: detail.event_type ?? "",
@@ -132,133 +122,76 @@ export function ActivityFormModal({
             series_number: detail.series_number ?? "",
             title: detail.title ?? "",
             abstract: detail.abstract ?? "",
-            speaker_name: detail.speaker_name ?? "",
-            speaker_organization: detail.speaker_organization ?? "",
-            speaker_position: detail.speaker_position ?? "",
-            speaker_bio: detail.speaker_bio ?? "",
-            speaker_photo_url: detail.speaker_photo_url ?? "",
-            event_date: dateStr,
+            event_date: toDateTimeInput(detail.event_date ?? ""),
             duration: detail.duration ?? 1,
             location: detail.location ?? "",
-            publicity: detail.publicity ?? "",
-            needs_email_invitation: detail.needs_email_invitation ?? false,
-            certificate_number: detail.certificate_number ?? "",
-            created_by: detail.created_by ?? "",
-            audit_status: detail.audit_status ?? "pending",
+            photo_url: detail.photo_url ?? "",
+            scholar_ids: detail.scholar_ids ?? [],
           });
 
-          // Initialize cascade state from existing data
           if (detail.event_type) {
             const categoryInfo = getCategoryByType(detail.event_type);
             if (categoryInfo) {
               setSelectedCategory(categoryInfo.categoryId);
               setSelectedSubcategory(categoryInfo.subcategoryId);
               setAvailableSubcategories(
-                getSubcategoriesByCategory(categoryInfo.categoryId).map(
-                  (sub) => ({
-                    id: sub.id,
-                    name: sub.name,
-                  }),
-                ),
+                getSubcategoriesByCategory(categoryInfo.categoryId).map((sub) => ({
+                  id: sub.id,
+                  name: sub.name,
+                })),
               );
-              setAvailableTypes(
-                getTypesBySubcategory(categoryInfo.subcategoryId),
-              );
+              setAvailableTypes(getTypesBySubcategory(categoryInfo.subcategoryId));
             }
           }
-        })
-        .catch(() => {
+
+          const scholars = await fetchActivityScholars(activity.id).catch(() => []);
+          setSelectedScholars(
+            scholars.map((s) => ({
+              scholar_id: s.scholar_id,
+              name: s.name,
+              institution: s.university,
+            })),
+          );
+        } catch {
           setFormData({
             ...defaultForm,
             category: activity.category ?? "",
-            event_type: activity.event_type,
+            event_type: activity.event_type ?? "",
             series: activity.series ?? "",
-            title: activity.title,
-            speaker_name: activity.speaker_name,
-            speaker_organization: activity.speaker_organization,
-            event_date: activity.event_date.slice(0, 16),
-            location: activity.location,
             series_number: activity.series_number ?? "",
+            title: activity.title ?? "",
+            abstract: activity.abstract ?? "",
+            event_date: toDateTimeInput(activity.event_date ?? ""),
+            duration: activity.duration ?? 1,
+            location: activity.location ?? "",
+            photo_url: activity.photo_url ?? "",
+            scholar_ids: [],
           });
-        });
-    } else {
-      setFormData(defaultForm);
-      setSelectedCategory("");
-      setSelectedSubcategory("");
-      setAvailableSubcategories([]);
-      setAvailableTypes([]);
-    }
-    setErrors({});
-    setSpeakerExpanded(true);
-    setAdminExpanded(false);
-    setScholarResults([]);
-    setShowScholarDropdown(false);
+          setSelectedScholars([]);
+        }
+      } else {
+        setFormData(defaultForm);
+        setSelectedCategory("");
+        setSelectedSubcategory("");
+        setAvailableSubcategories([]);
+        setAvailableTypes([]);
+        setSelectedScholars([]);
+      }
+      setErrors({});
+    };
+
+    load();
   }, [activity, mode, isOpen]);
 
-  // Debounced scholar search
-  useEffect(() => {
-    const name = formData.speaker_name;
-    if (!name || name.length < 1) {
-      setScholarResults([]);
-      setShowScholarDropdown(false);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setScholarSearching(true);
-      try {
-        const result = await fetchScholarList(1, 8, { search: name });
-        setScholarResults(result.items);
-        setShowScholarDropdown(true);
-      } catch {
-        // ignore search errors
-      } finally {
-        setScholarSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [formData.speaker_name]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!showScholarDropdown) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node) &&
-        speakerInputRef.current &&
-        !speakerInputRef.current.contains(e.target as Node)
-      ) {
-        setShowScholarDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showScholarDropdown]);
-
-  const selectScholar = (scholar: ScholarListItem) => {
-    setFormData((prev) => ({
-      ...prev,
-      speaker_name: scholar.name,
-      speaker_organization: scholar.university || prev.speaker_organization,
-      speaker_position: scholar.position || prev.speaker_position,
-      speaker_photo_url: scholar.photo_url || prev.speaker_photo_url,
-    }));
-    setShowScholarDropdown(false);
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next.speaker_name;
-      delete next.speaker_organization;
-      return next;
-    });
-  };
-
-  // Handle category cascade
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategory(categoryId);
     setSelectedSubcategory("");
-    setFormData((prev) => ({ ...prev, category: categoryId, event_type: "" }));
+    const categoryName = categoryIdToName.get(categoryId) ?? categoryId;
+    setFormData((prev) => ({
+      ...prev,
+      category: categoryName,
+      event_type: "",
+    }));
 
     const subcategories = getSubcategoriesByCategory(categoryId);
     setAvailableSubcategories(
@@ -303,9 +236,22 @@ export function ActivityFormModal({
     }
   };
 
-  const handleNavigateToAddScholar = () => {
-    onClose();
-    navigate("/scholars/add");
+  const handleAddScholar = (result: ScholarPickResult) => {
+    setSelectedScholars((prev) => {
+      if (prev.some((s) => s.scholar_id === result.scholar_id)) return prev;
+      return [
+        ...prev,
+        {
+          scholar_id: result.scholar_id,
+          name: result.name,
+          institution: result.institution,
+        },
+      ];
+    });
+  };
+
+  const handleRemoveScholar = (scholarId: string) => {
+    setSelectedScholars((prev) => prev.filter((s) => s.scholar_id !== scholarId));
   };
 
   const validate = () => {
@@ -313,9 +259,6 @@ export function ActivityFormModal({
     if (!formData.category.trim()) e.category = "活动分类不能为空";
     if (!formData.event_type.trim()) e.event_type = "活动类型不能为空";
     if (!formData.title.trim()) e.title = "活动标题不能为空";
-    if (!formData.speaker_name.trim()) e.speaker_name = "主讲人不能为空";
-    if (!formData.speaker_organization.trim())
-      e.speaker_organization = "主讲人单位不能为空";
     if (!formData.event_date.trim()) e.event_date = "活动日期不能为空";
     if (!formData.location.trim()) e.location = "活动地点不能为空";
     setErrors(e);
@@ -327,7 +270,21 @@ export function ActivityFormModal({
     if (!validate()) return;
     setIsSubmitting(true);
     try {
-      await onSubmit(formData);
+      const payload: ActivityCreateRequest = {
+        category: formData.category.trim(),
+        event_type: formData.event_type.trim(),
+        series: formData.series?.trim() || undefined,
+        series_number: formData.series_number?.trim() || undefined,
+        title: formData.title.trim(),
+        abstract: formData.abstract?.trim() || undefined,
+        event_date: formData.event_date.trim(),
+        duration: formData.duration,
+        location: formData.location.trim(),
+        photo_url: formData.photo_url?.trim() || undefined,
+        scholar_ids: selectedScholars.map((s) => s.scholar_id),
+      };
+
+      await onSubmit(payload);
       onClose();
     } catch (err) {
       setErrors({
@@ -338,7 +295,7 @@ export function ActivityFormModal({
     }
   };
 
-  const set = (field: keyof FormData, value: string | number | boolean) => {
+  const set = (field: keyof FormData, value: string | number | string[] | undefined) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field as string]) {
       setErrors((prev) => {
@@ -353,14 +310,19 @@ export function ActivityFormModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        onClick={() => {
+          if (!isSubmitting) onClose();
+        }}
+      >
         <motion.div
+          onClick={(e) => e.stopPropagation()}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col"
         >
-          {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
             <h2 className="text-xl font-bold text-gray-900">
               {mode === "create" ? "添加活动" : "编辑活动"}
@@ -373,139 +335,90 @@ export function ActivityFormModal({
             </button>
           </div>
 
-          {/* Form */}
           <form
             onSubmit={handleSubmit}
             className="flex-1 overflow-y-auto p-6 space-y-6"
           >
-            {/* === 基本信息 === */}
             <section>
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
                 基本信息
               </h3>
               <div className="space-y-4">
-                {/* Category Cascade Selection (三级级联) */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       一级分类 <span className="text-red-500">*</span>
                     </label>
-                    <SelectInput
-                      value={selectedCategory}
-                      onChange={handleCategoryChange}
+                    <ComboboxInput
+                      value={categoryIdToName.get(selectedCategory) ?? ""}
+                      onChange={(nextLabel) =>
+                        handleCategoryChange(categoryNameToId.get(nextLabel) ?? "")
+                      }
+                      options={categoryOptions.map((cat) => cat.name)}
                       placeholder="请选择分类"
                       error={Boolean(errors.category)}
-                    >
-                      {getAllCategories().map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </SelectInput>
+                      clearable
+                      maxHeight="260px"
+                    />
                     {errors.category && (
-                      <p className="mt-1 text-xs text-red-600">
-                        {errors.category}
-                      </p>
+                      <p className="mt-1 text-xs text-red-600">{errors.category}</p>
                     )}
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       二级分类 <span className="text-red-500">*</span>
                     </label>
-                    <SelectInput
-                      value={selectedSubcategory}
-                      onChange={handleSubcategoryChange}
+                    <ComboboxInput
+                      value={subcategoryIdToName.get(selectedSubcategory) ?? ""}
+                      onChange={(nextLabel) =>
+                        handleSubcategoryChange(
+                          subcategoryNameToId.get(nextLabel) ?? "",
+                        )
+                      }
+                      options={availableSubcategories.map((sub) => sub.name)}
                       disabled={!selectedCategory}
                       placeholder="请选择二级分类"
                       error={Boolean(errors.event_type)}
-                    >
-                      {availableSubcategories.map((sub) => (
-                        <option key={sub.id} value={sub.id}>
-                          {sub.name}
-                        </option>
-                      ))}
-                    </SelectInput>
+                      clearable
+                      maxHeight="260px"
+                    />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       活动类型 <span className="text-red-500">*</span>
                     </label>
-                    <SelectInput
+                    <ComboboxInput
                       value={formData.event_type}
                       onChange={handleEventTypeChange}
+                      options={availableTypes}
                       disabled={!selectedSubcategory}
                       placeholder="请选择活动类型"
                       error={Boolean(errors.event_type)}
-                    >
-                      {availableTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </SelectInput>
+                      clearable
+                      maxHeight="260px"
+                    />
                     {errors.event_type && (
-                      <p className="mt-1 text-xs text-red-600">
-                        {errors.event_type}
-                      </p>
+                      <p className="mt-1 text-xs text-red-600">{errors.event_type}</p>
                     )}
                   </div>
                 </div>
 
-                {/* Series */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     活动系列
                   </label>
-                  <SelectInput
+                  <ComboboxInput
                     value={formData.series ?? ""}
                     onChange={(v) => set("series", v)}
-                  >
-                    <option value="">无（独立活动）</option>
-                    {SERIES_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </SelectInput>
-                </div>
-
-                {/* Title */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    活动标题 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => set("title", e.target.value)}
-                    placeholder="请输入活动标题"
-                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                      errors.title ? "border-red-300" : "border-gray-200"
-                    }`}
-                  />
-                  {errors.title && (
-                    <p className="mt-1 text-xs text-red-600">{errors.title}</p>
-                  )}
-                </div>
-
-                {/* Abstract */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5" />
-                      摘要
-                    </span>
-                  </label>
-                  <textarea
-                    value={formData.abstract ?? ""}
-                    onChange={(e) => set("abstract", e.target.value)}
-                    placeholder="请输入活动摘要"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                    options={SERIES_OPTIONS}
+                    placeholder="无（独立活动）"
+                    clearable
+                    maxHeight="260px"
                   />
                 </div>
 
-                {/* Series Number + Certificate */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -525,25 +438,56 @@ export function ActivityFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       <span className="flex items-center gap-1.5">
-                        <Award className="w-3.5 h-3.5" />
-                        证书编号
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        活动照片 URL
                       </span>
                     </label>
                     <input
-                      type="text"
-                      value={formData.certificate_number ?? ""}
-                      onChange={(e) =>
-                        set("certificate_number", e.target.value)
-                      }
-                      placeholder="例如：XAI-D2642-001"
+                      type="url"
+                      value={formData.photo_url ?? ""}
+                      onChange={(e) => set("photo_url", e.target.value)}
+                      placeholder="https://example.com/activity.jpg"
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    活动标题 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => set("title", e.target.value)}
+                    placeholder="请输入活动标题"
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                      errors.title ? "border-red-300" : "border-gray-200"
+                    }`}
+                  />
+                  {errors.title && (
+                    <p className="mt-1 text-xs text-red-600">{errors.title}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5" />
+                      摘要
+                    </span>
+                  </label>
+                  <textarea
+                    value={formData.abstract ?? ""}
+                    onChange={(e) => set("abstract", e.target.value)}
+                    placeholder="请输入活动摘要"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                  />
+                </div>
               </div>
             </section>
 
-            {/* === 时间地点 === */}
             <section>
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
                 时间与地点
@@ -566,11 +510,10 @@ export function ActivityFormModal({
                       }`}
                     />
                     {errors.event_date && (
-                      <p className="mt-1 text-xs text-red-600">
-                        {errors.event_date}
-                      </p>
+                      <p className="mt-1 text-xs text-red-600">{errors.event_date}</p>
                     )}
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       <span className="flex items-center gap-1.5">
@@ -582,14 +525,18 @@ export function ActivityFormModal({
                       type="number"
                       step="0.5"
                       min="0.5"
-                      value={formData.duration ?? 1}
+                      value={formData.duration ?? ""}
                       onChange={(e) =>
-                        set("duration", parseFloat(e.target.value) || 1)
+                        set(
+                          "duration",
+                          e.target.value === "" ? undefined : parseFloat(e.target.value),
+                        )
                       }
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     <span className="flex items-center gap-1.5">
@@ -607,304 +554,55 @@ export function ActivityFormModal({
                     }`}
                   />
                   {errors.location && (
-                    <p className="mt-1 text-xs text-red-600">
-                      {errors.location}
-                    </p>
+                    <p className="mt-1 text-xs text-red-600">{errors.location}</p>
                   )}
                 </div>
               </div>
             </section>
 
-            {/* === 主讲人信息（可折叠） === */}
             <section>
-              <button
-                type="button"
-                onClick={() => setSpeakerExpanded((v) => !v)}
-                className="w-full flex items-center justify-between text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2"
-              >
-                <span className="flex items-center gap-2">
-                  <User className="w-3.5 h-3.5" />
-                  主讲人信息
-                </span>
-                {speakerExpanded ? (
-                  <ChevronUp className="w-4 h-4" />
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Users className="w-3.5 h-3.5" />
+                关联学者（可选）
+              </h3>
+
+              <div className="space-y-3">
+                <ScholarSearchPicker
+                  onSelect={handleAddScholar}
+                  placeholder="输入学者姓名、院校或研究方向搜索..."
+                  excludeIds={selectedScholars.map((s) => s.scholar_id)}
+                />
+
+                {selectedScholars.length === 0 ? (
+                  <p className="text-xs text-gray-500">
+                    当前未关联学者。创建后也可以在活动详情页继续添加。
+                  </p>
                 ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </button>
-              {speakerExpanded && (
-                <div className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Speaker name with scholar autocomplete */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        主讲人姓名 <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
-                        <input
-                          ref={speakerInputRef}
-                          type="text"
-                          value={formData.speaker_name}
-                          onChange={(e) => set("speaker_name", e.target.value)}
-                          onFocus={() => {
-                            if (scholarResults.length > 0)
-                              setShowScholarDropdown(true);
-                          }}
-                          placeholder="输入姓名从学者库搜索"
-                          className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                            errors.speaker_name
-                              ? "border-red-300"
-                              : "border-gray-200"
-                          }`}
-                        />
-                        {/* Scholar search dropdown */}
-                        {showScholarDropdown && (
-                          <div
-                            ref={dropdownRef}
-                            className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
-                          >
-                            {scholarSearching ? (
-                              <div className="px-3 py-3 text-xs text-gray-400 text-center">
-                                搜索中...
-                              </div>
-                            ) : scholarResults.length > 0 ? (
-                              <>
-                                <div className="max-h-48 overflow-y-auto">
-                                  {scholarResults.map((scholar) => (
-                                    <button
-                                      key={scholar.url_hash}
-                                      type="button"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        selectScholar(scholar);
-                                      }}
-                                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors text-left"
-                                    >
-                                      {scholar.photo_url ? (
-                                        <img
-                                          src={scholar.photo_url}
-                                          alt={scholar.name}
-                                          className="w-8 h-8 rounded-full object-cover shrink-0"
-                                        />
-                                      ) : (
-                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                                          <User className="w-4 h-4 text-gray-400" />
-                                        </div>
-                                      )}
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-gray-900">
-                                          {scholar.name}
-                                        </p>
-                                        <p className="text-xs text-gray-500 truncate">
-                                          {[
-                                            scholar.position,
-                                            scholar.university,
-                                          ]
-                                            .filter(Boolean)
-                                            .join(" · ")}
-                                        </p>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                                <div className="border-t border-gray-100 px-3 py-2">
-                                  <button
-                                    type="button"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      handleNavigateToAddScholar();
-                                    }}
-                                    className="w-full flex items-center justify-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 py-1"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    找不到？前往新增学者
-                                  </button>
-                                </div>
-                              </>
-                            ) : (
-                              <div className="px-3 py-3 text-center">
-                                <p className="text-xs text-gray-500 mb-2">
-                                  学者库中未找到匹配学者
-                                </p>
-                                <button
-                                  type="button"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    handleNavigateToAddScholar();
-                                  }}
-                                  className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 mx-auto"
-                                >
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                  前往新增学者
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {errors.speaker_name && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {errors.speaker_name}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Position */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        职务/职称
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.speaker_position ?? ""}
-                        onChange={(e) =>
-                          set("speaker_position", e.target.value)
-                        }
-                        placeholder="例如：教授、创始人"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Organization */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      所在单位 <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={formData.speaker_organization}
-                        onChange={(e) =>
-                          set("speaker_organization", e.target.value)
-                        }
-                        placeholder="请输入所在单位"
-                        className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                          errors.speaker_organization
-                            ? "border-red-300"
-                            : "border-gray-200"
-                        }`}
-                      />
-                    </div>
-                    {errors.speaker_organization && (
-                      <p className="mt-1 text-xs text-red-600">
-                        {errors.speaker_organization}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Bio */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      主讲人简介
-                    </label>
-                    <textarea
-                      value={formData.speaker_bio ?? ""}
-                      onChange={(e) => set("speaker_bio", e.target.value)}
-                      placeholder="请输入主讲人简介"
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-                    />
-                  </div>
-
-                  {/* Photo URL */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      照片文件名
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.speaker_photo_url ?? ""}
-                      onChange={(e) => set("speaker_photo_url", e.target.value)}
-                      placeholder="例如：zhou-ming-photo.png"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {/* === 管理信息（可折叠） === */}
-            <section>
-              <button
-                type="button"
-                onClick={() => setAdminExpanded((v) => !v)}
-                className="w-full flex items-center justify-between text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2"
-              >
-                <span className="flex items-center gap-2">
-                  <Megaphone className="w-3.5 h-3.5" />
-                  管理信息
-                </span>
-                {adminExpanded ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </button>
-              {adminExpanded && (
-                <div className="space-y-4 pt-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      宣传方式
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.publicity ?? ""}
-                      onChange={(e) => set("publicity", e.target.value)}
-                      placeholder="例如：可摄影摄像，仅图文发布"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      id="needs_email"
-                      type="checkbox"
-                      checked={formData.needs_email_invitation ?? false}
-                      onChange={(e) =>
-                        set("needs_email_invitation", e.target.checked)
-                      }
-                      className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <label
-                      htmlFor="needs_email"
-                      className="text-sm font-medium text-gray-700"
-                    >
-                      需要发送邮件邀请
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        录入人
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.created_by ?? ""}
-                        onChange={(e) => set("created_by", e.target.value)}
-                        placeholder="请输入录入人姓名"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        审核状态
-                      </label>
-                      <SelectInput
-                        value={formData.audit_status ?? "pending"}
-                        onChange={(v) => set("audit_status", v)}
+                  <div className="space-y-2">
+                    {selectedScholars.map((s) => (
+                      <div
+                        key={s.scholar_id}
+                        className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg"
                       >
-                        {AUDIT_STATUSES.map((s) => (
-                          <option key={s.value} value={s.value}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </SelectInput>
-                    </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{s.name}</p>
+                          {s.institution && (
+                            <p className="text-xs text-gray-500 truncate">{s.institution}</p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveScholar(s.scholar_id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="移除学者"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </section>
 
             {errors.submit && (
@@ -914,7 +612,6 @@ export function ActivityFormModal({
             )}
           </form>
 
-          {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"

@@ -159,8 +159,8 @@ export default function ScholarDetailPageDemo() {
               />
 
               <ProjectCategorySelector
-                primaryCategory={scholar.project_category}
-                subcategory={scholar.project_subcategory}
+                primaryCategory={scholar.project_tags?.[0]?.category ?? ""}
+                subcategory={scholar.project_tags?.[0]?.subcategory ?? ""}
                 onSave={handleProjectCategorySave}
               />
 

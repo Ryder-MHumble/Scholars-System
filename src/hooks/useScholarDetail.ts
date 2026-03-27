@@ -145,9 +145,13 @@ export function useScholarDetail(scholarId: string | undefined) {
   // -- Project category save --
   const handleProjectCategorySave = async (primary: string, sub: string) => {
     if (!scholar) return;
+    const projectTags =
+      primary || sub
+        ? [{ category: primary.trim(), subcategory: sub.trim() }]
+        : [];
     const updated = await patchScholarRelation(scholar.url_hash, {
-      project_category: primary,
-      project_subcategory: sub,
+      project_tags: projectTags,
+      is_cobuild_scholar: projectTags.length > 0,
     });
     setScholar(updated);
   };

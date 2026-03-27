@@ -17,6 +17,7 @@ interface InstitutionAutocompleteProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onCreateNew?: (name: string) => Promise<string | void> | string | void;
   required?: boolean;
   placeholder?: string;
   region?: string; // Optional region filter
@@ -27,6 +28,7 @@ export function InstitutionAutocomplete({
   label,
   value,
   onChange,
+  onCreateNew,
   required,
   placeholder = "输入机构名称搜索...",
   region,
@@ -35,6 +37,7 @@ export function InstitutionAutocomplete({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<InstitutionSearchResult[]>([]);
+  const [creating, setCreating] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,6 +107,31 @@ export function InstitutionAutocomplete({
     ? [...results, { id: "__create_new__", name: value, entity_type: null, region: null, org_type: null, parent_id: null, scholar_count: 0 } as InstitutionSearchResult]
     : results;
 
+  const handleSelect = async (option: InstitutionSearchResult) => {
+    const isCreateNew = option.id === "__create_new__";
+    const selectedName = option.name.trim();
+    if (!selectedName) return;
+
+    if (isCreateNew && onCreateNew) {
+      setCreating(true);
+      try {
+        const createdName = await onCreateNew(selectedName);
+        onChange((createdName ?? selectedName).trim());
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "创建机构失败";
+        alert(message);
+      } finally {
+        setCreating(false);
+        setOpen(false);
+      }
+      return;
+    }
+
+    onChange(selectedName);
+    setOpen(false);
+  };
+
   return (
     <div ref={containerRef} className="relative">
       <label className="block text-xs text-gray-500 mb-1">
@@ -114,6 +142,7 @@ export function InstitutionAutocomplete({
         <input
           type="text"
           value={value}
+          disabled={creating}
           onChange={(e) => {
             onChange(e.target.value);
             setOpen(true);
@@ -133,8 +162,7 @@ export function InstitutionAutocomplete({
               allOptions[highlightIdx]
             ) {
               e.preventDefault();
-              onChange(allOptions[highlightIdx].name);
-              setOpen(false);
+              void handleSelect(allOptions[highlightIdx]);
             } else if (e.key === "Escape") {
               setOpen(false);
             }
@@ -170,8 +198,7 @@ export function InstitutionAutocomplete({
                     key={option.id}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      onChange(option.name);
-                      setOpen(false);
+                      void handleSelect(option);
                     }}
                     onMouseEnter={() => setHighlightIdx(i)}
                     className={cn(
@@ -185,7 +212,7 @@ export function InstitutionAutocomplete({
                       <div className="flex items-center gap-2 text-primary-600">
                         <Plus className="w-4 h-4" />
                         <span className="font-medium">
-                          创建新机构: {option.name}
+                          {creating ? "创建中..." : `创建新机构: ${option.name}`}
                         </span>
                       </div>
                     ) : (

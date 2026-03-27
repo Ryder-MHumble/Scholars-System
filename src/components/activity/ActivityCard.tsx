@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Calendar, MapPin, Users, User, Hash, Clock } from "lucide-react";
+import { Calendar, MapPin, Users, Hash, Clock } from "lucide-react";
 import type { ActivityEvent } from "@/services/activityApi";
 
 interface ActivityCardProps {
@@ -149,30 +149,6 @@ export function ActivityCard({ activity, index }: ActivityCardProps) {
 
         {/* Content */}
         <div className="flex flex-col flex-1 px-5 py-4 gap-4">
-          {/* Speaker section with enhanced styling */}
-          <div className="flex items-center gap-3">
-            <div
-              className={`
-              w-10 h-10 rounded-xl ${colors.iconBg}
-              flex items-center justify-center shrink-0
-              ring-1 ring-gray-100
-              group-hover:scale-110 transition-transform duration-300
-            `}
-            >
-              <User className={`w-5 h-5 ${colors.accent}`} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
-                {activity.speaker_name || "主讲人待定"}
-              </p>
-              {activity.speaker_organization && (
-                <p className="text-xs text-gray-500 truncate leading-tight mt-1">
-                  {activity.speaker_organization}
-                </p>
-              )}
-            </div>
-          </div>
-
           {/* Date & Time section */}
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center gap-2.5 text-sm">
@@ -203,6 +179,11 @@ export function ActivityCard({ activity, index }: ActivityCardProps) {
                 </span>
               </div>
             )}
+
+            <div className="text-xs text-gray-500">
+              分类：{activity.category || "未分类"}
+              {activity.series ? ` · 系列：${activity.series}` : ""}
+            </div>
           </div>
         </div>
 

@@ -19,6 +19,15 @@ export interface ProjectOutput {
 
 export interface Project {
   id: string;
+  // Canonical backend fields (tag model)
+  category: string;
+  subcategory: string;
+  title: string;
+  summary: string;
+  scholar_ids: string[];
+  custom_fields?: Record<string, string>;
+
+  // Legacy UI fields (mapped from canonical fields for compatibility)
   name: string;
   pi_name: string;
   pi_institution: string;
@@ -27,7 +36,6 @@ export interface Project {
   start_year: number;
   end_year?: number;
   status: string;
-  category: string;
   description?: string;
   keywords: string[];
   tags: string[];
@@ -41,6 +49,15 @@ export interface Project {
 
 export interface ProjectListItem {
   id: string;
+  // Canonical backend fields
+  category: string;
+  subcategory: string;
+  title: string;
+  summary: string;
+  scholar_ids: string[];
+  scholar_count?: number;
+
+  // Legacy UI fields
   name: string;
   pi_name: string;
   pi_institution: string;
@@ -49,7 +66,6 @@ export interface ProjectListItem {
   start_year: number;
   end_year?: number;
   status: string;
-  category: string;
   description?: string;
   keywords: string[];
   tags: string[];
@@ -65,6 +81,15 @@ export interface ProjectListResponse {
 }
 
 export interface ProjectCreateRequest {
+  // Canonical backend fields
+  category: string;
+  subcategory?: string;
+  title?: string;
+  summary?: string;
+  scholar_ids?: string[];
+  custom_fields?: Record<string, string>;
+
+  // Legacy UI fields
   name: string;
   pi_name: string;
   pi_institution: string;
@@ -73,7 +98,6 @@ export interface ProjectCreateRequest {
   start_year: number;
   end_year?: number;
   status: string;
-  category: string;
   description?: string;
   keywords?: string[];
   tags?: string[];

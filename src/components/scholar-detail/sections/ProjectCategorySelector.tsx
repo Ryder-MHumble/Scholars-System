@@ -56,7 +56,7 @@ export function ProjectCategorySelector({
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
       <div className="flex items-center gap-2 mb-5">
         <FolderKanban className="w-5 h-5 text-primary-600" />
-        <h3 className="text-base font-semibold text-gray-900">项目分类</h3>
+        <h3 className="text-base font-semibold text-gray-900">项目所属导师</h3>
       </div>
 
       {/* Primary Category Selection */}

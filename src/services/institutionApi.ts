@@ -1,6 +1,7 @@
 import type {
   InstitutionListResponse,
   InstitutionDetail,
+  LeadershipDetailResponse,
   InstitutionPatchRequest,
   InstitutionTreeResponse,
 } from "@/types/institution";
@@ -141,6 +142,14 @@ export async function fetchInstitutionDetail(
 ): Promise<InstitutionDetail> {
   const res = await fetch(`${BASE_URL}/api/v1/institutions/${id}`);
   if (!res.ok) throw new Error(`机构详情加载失败: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchInstitutionLeadership(
+  institutionId: string,
+): Promise<LeadershipDetailResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/leadership/${institutionId}`);
+  if (!res.ok) throw new Error(`院领导信息加载失败: ${res.status}`);
   return res.json();
 }
 
@@ -325,4 +334,86 @@ export async function getDepartmentsForUniversity(
   return data.items
     .filter((dept: InstitutionSearchResult) => dept.parent_id === university.id)
     .map((dept: InstitutionSearchResult) => dept.name);
+}
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function findExactInstitution(
+  results: InstitutionSearchResult[],
+  name: string,
+  options?: {
+    entityType?: "organization" | "department";
+    parentId?: string;
+  },
+): InstitutionSearchResult | null {
+  const target = normalizeName(name);
+  for (const item of results) {
+    if (normalizeName(item.name) !== target) continue;
+    if (options?.entityType && item.entity_type !== options.entityType) continue;
+    if (options?.parentId !== undefined && item.parent_id !== options.parentId) continue;
+    return item;
+  }
+  return null;
+}
+
+export async function ensureOrganizationExists(
+  organizationName: string,
+): Promise<InstitutionSearchResult> {
+  const name = organizationName.trim();
+  if (!name) throw new Error("机构名称不能为空");
+
+  const search = await searchInstitutions(name, { limit: 50 });
+  const exact = findExactInstitution(search.results, name, {
+    entityType: "organization",
+  });
+  if (exact) return exact;
+
+  const created = await createInstitution({
+    name,
+    entity_type: "organization",
+  });
+  return {
+    id: created.id,
+    name: created.name,
+    entity_type: (created.entity_type as "organization" | "department" | null) ?? "organization",
+    region: created.region ?? null,
+    org_type: created.org_type ?? null,
+    parent_id: created.parent_id ?? null,
+    scholar_count: created.scholar_count ?? 0,
+  };
+}
+
+export async function ensureDepartmentExists(
+  universityName: string,
+  departmentName: string,
+): Promise<InstitutionSearchResult> {
+  const uniName = universityName.trim();
+  const deptName = departmentName.trim();
+  if (!uniName) throw new Error("请先选择院校");
+  if (!deptName) throw new Error("院系名称不能为空");
+
+  const organization = await ensureOrganizationExists(uniName);
+  const search = await searchInstitutions(deptName, { limit: 50 });
+  const exact = findExactInstitution(search.results, deptName, {
+    entityType: "department",
+    parentId: organization.id,
+  });
+  if (exact) return exact;
+
+  const created = await createInstitution({
+    name: deptName,
+    entity_type: "department",
+    parent_id: organization.id,
+  });
+  return {
+    id: created.id,
+    name: created.name,
+    entity_type: (created.entity_type as "organization" | "department" | null) ?? "department",
+    region: created.region ?? null,
+    org_type: created.org_type ?? null,
+    parent_id: created.parent_id ?? null,
+    scholar_count: created.scholar_count ?? 0,
+  };
 }

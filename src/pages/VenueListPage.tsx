@@ -13,7 +13,7 @@ import { cn } from "@/utils/cn";
 
 const API_BASE_URL = import.meta.env.DEV
   ? "http://localhost:8002/api/v1"
-  : "http://43.98.254.243:8001/api/v1";
+  : "http://10.1.132.21:8001/api/v1";
 
 export default function VenueListPage() {
   const [searchParams] = useSearchParams();

@@ -73,6 +73,37 @@ export interface PersonInfo {
   research_area: string | null;
 }
 
+export interface LeadershipMember {
+  name: string;
+  role: string;
+  profile_url: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  intro_lines: string[];
+  source_page_url: string | null;
+  detail_name_text: string | null;
+}
+
+export interface LeadershipDetailResponse {
+  source_id: string;
+  institution_id: string | null;
+  university_name: string;
+  source_name: string | null;
+  source_url: string | null;
+  dimension: string | null;
+  group: string | null;
+  crawled_at: string | null;
+  previous_crawled_at: string | null;
+  leader_count: number;
+  new_leader_count: number;
+  role_counts: Record<string, number>;
+  leaders: LeadershipMember[];
+  data_hash: string | null;
+  change_version: number;
+  last_changed_at: string | null;
+  updated_at: string | null;
+}
+
 export interface DepartmentSource {
   source_id: string;
   source_name: string;

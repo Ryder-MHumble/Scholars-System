@@ -14,6 +14,9 @@ import { ClickToEditField } from "@/components/scholar-detail/shared/ClickToEdit
 import { ExchangeRecordFormModal } from "@/components/scholar-detail/modals/ExchangeRecordFormModal";
 import { cn } from "@/utils/cn";
 import { slideInUp } from "@/utils/animations";
+import { getAllSubcategories } from "@/constants/projectCategories";
+import { getAllEventTypes } from "@/constants/activityCategories";
+import { ComboboxInput } from "@/components/ui/ComboboxInput";
 
 const AGREEMENT_STATUS_STYLES: Record<string, string> = {
   已签署: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -26,7 +29,12 @@ const AGREEMENT_STATUS_STYLES: Record<string, string> = {
 
 interface RelationCardProps {
   scholar: ScholarDetail;
-  onRelationToggle: (
+  mode?: "relation" | "category";
+  projectCategory?: string;
+  activityCategory?: string;
+  onProjectCategoryChange?: (value: string) => void;
+  onActivityCategoryChange?: (value: string) => void;
+  onRelationToggle?: (
     field: "is_advisor_committee" | "is_potential_recruit",
   ) => Promise<void>;
   onRelationNotesSave: (val: string) => Promise<void>;
@@ -40,6 +48,11 @@ const RELATION_BADGES = [
 
 export function RelationCard({
   scholar,
+  mode = "relation",
+  projectCategory = "",
+  activityCategory = "",
+  onProjectCategoryChange,
+  onActivityCategoryChange,
   onRelationToggle,
   onRelationNotesSave,
   onSaveExchangeRecords,
@@ -103,6 +116,8 @@ export function RelationCard({
 
   const adjSup = scholar.adjunct_supervisor;
   const hasAdjunct = Boolean(adjSup?.status);
+  const projectOptions = getAllSubcategories();
+  const activityOptions = getAllEventTypes();
 
   return (
     <>
@@ -131,48 +146,73 @@ export function RelationCard({
           <h3 className="text-base font-semibold text-gray-900">与两院关系</h3>
         </div>
 
-        {/* Relation badges */}
+        {/* Relation overview / category config */}
         <div className="mb-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-            关系概况
+            {mode === "category" ? "关系分类" : "关系概况"}
           </p>
-          <div className="flex flex-wrap gap-2">
-            {relationBadges.map((rel) => (
-              <button
-                key={rel.label}
-                onClick={() => onRelationToggle(rel.field)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all hover:opacity-80",
-                  rel.active
-                    ? "bg-primary-50 border-primary-200 text-primary-700"
-                    : "bg-gray-50 border-gray-200 text-gray-400",
-                )}
-              >
-                <span
-                  className={cn(
-                    "w-1.5 h-1.5 rounded-full",
-                    rel.active ? "bg-primary-500" : "bg-gray-300",
-                  )}
+          {mode === "category" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-1.5">项目分类</p>
+                <ComboboxInput
+                  value={projectCategory}
+                  onChange={(value) => onProjectCategoryChange?.(value)}
+                  options={projectOptions}
+                  placeholder="输入或选择项目分类"
+                  clearable
                 />
-                <span className="font-medium">{rel.label}</span>
-                {rel.active && rel.desc && (
-                  <span className="text-xs text-primary-500">{rel.desc}</span>
-                )}
-              </button>
-            ))}
-            {/* Adjunct supervisor badge (read-only display) */}
-            {hasAdjunct && (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm bg-indigo-50 border-indigo-200 text-indigo-700">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                <span className="font-medium">共建导师</span>
-                {adjSup?.status && (
-                  <span className="text-xs text-indigo-500">
-                    {adjSup.status}
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1.5">活动分类</p>
+                <ComboboxInput
+                  value={activityCategory}
+                  onChange={(value) => onActivityCategoryChange?.(value)}
+                  options={activityOptions}
+                  placeholder="输入或选择活动分类"
+                  clearable
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {relationBadges.map((rel) => (
+                <button
+                  key={rel.label}
+                  onClick={() => onRelationToggle?.(rel.field)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all hover:opacity-80",
+                    rel.active
+                      ? "bg-primary-50 border-primary-200 text-primary-700"
+                      : "bg-gray-50 border-gray-200 text-gray-400",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full",
+                      rel.active ? "bg-primary-500" : "bg-gray-300",
+                    )}
+                  />
+                  <span className="font-medium">{rel.label}</span>
+                  {rel.active && rel.desc && (
+                    <span className="text-xs text-primary-500">{rel.desc}</span>
+                  )}
+                </button>
+              ))}
+              {/* Adjunct supervisor badge (read-only display) */}
+              {hasAdjunct && (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm bg-indigo-50 border-indigo-200 text-indigo-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  <span className="font-medium">共建导师</span>
+                  {adjSup?.status && (
+                    <span className="text-xs text-indigo-500">
+                      {adjSup.status}
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
           {scholar.institute_relation_notes ? (
             <ClickToEditField
               value={scholar.institute_relation_notes}
