@@ -18,7 +18,6 @@ import type { ActivityCreateRequest } from "@/services/activityApi";
 import {
   getAllCategories,
   getCategoryByType,
-  getSubcategoriesByCategory,
 } from "@/constants/activityCategories";
 
 interface ActivityBatchImportModalProps {
@@ -66,8 +65,7 @@ function StepIndicator({ current }: { current: ModalStep }) {
 
 const ACTIVITY_FIELDS = [
   { label: "一级分类", required: true, hint: "教育培养 / 科研学术 / 人才引育" },
-  { label: "二级分类", required: true, hint: "如 论坛讲座 / 学术会议 / 人才论坛" },
-  { label: "活动类型", required: true, hint: "如 学科前沿讲座 / 国际AI科学家大会 / 青年论坛" },
+  { label: "活动类型", required: true, hint: "如 开学典礼 / 国际AI科学家大会 / 青年论坛" },
   { label: "活动系列", required: false, hint: "如 XAI智汇讲坛，可留空" },
   { label: "系列编号", required: false, hint: "如 42，可留空" },
   { label: "活动标题", required: true, hint: "完整活动名称" },
@@ -118,16 +116,6 @@ export function ActivityBatchImportModal({
   const categoryIdToName = new Map(
     getAllCategories().map((cat) => [cat.id, cat.name]),
   );
-  const subcategoryNameToId = new Map(
-    getAllCategories().flatMap((cat) =>
-      getSubcategoriesByCategory(cat.id).map((sub) => [sub.name, sub.id]),
-    ),
-  );
-  const subcategoryIdToName = new Map(
-    getAllCategories().flatMap((cat) =>
-      getSubcategoriesByCategory(cat.id).map((sub) => [sub.id, sub.name]),
-    ),
-  );
 
   const [step, setStep] = useState<ModalStep>(1);
   const [file, setFile] = useState<File | null>(null);
@@ -173,7 +161,6 @@ export function ActivityBatchImportModal({
         const rowNum = i + 2;
         const [
           categoryName,
-          subcategoryName,
           eventType,
           ,
           ,
@@ -186,7 +173,6 @@ export function ActivityBatchImportModal({
           ,
         ] = data;
         if (!categoryName?.trim()) return { row: rowNum, data, error: "一级分类不能为空" };
-        if (!subcategoryName?.trim()) return { row: rowNum, data, error: "二级分类不能为空" };
         if (!eventType?.trim()) return { row: rowNum, data, error: "活动类型不能为空" };
         if (!title?.trim()) return { row: rowNum, data, error: "活动标题不能为空" };
         if (!eventDate?.trim()) return { row: rowNum, data, error: "活动日期不能为空" };
@@ -194,10 +180,6 @@ export function ActivityBatchImportModal({
         const inputCategoryId = categoryNameToId.get(categoryName.trim());
         if (!inputCategoryId) {
           return { row: rowNum, data, error: `未知一级分类"${categoryName}"` };
-        }
-        const inputSubcategoryId = subcategoryNameToId.get(subcategoryName.trim());
-        if (!inputSubcategoryId) {
-          return { row: rowNum, data, error: `未知二级分类"${subcategoryName}"` };
         }
         const cat = getCategoryByType(eventType.trim());
         if (!cat) return { row: rowNum, data, error: `未知活动类型"${eventType}"` };
@@ -207,15 +189,6 @@ export function ActivityBatchImportModal({
             row: rowNum,
             data,
             error: `活动类型"${eventType}"应属于一级分类"${expectedCategoryName}"`,
-          };
-        }
-        if (cat.subcategoryId !== inputSubcategoryId) {
-          const expectedSubcategoryName =
-            subcategoryIdToName.get(cat.subcategoryId) ?? cat.subcategoryId;
-          return {
-            row: rowNum,
-            data,
-            error: `活动类型"${eventType}"应属于二级分类"${expectedSubcategoryName}"`,
           };
         }
         return { row: rowNum, data };
@@ -242,8 +215,7 @@ export function ActivityBatchImportModal({
     const errors: string[] = [];
     for (const pr of validRows) {
       const [
-        ,
-        ,
+        categoryName,
         eventType,
         series,
         seriesNumber,
@@ -256,10 +228,14 @@ export function ActivityBatchImportModal({
         scholarIds,
       ] = pr.data;
       try {
-        const cat = getCategoryByType(eventType.trim())!;
+        const cat = getCategoryByType(eventType.trim());
+        if (!cat) {
+          throw new Error(`未知活动类型"${eventType}"`);
+        }
         const data: ActivityCreateRequest = {
           category:
-            categoryIdToName.get(cat.categoryId) ??
+            categoryName?.trim() ||
+            categoryIdToName.get(cat.categoryId) ||
             cat.categoryId,
           event_type: eventType.trim(),
           series: series?.trim() || undefined,
@@ -295,8 +271,8 @@ export function ActivityBatchImportModal({
   };
 
   const downloadTemplate = () => {
-    const template = `一级分类,二级分类,活动类型,活动系列,系列编号,活动标题,摘要,活动日期,时长,活动地点,活动照片URL,关联学者IDs
-科研学术,论坛讲座,学科前沿讲座,XAI智汇讲坛,42,人工智能前沿技术探讨,探讨最新的AI技术发展趋势,2024-03-15T14:00,2,清华大学主楼,https://example.com/activity.jpg,scholar_001|scholar_002`;
+    const template = `一级分类,活动类型,活动系列,系列编号,活动标题,摘要,活动日期,时长,活动地点,活动照片URL,关联学者IDs
+科研学术,XAI智汇讲坛,XAI智汇讲坛,42,人工智能前沿技术探讨,探讨最新的AI技术发展趋势,2024-03-15T14:00,2,清华大学主楼,https://example.com/activity.jpg,scholar_001|scholar_002`;
     const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -452,7 +428,7 @@ export function ActivityBatchImportModal({
                       <ul className="space-y-2">
                         {[
                           "列顺序需与模板完全一致",
-                          "一级/二级分类与活动类型必须匹配",
+                          "一级分类与活动类型必须匹配",
                           "日期格式：2024-03-15T14:00",
                           "关联学者IDs 填学者 url_hash，多个用 | 分隔",
                           "导入后不可撤销，请核对后再提交",
@@ -654,13 +630,13 @@ export function ActivityBatchImportModal({
                               <tbody className="divide-y divide-gray-100">
                                 {validRows.slice(0, 5).map((pr, idx) => (
                                   <tr key={idx} className="hover:bg-blue-50/30">
-                                    <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">{pr.data[2]}</td>
-                                    <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{pr.data[5]}</td>
-                                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{pr.data[7]?.slice(0, 10)}</td>
-                                    <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">{pr.data[9]}</td>
+                                    <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">{pr.data[1]}</td>
+                                    <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{pr.data[4]}</td>
+                                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{pr.data[6]?.slice(0, 10)}</td>
+                                    <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">{pr.data[8]}</td>
                                     <td className="px-3 py-2 text-gray-700 max-w-[100px] truncate">
-                                      {pr.data[11]
-                                        ? pr.data[11]
+                                      {pr.data[10]
+                                        ? pr.data[10]
                                             .split("|")
                                             .map((id) => id.trim())
                                             .filter(Boolean).length

@@ -7,10 +7,9 @@ import type {
   ProjectPatchRequest,
   RelatedScholar,
 } from "@/types/project";
+import { API_BASE_URL } from "@/services/apiBase";
 
-const BASE_URL = import.meta.env.DEV
-  ? "http://localhost:8002"
-  : "http://10.1.132.21:8001";
+const BASE_URL = API_BASE_URL;
 
 interface BackendProjectListItem {
   id: string;

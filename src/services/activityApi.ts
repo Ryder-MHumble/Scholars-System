@@ -1,6 +1,6 @@
-const BASE_URL = import.meta.env.DEV
-  ? "http://localhost:8002"
-  : "http://10.1.132.21:8001";
+import { API_BASE_URL } from "@/services/apiBase";
+
+const BASE_URL = API_BASE_URL;
 
 // List item (from GET /api/v1/events/)
 export interface ActivityEvent {

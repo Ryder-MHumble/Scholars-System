@@ -157,47 +157,43 @@ function getGradient(id: string) {
   return MONOGRAM_GRADIENTS[h % MONOGRAM_GRADIENTS.length];
 }
 
-// ── Dept color accents ─────────────────────────────────────────────────────
-
-const DEPT_ACCENTS = [
-  "bg-blue-50 text-blue-700 ring-1 ring-blue-100",
-  "bg-violet-50 text-violet-700 ring-1 ring-violet-100",
-  "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
-  "bg-rose-50 text-rose-700 ring-1 ring-rose-100",
-  "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
-  "bg-teal-50 text-teal-700 ring-1 ring-teal-100",
-  "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100",
-] as const;
-
-function getDeptAccent(id: string, idx: number) {
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return DEPT_ACCENTS[(h + idx) % DEPT_ACCENTS.length];
-}
-
 // ── University logo component ──────────────────────────────────────────────
 
 function UniversityLogo({
   name,
   id,
   avatar,
+  mode = "compact",
 }: {
   name: string;
   id: string;
   avatar?: string | null;
+  mode?: "compact" | "hero";
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const logoSrc = avatar || getLogoSrc(name);
   const gradient = getGradient(id);
   const initial = name.trim().charAt(0);
 
+  const isHero = mode === "hero";
+
   if (logoSrc && !imgFailed) {
     return (
-      <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center overflow-hidden shrink-0 p-1">
+      <div
+        className={
+          isHero
+            ? "w-full h-full rounded-2xl bg-white flex items-center justify-center overflow-hidden"
+            : "w-14 h-14 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center overflow-hidden shrink-0 p-1"
+        }
+      >
         <img
           src={logoSrc}
           alt={`${name} logo`}
-          className="w-full h-full object-contain"
+          className={
+            isHero
+              ? "w-full h-full object-contain scale-[1.12]"
+              : "w-full h-full object-contain"
+          }
           onError={() => setImgFailed(true)}
         />
       </div>
@@ -206,9 +202,19 @@ function UniversityLogo({
 
   return (
     <div
-      className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0 shadow-md`}
+      className={
+        isHero
+          ? `w-full h-full rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`
+          : `w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0 shadow-md`
+      }
     >
-      <span className="text-white text-xl font-black leading-none tracking-tight">
+      <span
+        className={
+          isHero
+            ? "text-white text-4xl md:text-5xl font-black leading-none tracking-tight"
+            : "text-white text-xl font-black leading-none tracking-tight"
+        }
+      >
         {initial}
       </span>
     </div>
@@ -229,6 +235,8 @@ export function InstitutionCard({
   onOpen,
 }: InstitutionCardProps) {
   const navigate = useNavigate();
+  const hasDepartmentField = Array.isArray(institution.departments);
+  const hasDepartments = (institution.departments?.length ?? 0) > 0;
 
   return (
     <motion.article
@@ -242,83 +250,65 @@ export function InstitutionCard({
         }
         navigate(`/institutions/${institution.id}`);
       }}
-      className="group relative bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-slate-200 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
+      className="group relative bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-slate-200 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer overflow-hidden"
     >
-      {/* Top accent line */}
-      <div
-        className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${getGradient(institution.id)} opacity-0 group-hover:opacity-100 transition-opacity duration-200`}
-      />
+      <div className="grid min-h-[150px] h-full grid-cols-[104px_minmax(0,1fr)] md:grid-cols-[116px_minmax(0,1fr)]">
+        <div className="relative bg-gradient-to-b from-slate-50/70 to-white border-r border-slate-100 flex items-center justify-center p-2">
+          <div className="relative w-[84px] h-[84px] md:w-[92px] md:h-[92px] rounded-2xl bg-white border border-slate-100 shadow-sm p-1 flex items-center justify-center">
+            <UniversityLogo
+              name={institution.name}
+              id={institution.id}
+              avatar={institution.avatar}
+              mode="hero"
+            />
+          </div>
+        </div>
 
-      <div className="p-5">
-        {/* Header: logo + name */}
-        <div className="flex items-start gap-3.5">
-          <UniversityLogo
-            name={institution.name}
-            id={institution.id}
-            avatar={institution.avatar}
-          />
+        <div className="relative min-w-0 p-3.5 md:p-4 flex flex-col">
+          <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-slate-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-500 transition-colors" />
+          </div>
 
-          <div className="flex-1 min-w-0 pt-1">
-            <h3 className="text-sm font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
+          <div className="min-w-0 pr-8">
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors truncate">
               {institution.name}
             </h3>
             {institution.org_name && (
-              <p className="text-[10px] text-slate-400 mt-1 truncate font-medium">
+              <p className="text-[12px] text-slate-400 mt-1 truncate font-medium">
                 {institution.org_name}
               </p>
             )}
           </div>
 
-          <div className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-slate-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
-            <ArrowUpRight className="w-3 h-3 text-slate-300 group-hover:text-blue-500 transition-colors" />
-          </div>
-        </div>
-
-        {/* Scholar count + departments */}
-        <div className="mt-3.5 flex items-baseline justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-              <Users className="w-3 h-3 text-blue-500" />
+          <div className="mt-auto pt-3 flex items-center justify-between gap-2 min-w-0">
+            <div className="min-w-0 flex items-end gap-2">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                <Users className="w-3.5 h-3.5 text-blue-500" />
+              </div>
+              <div className="flex items-baseline gap-1 min-w-0">
+                <span className="text-[42px] font-black text-slate-800 leading-none">
+                  {institution.scholar_count}
+                </span>
+                <span className="text-[12px] text-slate-400 font-semibold tracking-wide mb-0.5">
+                  学者
+                </span>
+              </div>
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-black text-slate-800 leading-none">
-                {institution.scholar_count}
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium">
-                学者
-              </span>
-            </div>
-          </div>
 
-          {(institution.departments?.length ?? 0) > 0 && (
-            <span className="text-[9px] text-slate-500 font-semibold bg-slate-50 px-2 py-0.5 rounded-full whitespace-nowrap">
-              {institution.departments!.length} 院系
-            </span>
-          )}
+            {hasDepartments && (
+              <span className="shrink-0 max-w-[48%] truncate text-[11px] text-slate-500 font-semibold bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-full whitespace-nowrap">
+                {institution.departments!.length} 个子机构
+              </span>
+            )}
+
+            {!hasDepartments && hasDepartmentField && (
+              <span className="shrink-0 max-w-[48%] truncate inline-flex items-center rounded-full bg-slate-50 border border-slate-100 px-2.5 py-1 text-[11px] text-slate-400 font-medium">
+                暂无院系数据
+              </span>
+            )}
+          </div>
         </div>
       </div>
-
-      {/* Department chips */}
-      {(institution.departments?.length ?? 0) > 0 && (
-        <div className="px-5 pb-5 flex flex-wrap gap-1.5">
-          {institution.departments!.slice(0, 3).map((dept, i) => (
-            <span
-              key={dept.name}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium ${getDeptAccent(institution.id, i)}`}
-            >
-              {dept.name}
-              {dept.scholar_count > 0 && (
-                <span className="opacity-60">· {dept.scholar_count}</span>
-              )}
-            </span>
-          ))}
-          {institution.departments!.length > 3 && (
-            <span className="px-2.5 py-1 rounded-full text-[11px] text-slate-400 bg-slate-50 font-medium">
-              +{institution.departments!.length - 3} 更多
-            </span>
-          )}
-        </div>
-      )}
     </motion.article>
   );
 }

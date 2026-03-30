@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Search, UserPlus, Loader2, X, ExternalLink } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchScholarList, type ScholarListItem } from "@/services/scholarApi";
@@ -38,6 +38,7 @@ export function ScholarSearchPicker({
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [searched, setSearched] = useState(false);
+  const excludedIdSet = useMemo(() => new Set(excludeIds), [excludeIds]);
 
   // Debounced search
   useEffect(() => {
@@ -56,7 +57,7 @@ export function ScholarSearchPicker({
         // Filter results: prioritize name matches, then filter by relevance
         const searchTerm = query.trim().toLowerCase();
         const filtered = res.items
-          .filter((s) => !excludeIds.includes(s.url_hash))
+          .filter((s) => !excludedIdSet.has(s.url_hash))
           .filter((s) => {
             // Must match name, or university, or department, or research areas
             const nameMatch = s.name?.toLowerCase().includes(searchTerm);
@@ -92,7 +93,7 @@ export function ScholarSearchPicker({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query, excludeIds.join(",")]);
+  }, [query, excludedIdSet]);
 
   // Click outside to close
   useEffect(() => {

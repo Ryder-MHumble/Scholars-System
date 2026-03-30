@@ -12,7 +12,7 @@ import type {
 const CLASSIFICATION_SUB_OPTIONS: Record<string, string[]> = {
   共建高校: [
     "示范性合作伙伴",
-    "境内高校",
+    "京内高校",
     "京外C9高校",
     "综合强校",
     "工科强校",
@@ -67,7 +67,7 @@ function normalizeLegacyClassification(value?: string | null): string {
 
 function normalizeLegacySubClassification(value?: string | null): string {
   if (!value) return "";
-  if (value === "京内高校") return "境内高校";
+  if (value === "京内高校") return "京内高校";
   if (value === "京外C9") return "京外C9高校";
   if (value === "同行业机构") return "同行机构";
   if (value === "其他高校") return "其他";

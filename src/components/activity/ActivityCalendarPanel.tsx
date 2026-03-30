@@ -7,7 +7,7 @@ interface ActivityCalendarPanelProps {
   activities: ActivityEvent[];
   selectedDay: number | null;
   onClearDay: () => void;
-  onActivityClick: (id: string | number) => void;
+  onActivityClick: (activity: ActivityEvent) => void;
 }
 
 export function ActivityCalendarPanel({
@@ -52,7 +52,7 @@ export function ActivityCalendarPanel({
             <ActivityListItem
               key={activity.id}
               activity={activity}
-              onClick={() => onActivityClick(activity.id)}
+              onClick={() => onActivityClick(activity)}
             />
           ))
         )}

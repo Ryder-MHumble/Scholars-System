@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -29,7 +29,107 @@ import {
   fetchInstitutionDetail,
   fetchInstitutionLeadership,
 } from "@/services/institutionApi";
+import {
+  fetchScholarUniversities,
+  type ScholarUniversityItem,
+} from "@/services/scholarApi";
 import type { InstitutionDetail, LeadershipDetailResponse } from "@/types/institution";
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function resolveYearStudentMetrics(institution: InstitutionDetail): Array<{ year: string; value: number }> {
+  const merged = new Map<string, number>();
+
+  const yearMap = institution.student_counts_by_year ?? {};
+  for (const [year, value] of Object.entries(yearMap)) {
+    if (!/^\d{4}$/.test(year)) continue;
+    const count = Number(value ?? 0);
+    if (!Number.isFinite(count) || count <= 0) continue;
+    merged.set(year, count);
+  }
+
+  if (!merged.has("2024")) {
+    const c24 = Number(institution.student_count_24 ?? 0);
+    if (Number.isFinite(c24) && c24 > 0) merged.set("2024", c24);
+  }
+  if (!merged.has("2025")) {
+    const c25 = Number(institution.student_count_25 ?? 0);
+    if (Number.isFinite(c25) && c25 > 0) merged.set("2025", c25);
+  }
+
+  return Array.from(merged.entries())
+    .sort((a, b) => Number(b[0]) - Number(a[0]))
+    .map(([year, value]) => ({ year, value }));
+}
+
+function applyUnifiedScholarCounts(
+  institution: InstitutionDetail,
+  hierarchyOrganizations: ScholarUniversityItem[],
+): InstitutionDetail {
+  const matchedHierarchy =
+    hierarchyOrganizations.find(
+      (item) => item.institution_id && item.institution_id === institution.id,
+    ) ??
+    hierarchyOrganizations.find(
+      (item) => normalizeName(item.university) === normalizeName(institution.name),
+    );
+
+  if (!matchedHierarchy) return institution;
+
+  const hierarchyDeptById = new Map<string, { name: string; scholar_count: number }>();
+  const hierarchyDeptByName = new Map<string, { id?: string; scholar_count: number }>();
+  for (const dept of matchedHierarchy.departments ?? []) {
+    const deptName = String(dept.name ?? "").trim();
+    if (!deptName) continue;
+    if (dept.id) hierarchyDeptById.set(dept.id, { name: deptName, scholar_count: dept.scholar_count });
+    hierarchyDeptByName.set(normalizeName(deptName), {
+      id: dept.id,
+      scholar_count: dept.scholar_count,
+    });
+  }
+
+  const mergedDepartments = (institution.departments ?? []).map((dept) => {
+    const byId = dept.id ? hierarchyDeptById.get(dept.id) : undefined;
+    const byName = hierarchyDeptByName.get(normalizeName(dept.name));
+    const matched = byId ?? byName;
+    if (!matched) return dept;
+    return {
+      ...dept,
+      scholar_count: matched.scholar_count,
+    };
+  });
+
+  const existingDeptIds = new Set(mergedDepartments.map((dept) => dept.id).filter(Boolean));
+  const existingDeptNames = new Set(
+    mergedDepartments
+      .map((dept) => normalizeName(dept.name))
+      .filter((name) => name.length > 0),
+  );
+
+  for (const dept of matchedHierarchy.departments ?? []) {
+    const deptName = String(dept.name ?? "").trim();
+    if (!deptName) continue;
+    if (dept.id && existingDeptIds.has(dept.id)) continue;
+    if (existingDeptNames.has(normalizeName(deptName))) continue;
+
+    mergedDepartments.push({
+      id: dept.id ?? `${institution.id}::${deptName}`,
+      name: deptName,
+      org_name: null,
+      parent_id: institution.id,
+      scholar_count: dept.scholar_count,
+      sources: [],
+    });
+  }
+
+  return {
+    ...institution,
+    scholar_count: matchedHierarchy.scholar_count,
+    departments: mergedDepartments,
+  };
+}
 
 export default function InstitutionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -51,7 +151,8 @@ export default function InstitutionDetailPage() {
   const backHref =
     from?.pathname && from.pathname !== ""
       ? `${from.pathname}${from.search ?? ""}`
-      : "/?tab=institutions";
+      : window.sessionStorage.getItem("institution_list_return_to") ??
+        "/?tab=institutions";
 
   const goBackToList = () => {
     if (restoreInstitutionListState) {
@@ -61,24 +162,32 @@ export default function InstitutionDetailPage() {
     navigate(backHref);
   };
 
-  useEffect(() => {
-    if (!id) return;
+  const loadInstitutionData = useCallback(async (institutionId: string) => {
     setLoading(true);
     setLeadershipLoading(true);
-    Promise.all([
-      fetchInstitutionDetail(id),
-      fetchInstitutionLeadership(id).catch(() => null),
-    ])
-      .then(([institutionDetail, leadershipDetail]) => {
-        setInstitution(institutionDetail);
-        setLeadership(leadershipDetail);
-      })
-      .catch(() => setInstitution(null))
-      .finally(() => {
-        setLoading(false);
-        setLeadershipLoading(false);
-      });
-  }, [id]);
+    try {
+      const [institutionDetail, leadershipDetail, hierarchyOrganizations] =
+        await Promise.all([
+          fetchInstitutionDetail(institutionId),
+          fetchInstitutionLeadership(institutionId).catch(() => null),
+          fetchScholarUniversities().catch(() => [] as ScholarUniversityItem[]),
+        ]);
+      setInstitution(
+        applyUnifiedScholarCounts(institutionDetail, hierarchyOrganizations),
+      );
+      setLeadership(leadershipDetail);
+    } catch {
+      setInstitution(null);
+    } finally {
+      setLoading(false);
+      setLeadershipLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    void loadInstitutionData(id);
+  }, [id, loadInstitutionData]);
 
   async function handleDelete() {
     if (!institution) return;
@@ -123,6 +232,7 @@ export default function InstitutionDetailPage() {
     (institution.recruitment_events?.length ?? 0) > 0 ||
     (institution.visit_exchanges?.length ?? 0) > 0 ||
     (institution.cooperation_focus?.length ?? 0) > 0;
+  const yearStudentMetrics = resolveYearStudentMetrics(institution);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_#f8fafc_0%,_#f1f5f9_45%,_#eef2ff_100%)]">
@@ -202,16 +312,29 @@ export default function InstitutionDetailPage() {
             <SectionCard title="核心数据" icon={BookOpen} compact>
               <div className="grid grid-cols-2 gap-2.5">
                 <MetricCard icon={Users} label="学者总数" value={institution.scholar_count} />
-                <MetricCard
-                  icon={GraduationCap}
-                  label="24级学生"
-                  value={institution.student_count_24}
-                />
-                <MetricCard
-                  icon={GraduationCap}
-                  label="25级学生"
-                  value={institution.student_count_25}
-                />
+                {yearStudentMetrics.length > 0 ? (
+                  yearStudentMetrics.map((item) => (
+                    <MetricCard
+                      key={item.year}
+                      icon={GraduationCap}
+                      label={`${item.year.slice(-2)}级学生`}
+                      value={item.value}
+                    />
+                  ))
+                ) : (
+                  <>
+                    <MetricCard
+                      icon={GraduationCap}
+                      label="24级学生"
+                      value={institution.student_count_24}
+                    />
+                    <MetricCard
+                      icon={GraduationCap}
+                      label="25级学生"
+                      value={institution.student_count_25}
+                    />
+                  </>
+                )}
                 <MetricCard
                   icon={BookOpen}
                   label="学生总数"

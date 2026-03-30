@@ -17,13 +17,16 @@ export function generateScholarTemplate(
         姓名: scholar?.name || "",
         英文名: scholar?.name_en || "",
         职称: scholar?.position || "",
-        院校: scholar?.university || "",
-        院系: scholar?.department || "",
+        所属机构: scholar?.university || "",
+        "院系/部门": scholar?.department || "",
         邮箱: scholar?.email || "",
         电话: scholar?.phone || "",
         办公室: scholar?.office || "",
         主页: scholar?.profile_url || "",
+        谷歌学术: scholar?.google_scholar_url || "",
+        DBLP: scholar?.dblp_url || "",
         研究方向: (scholar?.research_areas || []).join(";"),
+        简介: scholar?.bio || "",
       },
     ];
 
@@ -38,7 +41,10 @@ export function generateScholarTemplate(
       { wch: 15 },
       { wch: 15 },
       { wch: 25 },
+      { wch: 25 },
+      { wch: 22 },
       { wch: 30 },
+      { wch: 36 },
     ];
 
     XLSX.utils.book_append_sheet(workbook, basicSheet, "基本信息");

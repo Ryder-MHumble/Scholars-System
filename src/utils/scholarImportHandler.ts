@@ -114,9 +114,17 @@ function parseBasicInfo(data: Record<string, string>): ScholarDetailPatch {
     name: "name",
     英文名: "name_en",
     english_name: "name_en",
+    name_en: "name_en",
     职称: "position",
     position: "position",
+    所属机构: "university",
+    院校: "university",
+    university: "university",
+    institution: "university",
+    "院系/部门": "department",
+    所属院系: "department",
     院系: "department",
+    部门: "department",
     department: "department",
     邮箱: "email",
     email: "email",
@@ -124,31 +132,55 @@ function parseBasicInfo(data: Record<string, string>): ScholarDetailPatch {
     phone: "phone",
     办公室: "office",
     office: "office",
-    主页: "homepage",
-    homepage: "homepage",
+    主页: "profile_url",
+    个人主页: "profile_url",
+    homepage: "profile_url",
+    profile_url: "profile_url",
+    谷歌学术: "google_scholar_url",
+    google_scholar: "google_scholar_url",
+    google_scholar_url: "google_scholar_url",
+    googlescholar: "google_scholar_url",
+    "google scholar": "google_scholar_url",
+    dblp: "dblp_url",
+    dblp_url: "dblp_url",
+    简介: "bio",
+    个人简介: "bio",
+    bio: "bio",
   };
 
   for (const [key, value] of Object.entries(data)) {
-    if (value && value.trim()) {
+    const textValue = Array.isArray(value)
+      ? value.map((item) => String(item ?? "")).join("；")
+      : String(value ?? "");
+    if (textValue.trim()) {
       const patchKey = mapping[key.toLowerCase().trim()];
       if (patchKey === "name_en") {
-        patch.name_en = value.trim();
+        patch.name_en = textValue.trim();
       } else if (
         patchKey === "name" ||
         patchKey === "position" ||
+        patchKey === "university" ||
         patchKey === "department" ||
         patchKey === "email" ||
         patchKey === "phone" ||
-        patchKey === "office"
+        patchKey === "office" ||
+        patchKey === "profile_url" ||
+        patchKey === "google_scholar_url" ||
+        patchKey === "dblp_url" ||
+        patchKey === "bio"
       ) {
-        (patch as Record<string, unknown>)[patchKey] = value.trim();
+        (patch as Record<string, unknown>)[patchKey] = textValue.trim();
       }
     }
   }
 
   // Handle research areas (comma/semicolon separated)
-  if (data["研究方向"] || data["research_areas"]) {
-    const areasStr = data["研究方向"] || data["research_areas"] || "";
+  if (data["研究方向"] || data["research_areas"] || data["researchFields"]) {
+    const rawAreas =
+      data["研究方向"] || data["research_areas"] || data["researchFields"] || "";
+    const areasStr = Array.isArray(rawAreas)
+      ? rawAreas.map((item) => String(item ?? "")).join("；")
+      : String(rawAreas);
     const areas = areasStr
       .split(/[;,，、]/)
       .map((a) => a.trim())

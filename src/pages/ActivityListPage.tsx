@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus,
   Search,
@@ -34,21 +34,80 @@ import type {
   ActivityStats,
 } from "@/services/activityApi";
 
+interface ActivityListViewState {
+  subtab: string;
+  viewMode: "card" | "calendar";
+  sortOrder: "desc" | "asc";
+  currentYear: number;
+  currentMonth: number;
+  selectedDay: number | null;
+  activeType: string;
+  searchQuery: string;
+  scrollY: number;
+}
+
+const ACTIVITY_LIST_RETURN_TO_KEY = "activity_list_return_to";
+const ACTIVITY_LIST_VIEW_STATE_KEY = "activity_list_view_state";
+
+function shouldDeleteUntitledActivity(activity: ActivityEvent): boolean {
+  const title = activity.title.trim();
+  return title === "无标题" || title === "（无标题）";
+}
+
+function isUntitledActivity(activity: ActivityEvent): boolean {
+  const title = activity.title.trim();
+  return title === "" || title === "无标题" || title === "（无标题）";
+}
+
 export default function ActivityListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const today = new Date();
 
   const subtab = searchParams.get("subtab") ?? "";
   const activeSeries = SUBTAB_TO_SERIES[subtab] ?? "";
+  const restoreStateFromLocation =
+    (
+      location.state as
+        | { restoreActivityListState?: ActivityListViewState }
+        | null
+    )?.restoreActivityListState ?? null;
+  let restoreStateFromSession: ActivityListViewState | null = null;
+  try {
+    const raw = window.sessionStorage.getItem(ACTIVITY_LIST_VIEW_STATE_KEY);
+    restoreStateFromSession = raw ? (JSON.parse(raw) as ActivityListViewState) : null;
+  } catch {
+    restoreStateFromSession = null;
+  }
+  const restoreState = restoreStateFromLocation ?? restoreStateFromSession;
+  const restoredRef = useRef(false);
 
-  const [viewMode, setViewMode] = useState<"card" | "calendar">("card");
-  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
-  const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [activeType, setActiveType] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"card" | "calendar">(
+    restoreState?.subtab === subtab ? restoreState.viewMode : "card",
+  );
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">(
+    restoreState?.subtab === subtab ? restoreState.sortOrder : "desc",
+  );
+  const [currentYear, setCurrentYear] = useState(
+    restoreState?.subtab === subtab
+      ? restoreState.currentYear
+      : today.getFullYear(),
+  );
+  const [currentMonth, setCurrentMonth] = useState(
+    restoreState?.subtab === subtab
+      ? restoreState.currentMonth
+      : today.getMonth(),
+  );
+  const [selectedDay, setSelectedDay] = useState<number | null>(
+    restoreState?.subtab === subtab ? restoreState.selectedDay : null,
+  );
+  const [activeType, setActiveType] = useState(
+    restoreState?.subtab === subtab ? restoreState.activeType : "",
+  );
+  const [searchQuery, setSearchQuery] = useState(
+    restoreState?.subtab === subtab ? restoreState.searchQuery : "",
+  );
   const [allActivities, setAllActivities] = useState<ActivityEvent[]>([]);
   const [allScholars, setAllScholars] = useState<ScholarListItem[]>([]);
   const [scholarLoading, setScholarLoading] = useState(false);
@@ -59,55 +118,49 @@ export default function ActivityListPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const autoJumped = useRef(false);
-  const shouldDeleteUntitledActivity = (activity: ActivityEvent) => {
-    const title = activity.title.trim();
-    return title === "无标题" || title === "（无标题）";
-  };
-  const isUntitledActivity = (activity: ActivityEvent) => {
-    const title = activity.title.trim();
-    return title === "" || title === "无标题" || title === "（无标题）";
-  };
-
-  const loadActivities = async (
-    eventType?: string,
-    series?: string,
-    category?: string,
-  ) => {
-    setLoading(true);
-    setActionError(null);
-    try {
-      const firstPage = await fetchActivities(
-        1,
-        200,
-        eventType || undefined,
-        series || undefined,
-        category || undefined,
-      );
-      const allItems = [...firstPage.items];
-      for (let page = 2; page <= firstPage.total_pages; page++) {
-        const pageData = await fetchActivities(
-          page,
+  const restoreConsumedRef = useRef(false);
+  const pendingSeriesResetRef = useRef(false);
+  const loadActivities = useCallback(
+    async (eventType?: string, series?: string, category?: string) => {
+      setLoading(true);
+      setActionError(null);
+      try {
+        const firstPage = await fetchActivities(
+          1,
           200,
           eventType || undefined,
           series || undefined,
           category || undefined,
         );
-        allItems.push(...pageData.items);
+        const allItems = [...firstPage.items];
+        for (let page = 2; page <= firstPage.total_pages; page++) {
+          const pageData = await fetchActivities(
+            page,
+            200,
+            eventType || undefined,
+            series || undefined,
+            category || undefined,
+          );
+          allItems.push(...pageData.items);
+        }
+        const untitledItems = allItems.filter(shouldDeleteUntitledActivity);
+        if (untitledItems.length > 0) {
+          await Promise.allSettled(
+            untitledItems.map((item) => deleteActivity(item.id)),
+          );
+          fetchActivityStats()
+            .then(setStats)
+            .catch(() => {});
+        }
+        setAllActivities(allItems.filter((item) => !isUntitledActivity(item)));
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "加载活动失败");
+      } finally {
+        setLoading(false);
       }
-      const untitledItems = allItems.filter(shouldDeleteUntitledActivity);
-      if (untitledItems.length > 0) {
-        await Promise.allSettled(untitledItems.map((item) => deleteActivity(item.id)));
-        fetchActivityStats()
-          .then(setStats)
-          .catch(() => {});
-      }
-      setAllActivities(allItems.filter((item) => !isUntitledActivity(item)));
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "加载活动失败");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [],
+  );
 
   useEffect(() => {
     if (allActivities.length === 0 || autoJumped.current) return;
@@ -127,21 +180,48 @@ export default function ActivityListPage() {
       setCurrentMonth(ld.getMonth());
       setSelectedDay(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allActivities]);
+  }, [allActivities, currentYear, currentMonth]);
 
   useEffect(() => {
-    setActiveType("");
+    if (!restoreConsumedRef.current && restoreState?.subtab === subtab) {
+      restoreConsumedRef.current = true;
+      autoJumped.current = false;
+      return;
+    }
+    setActiveType((prev) => {
+      if (prev === "") return prev;
+      pendingSeriesResetRef.current = true;
+      return "";
+    });
     autoJumped.current = false;
-    loadActivities("", activeSeries);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSeries]);
+  }, [activeSeries, restoreState, subtab]);
 
   useEffect(() => {
+    if (pendingSeriesResetRef.current && activeType !== "") {
+      return;
+    }
+    pendingSeriesResetRef.current = false;
     autoJumped.current = false;
-    loadActivities(activeType, activeSeries);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeType]);
+    void loadActivities(activeType, activeSeries);
+  }, [activeType, activeSeries, loadActivities]);
+
+  useEffect(() => {
+    if (
+      restoredRef.current ||
+      !restoreState ||
+      restoreState.subtab !== subtab ||
+      loading
+    ) {
+      return;
+    }
+    restoredRef.current = true;
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: Math.max(restoreState.scrollY ?? 0, 0),
+        behavior: "auto",
+      });
+    });
+  }, [loading, restoreState, subtab]);
 
   useEffect(() => {
     fetchActivityStats()
@@ -177,7 +257,7 @@ export default function ActivityListPage() {
   );
 
   const panelActivities = useMemo<ActivityEvent[]>(() => {
-    let list =
+    const list =
       selectedDay !== null
         ? (dayActivities[selectedDay] ?? [])
         : Object.values(dayActivities)
@@ -278,7 +358,7 @@ export default function ActivityListPage() {
       setIsSubmitting(true);
       setActionError(null);
       await createActivity(data);
-      loadActivities(activeType, activeSeries);
+      await loadActivities(activeType, activeSeries);
       fetchActivityStats()
         .then(setStats)
         .catch(() => {});
@@ -288,6 +368,60 @@ export default function ActivityListPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const buildListState = useCallback(
+    (): ActivityListViewState => ({
+      subtab,
+      viewMode,
+      sortOrder,
+      currentYear,
+      currentMonth,
+      selectedDay,
+      activeType,
+      searchQuery,
+      scrollY: window.scrollY,
+    }),
+    [
+      subtab,
+      viewMode,
+      sortOrder,
+      currentYear,
+      currentMonth,
+      selectedDay,
+      activeType,
+      searchQuery,
+    ],
+  );
+
+  useEffect(() => {
+    const returnTo = `${location.pathname}${location.search || "?tab=activities"}`;
+    window.sessionStorage.setItem(ACTIVITY_LIST_RETURN_TO_KEY, returnTo);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(
+      ACTIVITY_LIST_VIEW_STATE_KEY,
+      JSON.stringify(buildListState()),
+    );
+  }, [buildListState]);
+
+  const openActivityScholars = (activity: ActivityEvent) => {
+    const params = new URLSearchParams({
+      tab: "scholars",
+      participated_event_id: String(activity.id),
+      page: "1",
+    });
+    const title = String(activity.title ?? "").trim();
+    if (title) {
+      params.set("event_title", title);
+    }
+    navigate(`/?${params.toString()}`, {
+      state: {
+        from: location,
+        fromActivityList: buildListState(),
+      },
+    });
   };
 
   return (
@@ -373,7 +507,11 @@ export default function ActivityListPage() {
               {taggedScholars.slice(0, 12).map((scholar) => (
                 <button
                   key={scholar.url_hash}
-                  onClick={() => navigate(`/scholars/${scholar.url_hash}`)}
+                  onClick={() =>
+                    navigate(`/scholars/${scholar.url_hash}`, {
+                      state: { from: location },
+                    })
+                  }
                   className="text-left border border-gray-200 rounded-lg p-3 hover:border-primary-300 hover:bg-primary-50/30 transition-colors"
                 >
                   <p className="text-sm font-medium text-gray-900 truncate">
@@ -479,7 +617,7 @@ export default function ActivityListPage() {
               {cardActivities.map((activity, i) => (
                 <div
                   key={activity.id}
-                  onClick={() => navigate(`/activities/${activity.id}`)}
+                  onClick={() => openActivityScholars(activity)}
                   className="cursor-pointer"
                 >
                   <ActivityCard activity={activity} index={i} />
@@ -504,7 +642,7 @@ export default function ActivityListPage() {
               activities={panelActivities}
               selectedDay={selectedDay}
               onClearDay={() => setSelectedDay(null)}
-              onActivityClick={(id) => navigate(`/activities/${id}`)}
+              onActivityClick={openActivityScholars}
             />
           </div>
         )}

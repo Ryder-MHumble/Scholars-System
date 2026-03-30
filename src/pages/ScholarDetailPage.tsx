@@ -150,9 +150,8 @@ export default function ScholarDetailPageDemo() {
               animate="visible"
             >
               <ProjectCategorySelector
-                primaryCategory={scholar.project_tags?.[0]?.category ?? ""}
-                subcategory={scholar.project_tags?.[0]?.subcategory ?? ""}
-                activityType={scholar.event_tags?.[0]?.event_type ?? ""}
+                projectTags={scholar.project_tags ?? []}
+                eventTags={scholar.event_tags ?? []}
                 onSave={handleProjectCategorySave}
               />
 

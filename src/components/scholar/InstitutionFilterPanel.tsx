@@ -1,8 +1,10 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Building2, ChevronRight, BookOpen } from "lucide-react";
 import { cn } from "@/utils/cn";
 import type { UniNode } from "@/components/common/UniversitySidebarTree";
+
+const SCHOLAR_PANEL_SEARCH_KEY = "scholar_institution_panel_search";
 
 interface InstitutionFilterPanelProps {
   uniNodes: UniNode[];
@@ -23,8 +25,15 @@ export function InstitutionFilterPanel({
   onSelectDept,
   loading,
 }: InstitutionFilterPanelProps) {
-  const [panelSearch, setPanelSearch] = useState("");
+  const [panelSearch, setPanelSearch] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.sessionStorage.getItem(SCHOLAR_PANEL_SEARCH_KEY) ?? "";
+  });
   const [expandedUnis, setExpandedUnis] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    window.sessionStorage.setItem(SCHOLAR_PANEL_SEARCH_KEY, panelSearch);
+  }, [panelSearch]);
 
   const toggleUni = (name: string) =>
     setExpandedUnis((prev) => {
@@ -90,16 +99,16 @@ export function InstitutionFilterPanel({
             <button
               onClick={() => onSelectUni(null)}
               className={cn(
-                "w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-sm transition-all duration-150 mb-0.5",
+                "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm border transition-colors duration-150 mb-0.5",
                 isAllActive
-                  ? "bg-primary-600 text-white shadow-sm font-medium"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-800 font-medium",
+                  ? "bg-primary-50 text-primary-700 border-primary-200"
+                  : "bg-white text-gray-700 border-transparent hover:bg-gray-50",
               )}
             >
               <Building2
                 className={cn(
                   "w-3.5 h-3.5 shrink-0",
-                  isAllActive ? "text-white/80" : "text-gray-400",
+                  isAllActive ? "text-primary-500" : "text-gray-400",
                 )}
               />
               <span className="flex-1 text-left truncate text-sm">全部</span>
@@ -107,7 +116,7 @@ export function InstitutionFilterPanel({
                 className={cn(
                   "text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-md tabular-nums",
                   isAllActive
-                    ? "bg-white/20 text-white"
+                    ? "text-primary-700 bg-primary-100"
                     : "text-gray-400 bg-gray-100",
                 )}
               >
@@ -139,7 +148,7 @@ export function InstitutionFilterPanel({
                         className={cn(
                           "p-1 rounded-lg transition-all duration-150 shrink-0",
                           isUniActive
-                            ? "text-primary-400 hover:bg-primary-700"
+                            ? "text-primary-500 hover:bg-primary-50"
                             : "text-gray-400 hover:text-gray-600 hover:bg-gray-100",
                         )}
                       >
@@ -164,10 +173,10 @@ export function InstitutionFilterPanel({
                         }
                       }}
                       className={cn(
-                        "flex-1 flex items-center gap-2 px-2 py-1.5 rounded-xl text-sm transition-all duration-150 min-w-0",
+                        "flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm border transition-colors duration-150 min-w-0",
                         isUniActive
-                          ? "bg-primary-600 text-white shadow-sm font-medium"
-                          : "text-gray-600 hover:bg-gray-100 hover:text-gray-800",
+                          ? "bg-primary-50 text-primary-700 border-primary-200"
+                          : "bg-white text-gray-700 border-transparent hover:bg-gray-50",
                       )}
                     >
                       <span className="truncate text-sm flex-1 text-left">
@@ -177,7 +186,7 @@ export function InstitutionFilterPanel({
                         className={cn(
                           "text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-md tabular-nums",
                           isUniActive
-                            ? "bg-white/20 text-white"
+                            ? "text-primary-700 bg-primary-100"
                             : "text-gray-400 bg-gray-100",
                         )}
                       >
@@ -203,10 +212,10 @@ export function InstitutionFilterPanel({
                               key={dept.name}
                               onClick={() => onSelectDept(uni.name, dept.name)}
                               className={cn(
-                                "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all duration-150 min-w-0",
+                                "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-colors duration-150 min-w-0",
                                 isDeptActive
-                                  ? "bg-primary-50 text-primary-700 font-medium"
-                                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+                                  ? "bg-primary-50 text-primary-700 border-primary-200 font-medium"
+                                  : "bg-white text-gray-600 border-transparent hover:bg-gray-50",
                               )}
                             >
                               <BookOpen

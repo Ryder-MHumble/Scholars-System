@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   fetchScholarList,
@@ -54,6 +54,107 @@ const PROJECT_PARENT_CATEGORY_MAP: Record<string, string> = {
   talent: "人才引育",
 };
 
+const MENTOR_FILTER_OPTIONS = [
+  "全部",
+  "全部共建导师",
+  "科技教育委员会",
+  "学术委员会",
+  "教学委员会",
+  "学院学生高校导师",
+  "全职导师",
+  "产业导师",
+  "兼职导师",
+  "科研立项",
+  "卓工公派",
+] as const;
+
+const MENTOR_SUBCATEGORY_ALIASES: Record<string, string[]> = {
+  科技教育委员会: ["科技育青委员会"],
+  科技育青委员会: ["科技教育委员会"],
+  学院学生高校导师: ["学院学生事务导师"],
+  学院学生事务导师: ["学院学生高校导师"],
+};
+
+function normalizeLabel(value: string): string {
+  return value.trim().replace(/\s+/g, "");
+}
+
+function getScholarMentorSubcategories(item: ScholarListItem): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const tag of item.project_tags ?? []) {
+    const sub = String(tag.subcategory ?? "").trim();
+    if (!sub) continue;
+    const key = normalizeLabel(sub);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(sub);
+  }
+  const legacySubcategory = String(item.project_subcategory ?? "").trim();
+  if (legacySubcategory) {
+    const legacyKey = normalizeLabel(legacySubcategory);
+    if (!seen.has(legacyKey)) {
+      seen.add(legacyKey);
+      result.push(legacySubcategory);
+    }
+  }
+  return result;
+}
+
+function isCobuildScholar(item: ScholarListItem): boolean {
+  return (
+    Boolean(item.is_cobuild_scholar) ||
+    (item.project_tags?.length ?? 0) > 0 ||
+    Boolean(item.adjunct_supervisor?.status)
+  );
+}
+
+function matchesMentorType(item: ScholarListItem, mentorType: string): boolean {
+  if (!mentorType || mentorType === "全部") return true;
+  if (mentorType === "全部共建导师") return isCobuildScholar(item);
+
+  if (mentorType === "兼职导师") {
+    const subs = getScholarMentorSubcategories(item).map(normalizeLabel);
+    if (subs.includes(normalizeLabel("兼职导师"))) return true;
+    return Boolean(item.adjunct_supervisor?.status);
+  }
+
+  const target = normalizeLabel(mentorType);
+  const aliases = (MENTOR_SUBCATEGORY_ALIASES[mentorType] ?? []).map(
+    normalizeLabel,
+  );
+  const subs = getScholarMentorSubcategories(item).map(normalizeLabel);
+  return subs.some((value) => value === target || aliases.includes(value));
+}
+
+function buildUniNodesFromScholars(items: ScholarListItem[]): UniNode[] {
+  const uniMap = new Map<string, { count: number; departments: Map<string, number> }>();
+
+  for (const item of items) {
+    const uniName = String(item.university ?? "").trim() || "未知机构";
+    const deptName = String(item.department ?? "").trim();
+
+    const uniEntry = uniMap.get(uniName) ?? {
+      count: 0,
+      departments: new Map<string, number>(),
+    };
+    uniEntry.count += 1;
+    if (deptName) {
+      uniEntry.departments.set(deptName, (uniEntry.departments.get(deptName) ?? 0) + 1);
+    }
+    uniMap.set(uniName, uniEntry);
+  }
+
+  return Array.from(uniMap.entries()).map(([name, entry]) => ({
+    name,
+    count: entry.count,
+    departments: Array.from(entry.departments.entries()).map(([deptName, deptCount]) => ({
+      name: deptName,
+      count: deptCount,
+    })),
+  }));
+}
+
 export function useScholarList() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -61,12 +162,15 @@ export function useScholarList() {
   const activeUni = searchParams.get("university");
   const activeDept = searchParams.get("department");
   const pageParam = searchParams.get("page");
-  const isJointMentor = searchParams.get("is_adjunct_supervisor") === "true";
+  const mentorType = searchParams.get("mentor_type") ?? "全部";
   const activeSubTab = searchParams.get("subtab");
+  const participatedEventId = searchParams.get("participated_event_id");
+  const eventTitle = searchParams.get("event_title");
 
   const [query, setQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(pageParam ? parseInt(pageParam, 10) : 1);
+  const prevQueryRef = useRef(query);
 
   /* API state */
   const [apiData, setApiData] = useState<ScholarListResponse | null>(null);
@@ -74,6 +178,11 @@ export function useScholarList() {
   const [error, setError] = useState<string | null>(null);
   const [deletingHash, setDeletingHash] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [eventScopedUniNodes, setEventScopedUniNodes] = useState<UniNode[]>([]);
+  const [eventScopedUniLoading, setEventScopedUniLoading] = useState(false);
+  const [eventScopedUniError, setEventScopedUniError] = useState<string | null>(
+    null,
+  );
 
   // 根据当前 subtab 过滤机构节点
   const { region: subtabRegion, type: subtabType } = useMemo(
@@ -106,17 +215,22 @@ export function useScholarList() {
       Boolean(activeSubTab && PROJECT_PARENT_SUBCATEGORY_FILTERS[activeSubTab]),
     [activeTab, activeSubTab],
   );
+  const requiresMentorTypeFilter = useMemo(
+    () => Boolean(mentorType && mentorType !== "全部"),
+    [mentorType],
+  );
+  const needsClientFiltering = isProjectParentSubtab || requiresMentorTypeFilter;
 
   /* University counts — filtered by current subtab */
   const {
     universities,
-    totalCount,
-    loading: uniLoading,
-    error: uniError,
+    totalCount: defaultTotalCount,
+    loading: defaultUniLoading,
+    error: defaultUniError,
   } = useUniversityCounts({
     region: apiRegion,
     affiliation_type: apiAffiliationType,
-    is_adjunct_supervisor: isJointMentor || undefined,
+    is_adjunct_supervisor: mentorType === "兼职导师" ? true : undefined,
   });
 
   // uniNodes already filtered by backend, no client-side re-filtering needed
@@ -132,17 +246,79 @@ export function useScholarList() {
     }));
   }, [universities]);
 
+  useEffect(() => {
+    if (!participatedEventId) {
+      setEventScopedUniNodes([]);
+      setEventScopedUniError(null);
+      setEventScopedUniLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setEventScopedUniLoading(true);
+    setEventScopedUniError(null);
+
+    fetchAllScholars(
+      {
+        participated_event_id: participatedEventId,
+        region: apiRegion,
+        affiliation_type: apiAffiliationType,
+        is_adjunct_supervisor: mentorType === "兼职导师" ? true : undefined,
+      },
+      controller.signal,
+    )
+      .then((allItems) => {
+        const mentorFiltered = allItems.filter((item) =>
+          matchesMentorType(item, mentorType),
+        );
+        setEventScopedUniNodes(buildUniNodesFromScholars(mentorFiltered));
+        setEventScopedUniLoading(false);
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          setEventScopedUniError(err.message ?? "加载机构统计失败");
+          setEventScopedUniNodes([]);
+          setEventScopedUniLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [participatedEventId, apiRegion, apiAffiliationType, mentorType]);
+
+  const effectiveUniNodes = participatedEventId
+    ? eventScopedUniNodes
+    : filteredUniNodes;
+  const effectiveTotalCount = useMemo(
+    () => effectiveUniNodes.reduce((sum, uni) => sum + uni.count, 0),
+    [effectiveUniNodes],
+  );
+  const effectiveUniLoading = participatedEventId
+    ? eventScopedUniLoading
+    : defaultUniLoading;
+  const effectiveUniError = participatedEventId
+    ? eventScopedUniError
+    : defaultUniError;
+
   /* Fetch paginated data — cancel in-flight request on dep change */
   useEffect(() => {
     const controller = new AbortController();
     setIsLoading(true);
     setError(null);
-    if (isProjectParentSubtab && activeSubTab) {
-      const subcategorySet = new Set(PROJECT_PARENT_SUBCATEGORY_FILTERS[activeSubTab]);
-      const parentCategory = PROJECT_PARENT_CATEGORY_MAP[activeSubTab];
+    if (needsClientFiltering) {
+      const projectParentSubcategories =
+        activeSubTab && PROJECT_PARENT_SUBCATEGORY_FILTERS[activeSubTab]
+          ? PROJECT_PARENT_SUBCATEGORY_FILTERS[activeSubTab]
+          : [];
+      const subcategorySet = new Set(projectParentSubcategories);
+      const parentCategory = activeSubTab
+        ? PROJECT_PARENT_CATEGORY_MAP[activeSubTab]
+        : undefined;
       const matchProjectParent = (item: ScholarListItem): boolean => {
+        if (!isProjectParentSubtab || !activeSubTab) return true;
         const tags = item.project_tags ?? [];
-        const hasCategoryMatch = tags.some((tag) => tag.category === parentCategory);
+        const hasCategoryMatch = parentCategory
+          ? tags.some((tag) => tag.category === parentCategory)
+          : false;
         const hasSubcategoryMatch = tags.some((tag) =>
           subcategorySet.has((tag.subcategory ?? "").trim()),
         );
@@ -151,20 +327,26 @@ export function useScholarList() {
         );
         return hasCategoryMatch || hasSubcategoryMatch || legacySubMatch;
       };
+      const matchMentorType = (item: ScholarListItem): boolean =>
+        matchesMentorType(item, mentorType);
 
       fetchAllScholars(
         {
           university: activeUni ?? undefined,
           department: activeDept ?? undefined,
           search: query.trim() || undefined,
-          is_adjunct_supervisor: isJointMentor || undefined,
+          participated_event_id: participatedEventId ?? undefined,
+          is_adjunct_supervisor:
+            mentorType === "兼职导师" ? true : undefined,
           region: apiRegion,
           affiliation_type: apiAffiliationType,
         },
         controller.signal,
       )
         .then((allItems) => {
-          const filtered = allItems.filter(matchProjectParent);
+          const filtered = allItems.filter(
+            (item) => matchProjectParent(item) && matchMentorType(item),
+          );
           const total = filtered.length;
           const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
           const safePage = Math.min(Math.max(page, 1), totalPages);
@@ -199,7 +381,8 @@ export function useScholarList() {
         university: activeUni ?? undefined,
         department: activeDept ?? undefined,
         search: query.trim() || undefined,
-        is_adjunct_supervisor: isJointMentor || undefined,
+        participated_event_id: participatedEventId ?? undefined,
+        is_adjunct_supervisor: mentorType === "兼职导师" ? true : undefined,
         region: apiRegion,
         affiliation_type: apiAffiliationType,
         project_category: projectFilter.category,
@@ -223,9 +406,11 @@ export function useScholarList() {
     activeUni,
     activeDept,
     query,
-    isJointMentor,
+    participatedEventId,
+    mentorType,
     apiRegion,
     apiAffiliationType,
+    needsClientFiltering,
     isProjectParentSubtab,
     activeSubTab,
     projectFilter.category,
@@ -245,8 +430,10 @@ export function useScholarList() {
     setSearchParams(newParams, { replace: true });
   }, [page, pageParam, searchParams, setSearchParams]);
 
-  /* Reset page on query change */
+  /* Reset page only when query actually changes after initial mount */
   useEffect(() => {
+    if (prevQueryRef.current === query) return;
+    prevQueryRef.current = query;
     setPage(1);
   }, [query]);
 
@@ -271,13 +458,14 @@ export function useScholarList() {
     setSearchParams(newParams);
   };
 
-  const handleToggleJointMentor = () => {
+  const handleChangeMentorType = (nextType: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (isJointMentor) {
-      newParams.delete("is_adjunct_supervisor");
+    if (!nextType || nextType === "全部") {
+      newParams.delete("mentor_type");
     } else {
-      newParams.set("is_adjunct_supervisor", "true");
+      newParams.set("mentor_type", nextType);
     }
+    newParams.delete("is_adjunct_supervisor");
     newParams.set("page", "1");
     setSearchParams(newParams);
   };
@@ -285,6 +473,14 @@ export function useScholarList() {
   const clearAll = () => {
     setQuery("");
     setSearchParams(new URLSearchParams());
+  };
+
+  const handleClearParticipatedEvent = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("participated_event_id");
+    newParams.delete("event_title");
+    newParams.delete("page");
+    setSearchParams(newParams);
   };
 
   const handleDeleteScholar = async (urlHash: string, name: string) => {
@@ -304,7 +500,8 @@ export function useScholarList() {
         university: activeUni ?? undefined,
         department: activeDept ?? undefined,
         search: query.trim() || undefined,
-        is_adjunct_supervisor: isJointMentor || undefined,
+        participated_event_id: participatedEventId ?? undefined,
+        is_adjunct_supervisor: mentorType === "兼职导师" ? true : undefined,
         region: apiRegion,
         affiliation_type: apiAffiliationType,
         project_category: projectFilter.category,
@@ -333,7 +530,8 @@ export function useScholarList() {
       university: activeUni ?? undefined,
       department: activeDept ?? undefined,
       search: query.trim() || undefined,
-      is_adjunct_supervisor: isJointMentor || undefined,
+      participated_event_id: participatedEventId ?? undefined,
+      is_adjunct_supervisor: mentorType === "兼职导师" ? true : undefined,
       region: apiRegion,
       affiliation_type: apiAffiliationType,
       project_category: projectFilter.category,
@@ -356,13 +554,46 @@ export function useScholarList() {
         university: activeUni ?? undefined,
         department: activeDept ?? undefined,
         search: query.trim() || undefined,
-        is_adjunct_supervisor: isJointMentor || undefined,
+        participated_event_id: participatedEventId ?? undefined,
+        is_adjunct_supervisor: mentorType === "兼职导师" ? true : undefined,
         region: apiRegion,
         affiliation_type: apiAffiliationType,
         project_category: projectFilter.category,
         project_subcategory: projectFilter.subcategory,
       });
-      exportScholarsToExcel(allScholars);
+      if (!needsClientFiltering) {
+        exportScholarsToExcel(allScholars);
+        return;
+      }
+
+      const projectParentSubcategories =
+        activeSubTab && PROJECT_PARENT_SUBCATEGORY_FILTERS[activeSubTab]
+          ? PROJECT_PARENT_SUBCATEGORY_FILTERS[activeSubTab]
+          : [];
+      const subcategorySet = new Set(projectParentSubcategories);
+      const parentCategory = activeSubTab
+        ? PROJECT_PARENT_CATEGORY_MAP[activeSubTab]
+        : undefined;
+
+      const filteredScholars = allScholars.filter((item) => {
+        const mentorMatched = matchesMentorType(item, mentorType);
+        if (!mentorMatched) return false;
+        if (!isProjectParentSubtab || !activeSubTab) return true;
+
+        const tags = item.project_tags ?? [];
+        const hasCategoryMatch = parentCategory
+          ? tags.some((tag) => tag.category === parentCategory)
+          : false;
+        const hasSubcategoryMatch = tags.some((tag) =>
+          subcategorySet.has((tag.subcategory ?? "").trim()),
+        );
+        const legacySubMatch = subcategorySet.has(
+          String(item.project_subcategory ?? "").trim(),
+        );
+        return hasCategoryMatch || hasSubcategoryMatch || legacySubMatch;
+      });
+
+      exportScholarsToExcel(filteredScholars);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "导出失败";
       alert(errorMsg);
@@ -375,6 +606,14 @@ export function useScholarList() {
   const items = apiData?.items ?? [];
 
   const filterChips: { label: string; onRemove: () => void }[] = [
+    ...(participatedEventId
+      ? [
+          {
+            label: `活动：${eventTitle?.trim() || `ID ${participatedEventId}`}`,
+            onRemove: handleClearParticipatedEvent,
+          },
+        ]
+      : []),
     ...(activeUni
       ? [{ label: activeUni, onRemove: () => handleSelectUni(null) }]
       : []),
@@ -386,8 +625,8 @@ export function useScholarList() {
           },
         ]
       : []),
-    ...(isJointMentor
-      ? [{ label: "兼职导师", onRemove: handleToggleJointMentor }]
+    ...(mentorType && mentorType !== "全部"
+      ? [{ label: `共建导师：${mentorType}`, onRemove: () => handleChangeMentorType("全部") }]
       : []),
   ].filter((c) => c.label);
 
@@ -395,10 +634,10 @@ export function useScholarList() {
 
   return {
     // Sidebar data
-    filteredUniNodes,
-    totalCount,
-    uniLoading,
-    uniError,
+    filteredUniNodes: effectiveUniNodes,
+    totalCount: participatedEventId ? effectiveTotalCount : defaultTotalCount,
+    uniLoading: effectiveUniLoading,
+    uniError: effectiveUniError,
     activeUni,
     activeDept,
     activeSubTab,
@@ -413,8 +652,9 @@ export function useScholarList() {
     filterChips,
     hasAnyFilter,
     clearAll,
-    isJointMentor,
-    handleToggleJointMentor,
+    mentorType,
+    mentorTypeOptions: [...MENTOR_FILTER_OPTIONS],
+    handleChangeMentorType,
 
     // Data & pagination
     items,

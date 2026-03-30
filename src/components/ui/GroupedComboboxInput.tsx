@@ -29,7 +29,7 @@ export function GroupedComboboxInput({
   maxHeight = "400px",
 }: GroupedComboboxInputProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchText, setSearchText] = useState("");
+  const [searchText, setSearchText] = useState(value);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,13 +59,6 @@ export function GroupedComboboxInput({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [value]);
-
-  // Update search text when value changes externally
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchText(value);
-    }
-  }, [value, isOpen]);
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -137,6 +130,7 @@ export function GroupedComboboxInput({
   };
 
   const handleInputFocus = () => {
+    setSearchText(value);
     setIsOpen(true);
     setHighlightedIndex(-1);
   };
@@ -157,7 +151,7 @@ export function GroupedComboboxInput({
         <input
           ref={inputRef}
           type="text"
-          value={searchText}
+          value={isOpen ? searchText : value}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={handleInputFocus}

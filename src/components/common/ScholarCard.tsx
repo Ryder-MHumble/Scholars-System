@@ -11,7 +11,7 @@ import { getAvatarColor, getInitial } from "@/utils/avatar";
 interface ScholarCardProps {
   scholar: ScholarListItem;
   index?: number;
-  state?: any;
+  state?: unknown;
   onDelete?: (urlHash: string, name: string) => void;
   isDeleting?: boolean;
 }
@@ -40,11 +40,11 @@ export function ScholarCard({
               <img
                 src={s.photo_url}
                 alt={s.name}
-                className="w-11 h-11 rounded-full object-cover shrink-0"
+                className="w-11 h-11 rounded-lg object-cover shrink-0"
               />
             ) : (
               <div
-                className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                className="w-11 h-11 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
                 style={{
                   backgroundColor: getAvatarColor(s.name),
                 }}

@@ -224,7 +224,7 @@ export function InstitutionCreateModal({
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            新增高校
+            新增机构
           </button>
           <button
             onClick={() => setCreateMode("department")}
@@ -234,7 +234,7 @@ export function InstitutionCreateModal({
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            新增院系
+            新增二级机构
           </button>
         </div>
       </div>

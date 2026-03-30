@@ -149,7 +149,7 @@ ${content.substring(0, 8000)}
   try {
     const extracted = JSON.parse(jsonText);
     return extracted;
-  } catch (err) {
+  } catch {
     console.error("Failed to parse DeepSeek response:", jsonText);
     throw new Error("无法解析提取的学者信息");
   }

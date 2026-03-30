@@ -136,6 +136,7 @@ export interface InstitutionDetail {
   priority: string | null;
   student_count_24: number | null;
   student_count_25: number | null;
+  student_counts_by_year?: Record<string, number>;
   student_count_total: number | null;
   mentor_count: number | null;
   resident_leaders: string[];

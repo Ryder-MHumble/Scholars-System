@@ -10,10 +10,7 @@ import {
 } from "lucide-react";
 import type { Venue, VenueType, VenueRank } from "@/types/venue";
 import { cn } from "@/utils/cn";
-
-const API_BASE_URL = import.meta.env.DEV
-  ? "http://localhost:8002/api/v1"
-  : "http://10.1.132.21:8001/api/v1";
+import { fetchVenueList } from "@/services/venueApi";
 
 export default function VenueListPage() {
   const [searchParams] = useSearchParams();
@@ -53,58 +50,25 @@ export default function VenueListPage() {
 
   // Fetch venues from API
   useEffect(() => {
-    const fetchVenues = async () => {
+    const controller = new AbortController();
+
+    const loadVenues = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        const params = new URLSearchParams();
-        if (selectedType !== "全部") {
-          params.append(
-            "type",
-            selectedType === "会议" ? "conference" : "journal",
-          );
-        }
-        if (selectedRank !== "全部") {
-          params.append("rank", selectedRank);
-        }
-        if (selectedField !== "全部") {
-          params.append("field", selectedField);
-        }
-        if (searchQuery.trim()) {
-          params.append("keyword", searchQuery.trim());
-        }
-        params.append("page_size", "100");
-
-        const response = await fetch(`${API_BASE_URL}/venues/?${params}`);
-        if (!response.ok) {
-          throw new Error(`API 请求失败: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Transform API data to match frontend Venue type
-        const transformedVenues: Venue[] = (data.items || []).map(
-          (item: any) => ({
-            id: item.id,
-            name: item.name,
-            nameEn: item.name,
-            fullName: item.full_name || item.name,
-            type: item.type === "conference" ? "会议" : "期刊",
-            rank: item.rank as VenueRank,
-            field: item.fields?.[0] || "未分类",
-            description: item.description || "",
-            website: item.website,
-            h5Index: item.h5_index,
-            acceptanceRate: item.acceptance_rate
-              ? `${Math.round(item.acceptance_rate * 100)}%`
-              : undefined,
-            impactFactor: item.impact_factor,
-          }),
+        const nextVenues = await fetchVenueList(
+          {
+            type: selectedType,
+            rank: selectedRank,
+            field: selectedField,
+            keyword: searchQuery,
+            pageSize: 100,
+          },
+          controller.signal,
         );
-
-        setVenues(transformedVenues);
+        setVenues(nextVenues);
       } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
         console.error("Failed to fetch venues:", err);
         setError(err instanceof Error ? err.message : "加载失败");
         setVenues([]);
@@ -116,12 +80,15 @@ export default function VenueListPage() {
     // Debounce search query
     const timeoutId = setTimeout(
       () => {
-        fetchVenues();
+        void loadVenues();
       },
       searchQuery.trim() ? 300 : 0,
     );
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [selectedType, selectedRank, selectedField, searchQuery]);
 
   // Get unique fields from API data

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -59,9 +59,41 @@ interface ActivityScholar {
   name: string;
 }
 
+interface ActivityListViewState {
+  subtab: string;
+  viewMode: "card" | "calendar";
+  sortOrder: "desc" | "asc";
+  currentYear: number;
+  currentMonth: number;
+  selectedDay: number | null;
+  activeType: string;
+  searchQuery: string;
+  scrollY: number;
+}
+
 export default function ActivityDetailPage() {
   const { activityId } = useParams<{ activityId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (
+    location.state as { from?: { pathname?: string; search?: string } } | null
+  )?.from;
+  const restoreActivityListState = (
+    location.state as { restoreActivityListState?: ActivityListViewState } | null
+  )?.restoreActivityListState;
+  const backHref =
+    from?.pathname && from.pathname !== ""
+      ? `${from.pathname}${from.search ?? ""}`
+      : window.sessionStorage.getItem("activity_list_return_to") ??
+        "/?tab=activities";
+
+  const goBackToList = () => {
+    if (restoreActivityListState) {
+      navigate(backHref, { state: { restoreActivityListState } });
+      return;
+    }
+    navigate(backHref);
+  };
 
   const [detail, setDetail] = useState<ActivityEventDetail | null>(null);
   const [scholars, setScholars] = useState<ActivityScholar[]>([]);
@@ -118,7 +150,7 @@ export default function ActivityDetailPage() {
       setIsDeleting(true);
       setDeleteError(null);
       await deleteActivity(detail.id);
-      navigate("/?tab=activities");
+      goBackToList();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "删除失败");
       setIsDeleting(false);
@@ -164,7 +196,7 @@ export default function ActivityDetailPage() {
           <p className="text-lg font-semibold text-gray-900 mb-2">加载失败</p>
           <p className="text-sm text-gray-500 mb-5">{error ?? "活动不存在"}</p>
           <button
-            onClick={() => navigate("/?tab=activities")}
+            onClick={goBackToList}
             className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors"
           >
             返回活动列表
@@ -181,7 +213,7 @@ export default function ActivityDetailPage() {
       <div className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
         <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
           <button
-            onClick={() => navigate("/?tab=activities")}
+            onClick={goBackToList}
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -322,7 +354,11 @@ export default function ActivityDetailPage() {
                     {scholars.map((s) => (
                       <button
                         key={s.scholar_id}
-                        onClick={() => navigate(`/scholars/${s.scholar_id}`)}
+                        onClick={() =>
+                          navigate(`/scholars/${s.scholar_id}`, {
+                            state: { from: location },
+                          })
+                        }
                         className="flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-primary-50 hover:border-primary-200 border border-gray-200 rounded-lg transition-colors group"
                       >
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shrink-0">

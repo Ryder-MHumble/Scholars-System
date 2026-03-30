@@ -27,7 +27,7 @@ export interface NavNode {
 export const NAV_TREE: NavNode[] = [
   {
     id: "institutions",
-    label: "机构-Institution",
+    label: "机构",
     icon: Building2,
     tab: "institutions",
     children: [
@@ -49,7 +49,7 @@ export const NAV_TREE: NavNode[] = [
   },
   {
     id: "scholars",
-    label: "学者-Scholar",
+    label: "学者",
     icon: Users,
     tab: "scholars",
     children: [
@@ -81,7 +81,7 @@ export const NAV_TREE: NavNode[] = [
   },
   {
     id: "students",
-    label: "学生-Student",
+    label: "学生",
     icon: GraduationCap,
     tab: "students",
     children: [
@@ -93,7 +93,7 @@ export const NAV_TREE: NavNode[] = [
   },
   {
     id: "projects",
-    label: "项目-Program",
+    label: "项目",
     icon: FolderKanban,
     tab: "projects",
     children: [
@@ -134,7 +134,7 @@ export const NAV_TREE: NavNode[] = [
   },
   {
     id: "activities",
-    label: "活动-Event",
+    label: "活动",
     icon: Calendar,
     tab: "activities",
     children: [
@@ -174,7 +174,7 @@ export const NAV_TREE: NavNode[] = [
   },
   {
     id: "venues",
-    label: "社群-Community",
+    label: "社群",
     icon: BookOpen,
     tab: "venues",
     children: [

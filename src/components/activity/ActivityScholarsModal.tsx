@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trash2, Users, Mail, ExternalLink } from "lucide-react";
 import {
@@ -31,11 +31,24 @@ export function ActivityScholarsModal({
   const [error, setError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
+  const loadScholars = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const activityScholars = await fetchActivityScholars(activityId);
+      setScholars(activityScholars);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }, [activityId]);
+
   useEffect(() => {
     if (isOpen) {
       loadScholars();
     }
-  }, [isOpen, activityId]);
+  }, [isOpen, loadScholars]);
 
   // Handle click outside to close
   useEffect(() => {
@@ -56,19 +69,6 @@ export function ActivityScholarsModal({
     }
   }, [isOpen, onClose]);
 
-  const loadScholars = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const activityScholars = await fetchActivityScholars(activityId);
-      setScholars(activityScholars);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "加载失败");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAddScholar = async (result: ScholarPickResult) => {
     try {
       setError(null);
@@ -85,7 +85,7 @@ export function ActivityScholarsModal({
     try {
       setError(null);
       await removeActivityScholar(activityId, scholarId);
-      setScholars(scholars.filter((s) => s.scholar_id !== scholarId));
+      setScholars((prev) => prev.filter((s) => s.scholar_id !== scholarId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "移除失败");
     }

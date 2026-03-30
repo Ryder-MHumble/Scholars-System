@@ -48,7 +48,6 @@ interface UniversitySidebarTreeProps {
   onSelectDept: (uniName: string, deptName: string) => void;
   uniNodes: UniNode[];
   totalCount: number;
-  onSearchChange: (search: string) => void;
 }
 
 export function UniversitySidebarTree({
@@ -59,7 +58,6 @@ export function UniversitySidebarTree({
   onSelectDept,
   uniNodes,
   totalCount,
-  onSearchChange: _onSearchChange,
 }: UniversitySidebarTreeProps) {
   const [sortMode, setSortMode] = useState<"region-type" | "alphabetical">(
     "region-type",

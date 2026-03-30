@@ -4,6 +4,36 @@ import { Eye, Trash2 } from "lucide-react";
 import type { ScholarListItem } from "@/services/scholarApi";
 import { getAvatarColor, getInitial } from "@/utils/avatar";
 
+const SUBCATEGORY_ALIAS_MAP: Record<string, string> = {
+  科技育青委员会: "科技教育委员会",
+  学院学生事务导师: "学院学生高校导师",
+};
+
+function getMentorTypes(scholar: ScholarListItem): string[] {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  const addLabel = (raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    const normalized = SUBCATEGORY_ALIAS_MAP[value] ?? value;
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    labels.push(normalized);
+  };
+
+  for (const tag of scholar.project_tags ?? []) {
+    addLabel(String(tag.subcategory ?? ""));
+  }
+
+  addLabel(String(scholar.project_subcategory ?? ""));
+
+  if (scholar.adjunct_supervisor?.status) {
+    addLabel("兼职导师");
+  }
+
+  return labels;
+}
+
 interface ScholarTableProps {
   items: ScholarListItem[];
   locationState: unknown;
@@ -23,19 +53,22 @@ export function ScholarTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="px-6 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
+              <th className="px-5 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
                 学者
               </th>
-              <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
+              <th className="px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
                 所属机构
               </th>
-              <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
+              <th className="px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
                 研究方向
               </th>
-              <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
+              <th className="px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
                 职称
               </th>
-              <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70 text-right">
+              <th className="px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
+                共建导师类别
+              </th>
+              <th className="px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70 text-right">
                 操作
               </th>
             </tr>
@@ -54,7 +87,7 @@ export function ScholarTable({
                 className="group relative border-b border-gray-50 last:border-b-0 hover:bg-primary-50/40 transition-colors duration-150"
               >
                 {/* 头像 + 姓名 — 左边 accent 线 */}
-                <td className="px-6 py-3.5 border-l-2 border-transparent group-hover:border-primary-400 transition-colors duration-150">
+                <td className="px-5 py-2.5 border-l-2 border-transparent group-hover:border-primary-400 transition-colors duration-150">
                   <Link
                     to={`/scholars/${s.url_hash}`}
                     state={locationState}
@@ -64,11 +97,11 @@ export function ScholarTable({
                       <img
                         src={s.photo_url}
                         alt={s.name}
-                        className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-transparent group-hover:ring-primary-200 transition-all duration-150"
+                        className="w-14 h-14 rounded-lg object-cover shrink-0 ring-2 ring-transparent group-hover:ring-primary-200 transition-all duration-150"
                       />
                     ) : (
                       <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ring-2 ring-transparent group-hover:ring-primary-200 transition-all duration-150"
+                        className="w-14 h-14 rounded-lg flex items-center justify-center text-white font-bold text-lg shrink-0 ring-2 ring-transparent group-hover:ring-primary-200 transition-all duration-150"
                         style={{ backgroundColor: getAvatarColor(s.name) }}
                       >
                         {getInitial(s.name)}
@@ -81,7 +114,7 @@ export function ScholarTable({
                 </td>
 
                 {/* 所属机构 */}
-                <td className="px-5 py-3.5">
+                <td className="px-4 py-2.5">
                   <div className="min-w-0">
                     <p className="text-sm text-gray-700 font-medium truncate max-w-[160px]">
                       {s.university || "—"}
@@ -93,7 +126,7 @@ export function ScholarTable({
                 </td>
 
                 {/* 研究方向 */}
-                <td className="px-5 py-3.5">
+                <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1 max-w-[200px]">
                     {(s.research_areas ?? []).slice(0, 2).map((f) => (
                       <span
@@ -115,14 +148,41 @@ export function ScholarTable({
                 </td>
 
                 {/* 职称 */}
-                <td className="px-5 py-3.5">
+                <td className="px-4 py-2.5">
                   <span className="text-sm text-gray-600">
                     {s.position ? s.position.replace(/^职称[：:]\s*/, "") : "—"}
                   </span>
                 </td>
 
+                {/* 共建导师类别 */}
+                <td className="px-4 py-2.5">
+                  {(() => {
+                    const mentorTypes = getMentorTypes(s);
+                    if (!mentorTypes.length) {
+                      return <span className="text-xs text-gray-300">—</span>;
+                    }
+                    return (
+                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                        {mentorTypes.slice(0, 2).map((label) => (
+                          <span
+                            key={label}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                        {mentorTypes.length > 2 && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400 border border-gray-200">
+                            +{mentorTypes.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </td>
+
                 {/* 操作 */}
-                <td className="px-5 py-3.5 text-right">
+                <td className="px-4 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                     <Link
                       to={`/scholars/${s.url_hash}`}

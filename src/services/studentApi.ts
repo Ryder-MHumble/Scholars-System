@@ -99,6 +99,40 @@ export async function fetchStudentList(
   return res.json();
 }
 
+export async function fetchStudentListAll(
+  filters: StudentListFilters = {},
+  signal?: AbortSignal,
+): Promise<StudentRecord[]> {
+  const pageSize = Math.max(1, Math.min(filters.page_size ?? 500, 500));
+  const firstPage = await fetchStudentList(
+    {
+      ...filters,
+      page: 1,
+      page_size: pageSize,
+    },
+    signal,
+  );
+
+  const items = [...(firstPage.items ?? [])];
+  const totalPages = Math.max(firstPage.total_pages || 1, 1);
+  if (totalPages <= 1) return items;
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    if (signal?.aborted) break;
+    const nextPage = await fetchStudentList(
+      {
+        ...filters,
+        page,
+        page_size: pageSize,
+      },
+      signal,
+    );
+    items.push(...(nextPage.items ?? []));
+  }
+
+  return items;
+}
+
 export async function fetchStudentOptions(
   enrollmentYear?: string,
 ): Promise<StudentFilterOptions> {

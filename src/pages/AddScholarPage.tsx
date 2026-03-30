@@ -248,25 +248,32 @@ export default function AddScholarPage() {
         row.title || row.position || row.职称 || "",
       ) as AcademicTitle,
       universityId: String(
-        row.university || row.institution || row.院校 || "",
+        row.university || row.institution || row.所属机构 || row.院校 || "",
       ).trim(),
-      departmentId: String(row.department || row.院系 || "").trim(),
+      departmentId: String(
+        row.department || row.院系 || row["院系/部门"] || row.部门 || "",
+      ).trim(),
       email: String(row.email || row.邮箱 || "").trim(),
       phone: String(row.phone || row.电话 || "").trim(),
       homepage: String(
-        row.homepage || row.profile_url || row.主页 || "",
+        row.homepage || row.profile_url || row.个人主页 || row.主页 || "",
       ).trim(),
       googleScholar: String(
-        row.google_scholar || row.googleScholar || row.谷歌学术 || "",
+        row.google_scholar ||
+          row.google_scholar_url ||
+          row.googleScholar ||
+          row["Google Scholar"] ||
+          row.谷歌学术 ||
+          "",
       ).trim(),
-      dblp: String(row.dblp || row.dblp_url || "").trim(),
+      dblp: String(row.dblp || row.dblp_url || row.DBLP || "").trim(),
       researchFields: String(
         row.researchFields || row.research_areas || row.研究方向 || "",
       )
         .split(/[,，、;；]/)
         .map((s: string) => s.trim())
         .filter(Boolean),
-      bio: String(row.bio || row.简介 || "").trim(),
+      bio: String(row.bio || row.个人简介 || row.简介 || "").trim(),
       hIndex: String(row.hIndex || row.h_index || ""),
       citationCount: String(row.citationCount || row.citation_count || ""),
       paperCount: String(row.paperCount || row.paper_count || ""),
@@ -415,7 +422,7 @@ export default function AddScholarPage() {
                     placeholder="e.g. Zhang San"
                   />
                 </Field>
-                <Field label="所属院校" required>
+                <Field label="所属机构" required>
                   <GroupedComboboxInput
                     value={form.universityId}
                     onChange={(v) => {
@@ -430,7 +437,7 @@ export default function AddScholarPage() {
                     disabled={uniLoading}
                   />
                   {errors.universityId && (
-                    <p className="mt-1 text-xs text-red-500">请选择所属院校</p>
+                    <p className="mt-1 text-xs text-red-500">请选择所属机构</p>
                   )}
                 </Field>
                 <Field label="所属院系">

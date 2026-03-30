@@ -19,7 +19,7 @@ import { ComboboxInput } from "@/components/ui/ComboboxInput";
 import {
   createStudent,
   deleteStudent,
-  fetchStudentList,
+  fetchStudentListAll,
   fetchStudentOptions,
   patchStudent,
   type StudentCreatePayload,
@@ -93,6 +93,10 @@ function sortYears(values: string[]): string[] {
 function safeText(value: string | null | undefined): string {
   const text = (value ?? "").trim();
   return text || "-";
+}
+
+function normalizeUniversity(value: string | null | undefined): string {
+  return (value ?? "").trim();
 }
 
 function formatEnrollmentYear(value: string | null | undefined): string {
@@ -335,18 +339,18 @@ export default function StudentListPage() {
     setIsLoading(true);
     setError(null);
 
-    fetchStudentList(
+    fetchStudentListAll(
       {
         enrollment_year: activeYear ?? undefined,
         mentor_name: selectedMentor === ALL_MENTOR ? undefined : selectedMentor,
         keyword: searchKeyword || undefined,
-        page: 1,
         page_size: 500,
       },
       controller.signal,
     )
-      .then((res) => {
-        setAllStudents(res.items ?? []);
+      .then((items) => {
+        if (controller.signal.aborted) return;
+        setAllStudents(items ?? []);
         setIsLoading(false);
       })
       .catch((err) => {
@@ -367,7 +371,7 @@ export default function StudentListPage() {
   const universityCounts = useMemo(() => {
     const map = new Map<string, number>();
     yearScopedStudents.forEach((item) => {
-      const uni = (item.home_university || "").trim();
+      const uni = normalizeUniversity(item.home_university);
       if (!uni) return;
       map.set(uni, (map.get(uni) ?? 0) + 1);
     });
@@ -386,7 +390,9 @@ export default function StudentListPage() {
 
   const studentsForRender = useMemo(() => {
     if (selectedUniversity === ALL_UNIVERSITY) return yearScopedStudents;
-    return yearScopedStudents.filter((item) => item.home_university === selectedUniversity);
+    return yearScopedStudents.filter(
+      (item) => normalizeUniversity(item.home_university) === selectedUniversity,
+    );
   }, [yearScopedStudents, selectedUniversity]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -25,6 +25,7 @@ import {
   patchProject,
 } from "@/services/projectApi";
 import type { Project, RelatedScholar, ProjectOutput } from "@/types/project";
+import type { ProjectPatchRequest } from "@/types/project";
 import { cn } from "@/utils/cn";
 import { FieldEditor } from "@/components/common/FieldEditor";
 import {
@@ -76,6 +77,26 @@ function Section({
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (
+    location.state as { from?: { pathname?: string; search?: string } } | null
+  )?.from;
+  const restoreProjectListState = (
+    location.state as { restoreProjectListState?: unknown } | null
+  )?.restoreProjectListState;
+  const backHref =
+    from?.pathname && from.pathname !== ""
+      ? `${from.pathname}${from.search ?? ""}`
+      : window.sessionStorage.getItem("project_list_return_to") ??
+        "/?tab=projects";
+
+  const goBackToList = () => {
+    if (restoreProjectListState) {
+      navigate(backHref, { state: { restoreProjectListState } });
+      return;
+    }
+    navigate(backHref);
+  };
 
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,32 +109,53 @@ export default function ProjectDetailPage() {
   const [showAddField, setShowAddField] = useState(false);
   const [showAddOutput, setShowAddOutput] = useState(false);
 
-  useEffect(() => {
-    if (!projectId) return;
-    loadProject();
-  }, [projectId]);
-
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     if (!projectId) return;
     setLoading(true);
     setError(null);
     try {
       const data = await fetchProjectDetail(projectId);
       setProject(data);
-      setCustomFields((data.extra as Record<string, string>) ?? {});
+      const extra = data.extra;
+      if (extra && typeof extra === "object" && !Array.isArray(extra)) {
+        const normalized: Record<string, string> = {};
+        Object.entries(extra).forEach(([key, val]) => {
+          normalized[key] = typeof val === "string" ? val : JSON.stringify(val);
+        });
+        setCustomFields(normalized);
+      } else {
+        setCustomFields({});
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载失败");
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    void loadProject();
+  }, [projectId, loadProject]);
 
   // ─── Field update helpers ───────────────────────────────────────────────
 
-  const updateField = async (field: keyof Project, value: unknown) => {
+  const updateField = async <K extends keyof ProjectPatchRequest & keyof Project>(
+    field: K,
+    value: ProjectPatchRequest[K],
+  ) => {
     if (!projectId || !project) return;
-    await patchProject(projectId, { [field]: value } as any);
-    setProject({ ...project, [field]: value } as Project);
+    await patchProject(projectId, {
+      [field]: value,
+    } as Pick<ProjectPatchRequest, K>);
+    setProject((prev) =>
+      prev
+        ? ({
+            ...prev,
+            [field]: value,
+          } as Project)
+        : prev,
+    );
   };
 
   const addCustomField = async () => {
@@ -203,7 +245,7 @@ export default function ProjectDetailPage() {
     setDeleting(true);
     try {
       await deleteProject(projectId);
-      navigate("/?tab=projects");
+      goBackToList();
     } catch (err) {
       alert(err instanceof Error ? err.message : "删除失败");
       setDeleting(false);
@@ -235,7 +277,7 @@ export default function ProjectDetailPage() {
             {error || "该项目不存在或已被删除"}
           </p>
           <button
-            onClick={() => navigate("/?tab=projects")}
+            onClick={goBackToList}
             className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors"
           >
             返回项目列表
@@ -254,7 +296,7 @@ export default function ProjectDetailPage() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           {/* Breadcrumb */}
           <button
-            onClick={() => navigate("/?tab=projects")}
+            onClick={goBackToList}
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors mb-3"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -457,7 +499,9 @@ export default function ProjectDetailPage() {
                         className="cursor-pointer"
                         onClick={() => {
                           if (scholar.scholar_id)
-                            navigate(`/scholars/${scholar.scholar_id}`);
+                            navigate(`/scholars/${scholar.scholar_id}`, {
+                              state: { from: location },
+                            });
                         }}
                         title={scholar.scholar_id ? "查看学者详情" : undefined}
                       >
@@ -479,7 +523,9 @@ export default function ProjectDetailPage() {
                             )}
                             onClick={() => {
                               if (scholar.scholar_id)
-                                navigate(`/scholars/${scholar.scholar_id}`);
+                                navigate(`/scholars/${scholar.scholar_id}`, {
+                                  state: { from: location },
+                                });
                             }}
                           >
                             {scholar.name}

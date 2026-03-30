@@ -1,37 +1,10 @@
-import { lazy, Suspense, useState, useEffect } from "react";
-import type { ComponentType } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { NavTreeItem } from "@/components/nav/NavTreeItem";
 import { NAV_TREE, getAncestorIds } from "@/constants/navTree";
 import type { TabId } from "@/constants/navTree";
-
-function lazyWithRetry<T extends { default: ComponentType<any> }>(
-  importer: () => Promise<T>,
-  retryKey: string,
-) {
-  return lazy(async () => {
-    try {
-      return await importer();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const isChunkLoadError =
-        message.includes("Failed to fetch dynamically imported module") ||
-        message.includes("Importing a module script failed");
-      if (isChunkLoadError) {
-        const storageKey = `lazy-reload-once:${retryKey}`;
-        const alreadyReloaded = window.sessionStorage.getItem(storageKey);
-        if (!alreadyReloaded) {
-          window.sessionStorage.setItem(storageKey, "1");
-          window.location.reload();
-          return new Promise<never>(() => {});
-        }
-        window.sessionStorage.removeItem(storageKey);
-      }
-      throw error;
-    }
-  });
-}
+import { lazyWithRetry } from "@/utils/lazyWithRetry";
 
 const ScholarListPage = lazyWithRetry(
   () => import("./ScholarListPage"),
@@ -65,25 +38,25 @@ export default function HomePage() {
   const activeTab = (searchParams.get("tab") as TabId) || "institutions";
   const activeSubTab = searchParams.get("subtab");
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
+  const [manualExpandedIds, setManualExpandedIds] = useState<Set<string>>(() => {
     return new Set(getAncestorIds(activeTab, activeSubTab));
   });
 
-  useEffect(() => {
+  const expandedIds = useMemo(() => {
     const ancestors = getAncestorIds(activeTab, activeSubTab);
-    setExpandedIds((prev) => {
-      const next = new Set([...prev].filter((id) => !topLevelIds.includes(id)));
-      ancestors.forEach((id) => next.add(id));
-      return next;
-    });
-  }, [activeTab, activeSubTab]);
+    const next = new Set(
+      [...manualExpandedIds].filter((id) => !topLevelIds.includes(id)),
+    );
+    ancestors.forEach((id) => next.add(id));
+    return next;
+  }, [activeTab, activeSubTab, manualExpandedIds]);
 
   const handleNavigate = (tab: TabId, subtab?: string) => {
     setSearchParams(subtab ? { tab, subtab } : { tab });
   };
 
   const handleToggle = (id: string) => {
-    setExpandedIds((prev) => {
+    setManualExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -118,19 +91,19 @@ export default function HomePage() {
   return (
     <div className="h-screen flex overflow-hidden">
       {/* Left Sidebar Navigation */}
-      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shrink-0 overflow-hidden">
-        <div className="px-5 pt-5 pb-4 shrink-0 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
+      <aside className="w-56 bg-white border-r border-gray-100 flex flex-col shrink-0 overflow-hidden">
+        <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100">
+          <div className="flex items-center gap-2">
             <img
               src="/ScholarDB.png"
               alt="ScholarDB Logo"
-              className="w-12 h-12 rounded object-contain"
+              className="w-10 h-10 rounded object-contain"
             />
             <div>
-              <h1 className="text-base font-bold text-gray-900 leading-snug">
+              <h1 className="text-sm font-bold text-gray-900 leading-snug">
                 学者知识图谱
               </h1>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-[11px] text-gray-400 mt-0.5">
                 Scholar Knowledge Graph
               </p>
             </div>
@@ -138,13 +111,13 @@ export default function HomePage() {
         </div>
 
         {/* Support Notice */}
-        <div className="px-5 py-3 border-b border-gray-100 bg-blue-50">
+        <div className="px-4 py-3 border-b border-gray-100 bg-blue-50">
           <p className="text-xs text-blue-700 leading-relaxed">
             💬 如遇到相关问题请咨询孙铭浩
           </p>
         </div>
 
-        <nav className="flex-1 overflow-y-auto scrollbar-hide py-4 px-3">
+        <nav className="flex-1 overflow-y-auto scrollbar-hide py-3 px-2.5">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3 px-3">
             核心数据库
           </p>

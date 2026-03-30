@@ -107,23 +107,7 @@ export function ExcelImportModal<T>({
     e.preventDefault();
     setIsDragging(false);
   }, []);
-  const handleDrop = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      const droppedFile = e.dataTransfer.files[0];
-      if (
-        droppedFile &&
-        (droppedFile.name.endsWith(".xlsx") ||
-          droppedFile.name.endsWith(".xls"))
-      ) {
-        await handleFileSelect(droppedFile);
-      }
-    },
-    [columns],
-  );
-
-  const handleFileSelect = async (selectedFile: File) => {
+  const handleFileSelect = useCallback(async (selectedFile: File) => {
     setFile(selectedFile);
     setIsProcessing(true);
     setErrors([]);
@@ -141,7 +125,22 @@ export function ExcelImportModal<T>({
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [columns]);
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const droppedFile = e.dataTransfer.files[0];
+      if (
+        droppedFile &&
+        (droppedFile.name.endsWith(".xlsx") ||
+          droppedFile.name.endsWith(".xls"))
+      ) {
+        await handleFileSelect(droppedFile);
+      }
+    },
+    [handleFileSelect],
+  );
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];

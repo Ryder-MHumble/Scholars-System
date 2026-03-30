@@ -22,7 +22,7 @@ const FIELD_MAPPING: Record<keyof ScholarListItem | string, string> = {
  */
 function transformScholarForExport(
   scholar: ScholarListItem,
-): Record<string, any> {
+): Record<string, string> {
   return {
     [FIELD_MAPPING.name]: scholar.name || "",
     [FIELD_MAPPING.name_en]: scholar.name_en || "",

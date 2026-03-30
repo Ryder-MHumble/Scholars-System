@@ -9,6 +9,7 @@ import type {
   AwardRecord,
   ScholarProjectTag,
   ScholarEventTag,
+  EducationRecord,
 } from "@/services/scholarApi";
 import {
   createScholar,
@@ -23,7 +24,6 @@ import { EditAchievementsModal } from "@/components/scholar-detail/modals/EditAc
 import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfileModal";
 import { staggerContainer, slideInLeft } from "@/utils/animations";
 import { cn } from "@/utils/cn";
-import { getAllCategories, getCategoryByType } from "@/constants/activityCategories";
 
 const emptyScholar: ScholarDetail = {
   url_hash: "new",
@@ -116,7 +116,7 @@ export default function AddScholarDetailPage() {
   };
 
   // Education save handler
-  const handleEducationSave = async (records: any[]) => {
+  const handleEducationSave = async (records: EducationRecord[]) => {
     try {
       setScholar((prev) => ({ ...prev, education: records }));
       setError(null);
@@ -126,7 +126,7 @@ export default function AddScholarDetailPage() {
   };
 
   // Management roles save handlers
-  const handleManagementRolesSave = async (records: any[]) => {
+  const handleManagementRolesSave = async (records: string[]) => {
     try {
       setScholar((prev) => ({ ...prev, joint_management_roles: records }));
       setError(null);
@@ -135,7 +135,7 @@ export default function AddScholarDetailPage() {
     }
   };
 
-  const handleManagementRolesInlineSave = async (roles: any[]) => {
+  const handleManagementRolesInlineSave = async (roles: string[]) => {
     try {
       setScholar((prev) => ({ ...prev, joint_management_roles: roles }));
       setError(null);
@@ -165,35 +165,14 @@ export default function AddScholarDetailPage() {
   };
 
   const handleProjectCategorySave = async (
-    primary: string,
-    sub: string,
-    activityType: string,
+    projectTags: ScholarProjectTag[],
+    eventTags: ScholarEventTag[],
   ) => {
-    const projectTags: ScholarProjectTag[] =
-      primary || sub
-        ? [{ category: primary.trim(), subcategory: sub.trim(), project_id: "", project_title: "" }]
-        : [];
-    const trimmed = activityType.trim();
-    const allCategories = getAllCategories();
-    const categoryMap = new Map(allCategories.map((item) => [item.id, item.name]));
-    const matched = trimmed ? getCategoryByType(trimmed) : null;
-    const categoryName = matched ? categoryMap.get(matched.categoryId) ?? "" : "";
-    const nextTags: ScholarEventTag[] = trimmed
-      ? [
-          {
-            category: categoryName,
-            series: "",
-            event_type: trimmed,
-            event_id: "",
-            event_title: "",
-          },
-        ]
-      : [];
     setScholar((prev) => ({
       ...prev,
       project_tags: projectTags,
-      event_tags: nextTags,
-      is_cobuild_scholar: projectTags.length > 0 || nextTags.length > 0,
+      event_tags: eventTags,
+      is_cobuild_scholar: projectTags.length > 0 || eventTags.length > 0,
     }));
   };
 
@@ -204,7 +183,7 @@ export default function AddScholarDetailPage() {
       return;
     }
     if (!scholar.university) {
-      setError("所属院校不能为空");
+      setError("所属机构不能为空");
       return;
     }
 
@@ -367,9 +346,8 @@ export default function AddScholarDetailPage() {
               animate="visible"
             >
               <ProjectCategorySelector
-                primaryCategory={scholar.project_tags?.[0]?.category ?? ""}
-                subcategory={scholar.project_tags?.[0]?.subcategory ?? ""}
-                activityType={scholar.event_tags?.[0]?.event_type ?? ""}
+                projectTags={scholar.project_tags ?? []}
+                eventTags={scholar.event_tags ?? []}
                 onSave={handleProjectCategorySave}
               />
 

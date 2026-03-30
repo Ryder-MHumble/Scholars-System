@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -15,16 +15,23 @@ import { useInstitutions } from "@/hooks/useInstitutions";
 import { InstitutionCard } from "@/components/institution/InstitutionCard";
 import { InstitutionCreateModal } from "@/components/institution/InstitutionCreateModal";
 import { ExcelImportModal } from "@/components/common/ExcelImportModal";
-import { createInstitution, fetchInstitutionList } from "@/services/institutionApi";
+import {
+  createInstitution,
+  fetchInstitutionHierarchy,
+  fetchInstitutionList,
+} from "@/services/institutionApi";
 import type { ExcelColumn } from "@/types/import";
-import type { InstitutionListItem } from "@/types/institution";
+import type {
+  InstitutionDepartmentListItem,
+  InstitutionListItem,
+} from "@/types/institution";
 import { Pagination } from "@/components/common/Pagination";
 
 const MODULE_PAGE_SIZE = 30;
 
 type JointSubcategory =
   | "示范性合作伙伴"
-  | "境内高校"
+  | "京内高校"
   | "京外C9高校"
   | "综合强校"
   | "工科强校"
@@ -34,7 +41,7 @@ type OverseasSubcategory = "香港高校" | "亚太高校" | "欧美高校" | "�
 
 const JOINT_SUBCATEGORY_ORDER: JointSubcategory[] = [
   "示范性合作伙伴",
-  "境内高校",
+  "京内高校",
   "京外C9高校",
   "综合强校",
   "工科强校",
@@ -55,6 +62,13 @@ interface InstitutionListViewState {
   viewMode: "priority" | "alpha";
   page: number;
   scrollY: number;
+}
+
+const INSTITUTION_LIST_RETURN_TO_KEY = "institution_list_return_to";
+const INSTITUTION_LIST_VIEW_STATE_KEY = "institution_list_view_state";
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, "");
 }
 
 const EXCEL_COLUMNS: ExcelColumn[] = [
@@ -126,7 +140,14 @@ export default function InstitutionListPage() {
   const restoreStateFromLocation =
     (location.state as { restoreInstitutionListState?: InstitutionListViewState })
       ?.restoreInstitutionListState ?? null;
-  const restoreState = restoreStateFromLocation;
+  let restoreStateFromSession: InstitutionListViewState | null = null;
+  try {
+    const raw = window.sessionStorage.getItem(INSTITUTION_LIST_VIEW_STATE_KEY);
+    restoreStateFromSession = raw ? (JSON.parse(raw) as InstitutionListViewState) : null;
+  } catch {
+    restoreStateFromSession = null;
+  }
+  const restoreState = restoreStateFromLocation ?? restoreStateFromSession;
 
   const apiFilters = useMemo(() => mapSubtabToFilters(subtab), [subtab]);
   const [searchQuery, setSearchQuery] = useState(
@@ -149,6 +170,18 @@ export default function InstitutionListPage() {
   const [moduleInstitutions, setModuleInstitutions] = useState<
     InstitutionListItem[]
   >([]);
+  const [deptMapById, setDeptMapById] = useState<
+    Record<string, InstitutionDepartmentListItem[]>
+  >({});
+  const [deptMapByName, setDeptMapByName] = useState<
+    Record<string, InstitutionDepartmentListItem[]>
+  >({});
+  const [scholarCountMapById, setScholarCountMapById] = useState<
+    Record<string, number>
+  >({});
+  const [scholarCountMapByName, setScholarCountMapByName] = useState<
+    Record<string, number>
+  >({});
   const [moduleTotal, setModuleTotal] = useState(0);
   const [moduleLoading, setModuleLoading] = useState(false);
   const [moduleError, setModuleError] = useState<string | null>(null);
@@ -176,6 +209,57 @@ export default function InstitutionListPage() {
     initialPage,
     !isModuleSubtab,
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchInstitutionHierarchy({
+      entity_type: "organization",
+      region: listFilters.region,
+      org_type: listFilters.org_type,
+      classification: listFilters.classification,
+      keyword: listFilters.keyword,
+    })
+      .then((organizations) => {
+        if (cancelled) return;
+        const nextById: Record<string, InstitutionDepartmentListItem[]> = {};
+        const nextByName: Record<string, InstitutionDepartmentListItem[]> = {};
+        const nextScholarById: Record<string, number> = {};
+        const nextScholarByName: Record<string, number> = {};
+        organizations.forEach((org) => {
+          const normalizedOrgName = normalizeName(org.name);
+          nextScholarById[org.id] = Number(org.scholar_count ?? 0);
+          if (normalizedOrgName) {
+            nextScholarByName[normalizedOrgName] = Number(org.scholar_count ?? 0);
+          }
+
+          const departments = (org.departments ?? []).map((dept) => ({
+            name: dept.name,
+            scholar_count: dept.scholar_count,
+            org_name: dept.org_name ?? null,
+          }));
+          if (departments.length === 0) return;
+          nextById[org.id] = departments;
+          if (normalizedOrgName) {
+            nextByName[normalizedOrgName] = departments;
+          }
+        });
+        setDeptMapById(nextById);
+        setDeptMapByName(nextByName);
+        setScholarCountMapById(nextScholarById);
+        setScholarCountMapByName(nextScholarByName);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDeptMapById({});
+        setDeptMapByName({});
+        setScholarCountMapById({});
+        setScholarCountMapByName({});
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [listFilters.classification, listFilters.keyword, listFilters.org_type, listFilters.region]);
 
   useEffect(() => {
     if (!isModuleSubtab) {
@@ -208,7 +292,7 @@ export default function InstitutionListPage() {
           if (cancelled) return;
           const grouped: Record<JointSubcategory, InstitutionListItem[]> = {
             示范性合作伙伴: responses[0].items,
-            境内高校: responses[1].items,
+            京内高校: responses[1].items,
             京外C9高校: responses[2].items,
             综合强校: responses[3].items,
             工科强校: responses[4].items,
@@ -296,14 +380,29 @@ export default function InstitutionListPage() {
   const effectiveLoading = isModuleSubtab ? moduleLoading : loading;
   const effectiveError = isModuleSubtab ? moduleError : error;
 
-  const buildListState = (): InstitutionListViewState => ({
-    subtab,
-    searchQuery,
-    searchInput,
-    viewMode,
-    page: currentPageForState,
-    scrollY: window.scrollY,
-  });
+  const buildListState = useCallback(
+    (): InstitutionListViewState => ({
+      subtab,
+      searchQuery,
+      searchInput,
+      viewMode,
+      page: currentPageForState,
+      scrollY: window.scrollY,
+    }),
+    [subtab, searchQuery, searchInput, viewMode, currentPageForState],
+  );
+
+  useEffect(() => {
+    const returnTo = `${location.pathname}${location.search || "?tab=institutions"}`;
+    window.sessionStorage.setItem(INSTITUTION_LIST_RETURN_TO_KEY, returnTo);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(
+      INSTITUTION_LIST_VIEW_STATE_KEY,
+      JSON.stringify(buildListState()),
+    );
+  }, [buildListState]);
 
   const filteredInstitutions = useMemo<InstitutionListItem[]>(() => {
     if (isModuleSubtab) return moduleInstitutions;
@@ -316,7 +415,7 @@ export default function InstitutionListPage() {
     if (jointModuleData) return jointModuleData;
     const grouped: Record<JointSubcategory, InstitutionListItem[]> = {
       示范性合作伙伴: [],
-      境内高校: [],
+      京内高校: [],
       京外C9高校: [],
       综合强校: [],
       工科强校: [],
@@ -326,7 +425,7 @@ export default function InstitutionListPage() {
       filteredInstitutions.forEach((inst) => {
         const normalizedSub =
           inst.sub_classification === "京内高校"
-            ? "境内高校"
+            ? "京内高校"
             : inst.sub_classification;
         if (normalizedSub && normalizedSub in grouped) {
           grouped[normalizedSub as JointSubcategory].push(inst);
@@ -376,6 +475,30 @@ export default function InstitutionListPage() {
     });
     return grouped;
   }, [viewMode, filteredInstitutions]);
+
+  const enrichInstitutionDepartments = (
+    institution: InstitutionListItem,
+  ): InstitutionListItem => {
+    const normalizedName = normalizeName(institution.name);
+    const hierarchyDepartments =
+      deptMapById[institution.id] ?? deptMapByName[normalizedName];
+    const fallback = hierarchyDepartments ?? [];
+    const mergedDepartments =
+      fallback.length > 0 ? fallback : institution.departments;
+    const hierarchyScholarCount =
+      scholarCountMapById[institution.id] ?? scholarCountMapByName[normalizedName];
+
+    if (!mergedDepartments && hierarchyScholarCount === undefined) return institution;
+
+    return {
+      ...institution,
+      scholar_count:
+        hierarchyScholarCount !== undefined
+          ? hierarchyScholarCount
+          : institution.scholar_count,
+      ...(mergedDepartments ? { departments: mergedDepartments } : {}),
+    };
+  };
 
   const handleOpenInstitution = (institution: InstitutionListItem) => {
     const listState = buildListState();
@@ -551,7 +674,7 @@ export default function InstitutionListPage() {
                       {items.map((institution, index) => (
                         <InstitutionCard
                           key={institution.id}
-                          institution={institution}
+                          institution={enrichInstitutionDepartments(institution)}
                           index={index}
                           onOpen={handleOpenInstitution}
                         />
@@ -575,7 +698,7 @@ export default function InstitutionListPage() {
                     {items.map((institution, index) => (
                       <InstitutionCard
                         key={institution.id}
-                        institution={institution}
+                        institution={enrichInstitutionDepartments(institution)}
                         index={index}
                         onOpen={handleOpenInstitution}
                       />
@@ -599,7 +722,7 @@ export default function InstitutionListPage() {
                     {items.map((institution, index) => (
                       <InstitutionCard
                         key={institution.id}
-                        institution={institution}
+                        institution={enrichInstitutionDepartments(institution)}
                         index={index}
                         onOpen={handleOpenInstitution}
                       />
@@ -614,7 +737,7 @@ export default function InstitutionListPage() {
             {filteredInstitutions.map((institution, index) => (
               <InstitutionCard
                 key={institution.id}
-                institution={institution}
+                institution={enrichInstitutionDepartments(institution)}
                 index={index}
                 onOpen={handleOpenInstitution}
               />

@@ -305,7 +305,7 @@ export type InstitutionBusinessGroup =
 
 export type JointSubcategory =
   | "示范性合作伙伴"
-  | "境内高校"
+  | "京内高校"
   | "京外C9高校"
   | "综合强校"
   | "工科强校"
@@ -330,7 +330,7 @@ function normalizeClassification(value?: string | null): string | null {
 
 function normalizeSubClassification(value?: string | null): string | null {
   if (!value) return null;
-  if (value === "京内高校") return "境内高校";
+  if (value === "京内高校") return "京内高校";
   if (value === "京外C9") return "京外C9高校";
   if (value === "同行业机构") return "同行机构";
   if (value === "其他高校") return "其他";
@@ -394,7 +394,7 @@ export function getOverseasSubcategory(
 /** 共建高校子分类顺序 */
 export const JOINT_SUBCATEGORY_ORDER: JointSubcategory[] = [
   "示范性合作伙伴",
-  "境内高校",
+  "京内高校",
   "京外C9高校",
   "综合强校",
   "工科强校",

@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { FolderKanban, Users, DollarSign, Calendar, Pencil, Trash2 } from "lucide-react";
 import type { ProjectListItem } from "@/types/project";
 
 interface ProjectCardProps {
   project: ProjectListItem;
   index: number;
+  locationState?: Record<string, unknown>;
   onEdit?: (project: ProjectListItem) => void;
   onDelete?: (project: ProjectListItem) => void;
 }
@@ -17,7 +18,14 @@ const STATUS_COLORS: Record<string, string> = {
   已终止: "bg-red-100 text-red-700",
 };
 
-export function ProjectCard({ project, index, onEdit, onDelete }: ProjectCardProps) {
+export function ProjectCard({
+  project,
+  index,
+  locationState,
+  onEdit,
+  onDelete,
+}: ProjectCardProps) {
+  const location = useLocation();
   const statusColor =
     STATUS_COLORS[project.status] ?? "bg-gray-100 text-gray-700";
 
@@ -30,6 +38,7 @@ export function ProjectCard({ project, index, onEdit, onDelete }: ProjectCardPro
     >
       <Link
         to={`/projects/${project.id}`}
+        state={{ from: location, ...(locationState ?? {}) }}
         className="block bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg hover:border-primary-300 transition-all"
       >
         {/* Header */}

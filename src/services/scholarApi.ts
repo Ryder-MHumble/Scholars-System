@@ -1,6 +1,7 @@
-export const BASE_URL = import.meta.env.DEV
-  ? "http://localhost:8002"
-  : "http://10.1.132.21:8001";
+import { normalizeProjectSubcategoryLabel } from "@/constants/projectCategories";
+import { API_BASE_URL } from "@/services/apiBase";
+
+export const BASE_URL = API_BASE_URL;
 
 export interface AdjunctSupervisorInfo {
   status: string;
@@ -174,6 +175,7 @@ export interface ScholarListFilters {
   university?: string;
   department?: string;
   search?: string;
+  participated_event_id?: string;
   is_adjunct_supervisor?: boolean;
   institution_group?: string;
   institution_category?: string;
@@ -181,6 +183,9 @@ export interface ScholarListFilters {
   affiliation_type?: string;
   project_category?: string;
   project_subcategory?: string;
+  project_categories?: string[];
+  project_subcategories?: string[];
+  event_types?: string[];
 }
 
 export interface NewScholarUpdate {
@@ -295,9 +300,28 @@ export interface StudentPatch {
 }
 
 export interface ScholarUniversityItem {
+  institution_id?: string;
   university: string;
   scholar_count: number;
-  departments: { name: string; scholar_count: number }[];
+  departments: { id?: string; name: string; scholar_count: number }[];
+}
+
+interface BackendInstitutionDepartment {
+  id?: string;
+  name?: string;
+  scholar_count?: number;
+}
+
+interface BackendInstitutionItem {
+  id?: string;
+  name?: string;
+  scholar_count?: number;
+  departments?: BackendInstitutionDepartment[];
+}
+
+interface BackendInstitutionHierarchyResponse {
+  organizations?: BackendInstitutionItem[];
+  items?: BackendInstitutionItem[];
 }
 
 const UNIVERSITY_CACHE_TTL_MS = 30_000;
@@ -319,6 +343,59 @@ function buildUniversityCacheKey(filters?: {
   });
 }
 
+function appendScholarFilterParams(
+  params: URLSearchParams,
+  filters?: ScholarListFilters,
+): void {
+  if (filters?.university) params.set("university", filters.university);
+  if (filters?.department) params.set("department", filters.department);
+  if (filters?.search) params.set("keyword", filters.search);
+  if (filters?.participated_event_id) {
+    params.set("participated_event_id", filters.participated_event_id);
+  }
+  if (filters?.is_adjunct_supervisor) {
+    params.set("is_adjunct_supervisor", "true");
+  }
+  if (filters?.institution_group) {
+    params.set("institution_group", filters.institution_group);
+  }
+  if (filters?.institution_category) {
+    params.set("institution_category", filters.institution_category);
+  }
+  if (filters?.region) params.set("region", filters.region);
+  if (filters?.affiliation_type) {
+    params.set("affiliation_type", filters.affiliation_type);
+  }
+  if (filters?.project_category) {
+    params.set("project_category", filters.project_category);
+  }
+  if (filters?.project_subcategory) {
+    params.set("project_subcategory", filters.project_subcategory);
+  }
+  if (filters?.project_categories?.length) {
+    params.set("project_categories", filters.project_categories.join(","));
+  }
+  if (filters?.project_subcategories?.length) {
+    params.set("project_subcategories", filters.project_subcategories.join(","));
+  }
+  if (filters?.event_types?.length) {
+    params.set("event_types", filters.event_types.join(","));
+  }
+}
+
+function buildScholarListParams(
+  page: number,
+  pageSize: number,
+  filters?: ScholarListFilters,
+): URLSearchParams {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  appendScholarFilterParams(params, filters);
+  return params;
+}
+
 function normalizeProjectTags(raw: unknown): ScholarProjectTag[] {
   if (!Array.isArray(raw)) return [];
   const tags: ScholarProjectTag[] = [];
@@ -326,7 +403,9 @@ function normalizeProjectTags(raw: unknown): ScholarProjectTag[] {
     if (!item || typeof item !== "object") continue;
     const tag = item as Record<string, unknown>;
     const category = String(tag.category ?? "").trim();
-    const subcategory = String(tag.subcategory ?? "").trim();
+    const subcategory = normalizeProjectSubcategoryLabel(
+      String(tag.subcategory ?? "").trim(),
+    );
     if (!category && !subcategory) continue;
     tags.push({
       category,
@@ -385,7 +464,9 @@ function normalizeScholarProjectFields<T extends ScholarProjectFields>(
   const projectTags = normalizeProjectTags(scholar.project_tags);
   const eventTags = normalizeEventTags(scholar.event_tags);
   const legacyCategory = String(scholar.project_category ?? "").trim();
-  const legacySubcategory = String(scholar.project_subcategory ?? "").trim();
+  const legacySubcategory = normalizeProjectSubcategoryLabel(
+    String(scholar.project_subcategory ?? "").trim(),
+  );
   const mergedTags =
     projectTags.length > 0
       ? projectTags
@@ -414,7 +495,9 @@ function buildRelationPayload(data: RelationPatch): Record<string, unknown> {
   const tags = normalizeProjectTags(payload.project_tags);
   const eventTags = normalizeEventTags(payload.event_tags);
   const legacyCategory = String(payload.project_category ?? "").trim();
-  const legacySubcategory = String(payload.project_subcategory ?? "").trim();
+  const legacySubcategory = normalizeProjectSubcategoryLabel(
+    String(payload.project_subcategory ?? "").trim(),
+  );
 
   if (tags.length > 0) {
     payload.project_tags = tags;
@@ -470,16 +553,18 @@ export async function fetchScholarUniversities(filters?: {
     );
     if (!res.ok)
       throw new Error(`Failed to fetch scholar universities: ${res.status}`);
-    const data = await res.json();
+    const data: BackendInstitutionHierarchyResponse = await res.json();
 
     // Transform the new API response to match the old format
     // Backend returns: { organizations: [...] }
-    const organizations = data.organizations || data.items || [];
-    const transformed = organizations.map((inst: any) => ({
-      university: inst.name,
+    const organizations = data.organizations ?? data.items ?? [];
+    const transformed = organizations.map((inst) => ({
+      institution_id: String(inst.id ?? "").trim() || undefined,
+      university: String(inst.name ?? "").trim(),
       scholar_count: inst.scholar_count || 0,
-      departments: (inst.departments || []).map((dept: any) => ({
-        name: dept.name,
+      departments: (inst.departments ?? []).map((dept) => ({
+        id: String(dept.id ?? "").trim() || undefined,
+        name: String(dept.name ?? "").trim(),
         scholar_count: dept.scholar_count || 0,
       })),
     }));
@@ -505,26 +590,7 @@ export async function fetchScholarList(
   filters?: ScholarListFilters,
   signal?: AbortSignal,
 ): Promise<ScholarListResponse> {
-  const params = new URLSearchParams({
-    page: String(page),
-    page_size: String(pageSize),
-  });
-  if (filters?.university) params.set("university", filters.university);
-  if (filters?.department) params.set("department", filters.department);
-  if (filters?.search) params.set("keyword", filters.search);
-  if (filters?.is_adjunct_supervisor)
-    params.set("is_adjunct_supervisor", "true");
-  if (filters?.institution_group)
-    params.set("institution_group", filters.institution_group);
-  if (filters?.institution_category)
-    params.set("institution_category", filters.institution_category);
-  if (filters?.region) params.set("region", filters.region);
-  if (filters?.affiliation_type)
-    params.set("affiliation_type", filters.affiliation_type);
-  if (filters?.project_category)
-    params.set("project_category", filters.project_category);
-  if (filters?.project_subcategory)
-    params.set("project_subcategory", filters.project_subcategory);
+  const params = buildScholarListParams(page, pageSize, filters);
 
   const res = await fetch(`${BASE_URL}/api/v1/scholars?${params}`, { signal });
   if (!res.ok) throw new Error(`Failed to fetch scholar list: ${res.status}`);
@@ -540,28 +606,7 @@ export async function fetchAllScholars(
   signal?: AbortSignal,
 ): Promise<ScholarListItem[]> {
   // First, get the first page to know the total count
-  const firstPageParams = new URLSearchParams({
-    page: "1",
-    page_size: "100",
-  });
-  if (filters?.university)
-    firstPageParams.set("university", filters.university);
-  if (filters?.department)
-    firstPageParams.set("department", filters.department);
-  if (filters?.search) firstPageParams.set("keyword", filters.search);
-  if (filters?.is_adjunct_supervisor)
-    firstPageParams.set("is_adjunct_supervisor", "true");
-  if (filters?.institution_group)
-    firstPageParams.set("institution_group", filters.institution_group);
-  if (filters?.institution_category)
-    firstPageParams.set("institution_category", filters.institution_category);
-  if (filters?.region) firstPageParams.set("region", filters.region);
-  if (filters?.affiliation_type)
-    firstPageParams.set("affiliation_type", filters.affiliation_type);
-  if (filters?.project_category)
-    firstPageParams.set("project_category", filters.project_category);
-  if (filters?.project_subcategory)
-    firstPageParams.set("project_subcategory", filters.project_subcategory);
+  const firstPageParams = buildScholarListParams(1, 100, filters);
 
   const firstRes = await fetch(
     `${BASE_URL}/api/v1/scholars?${firstPageParams}`,
@@ -587,32 +632,13 @@ export async function fetchAllScholars(
   // Fetch remaining pages in parallel
   const pagePromises: Promise<ScholarListResponse>[] = [];
   for (let page = 2; page <= totalPages; page++) {
-    const params = new URLSearchParams({
-      page: String(page),
-      page_size: "100",
-    });
-    if (filters?.university) params.set("university", filters.university);
-    if (filters?.department) params.set("department", filters.department);
-    if (filters?.search) params.set("keyword", filters.search);
-    if (filters?.is_adjunct_supervisor)
-      params.set("is_adjunct_supervisor", "true");
-    if (filters?.institution_group)
-      params.set("institution_group", filters.institution_group);
-    if (filters?.institution_category)
-      params.set("institution_category", filters.institution_category);
-    if (filters?.region) params.set("region", filters.region);
-    if (filters?.affiliation_type)
-      params.set("affiliation_type", filters.affiliation_type);
-    if (filters?.project_category)
-      params.set("project_category", filters.project_category);
-    if (filters?.project_subcategory)
-      params.set("project_subcategory", filters.project_subcategory);
+    const params = buildScholarListParams(page, 100, filters);
 
     pagePromises.push(
       fetch(`${BASE_URL}/api/v1/scholars?${params}`, { signal }).then((res) => {
         if (!res.ok)
           throw new Error(`Failed to fetch page ${page}: ${res.status}`);
-        return res.json();
+        return res.json() as Promise<ScholarListResponse>;
       }),
     );
   }
@@ -832,7 +858,20 @@ export async function createScholar(
     },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`Failed to create scholar: ${res.status}`);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const payload = await res.json();
+      detail = String(payload?.detail || "").trim();
+    } catch {
+      // ignore non-json response
+    }
+    throw new Error(
+      detail
+        ? `Failed to create scholar: ${res.status} (${detail})`
+        : `Failed to create scholar: ${res.status}`,
+    );
+  }
   const created: ScholarDetail = await res.json();
   return normalizeScholarProjectFields(created);
 }

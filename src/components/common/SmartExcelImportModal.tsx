@@ -40,6 +40,32 @@ export function SmartExcelImportModal<T>({
     setIsDragging(false);
   }, []);
 
+  const handleFileSelect = useCallback(
+    async (selectedFile: File) => {
+      setFile(selectedFile);
+      setIsProcessing(true);
+      setParseResult(null);
+      setImportSuccess(false);
+
+      try {
+        const result = await smartParseExcel<T>(selectedFile, expectedType);
+        setParseResult(result);
+      } catch (err) {
+        setParseResult({
+          data: [],
+          detectedColumns: [],
+          errors: [
+            { row: 0, error: err instanceof Error ? err.message : "解析失败" },
+          ],
+          confidence: 0,
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [expectedType],
+  );
+
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault();
@@ -54,31 +80,8 @@ export function SmartExcelImportModal<T>({
         await handleFileSelect(droppedFile);
       }
     },
-    [expectedType],
+    [handleFileSelect],
   );
-
-  const handleFileSelect = async (selectedFile: File) => {
-    setFile(selectedFile);
-    setIsProcessing(true);
-    setParseResult(null);
-    setImportSuccess(false);
-
-    try {
-      const result = await smartParseExcel<T>(selectedFile, expectedType);
-      setParseResult(result);
-    } catch (err) {
-      setParseResult({
-        data: [],
-        detectedColumns: [],
-        errors: [
-          { row: 0, error: err instanceof Error ? err.message : "解析失败" },
-        ],
-        confidence: 0,
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];

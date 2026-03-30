@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   fetchScholarDetail,
   patchScholarRelation,
@@ -13,8 +13,9 @@ import {
   type PatentRecord,
   type AwardRecord,
   type EducationRecord,
+  type ScholarProjectTag,
+  type ScholarEventTag,
 } from "@/services/scholarApi";
-import { getAllCategories, getCategoryByType } from "@/constants/activityCategories";
 
 export function useScholarDetail(scholarId: string | undefined) {
   const [scholar, setScholar] = useState<ScholarDetail | null>(null);
@@ -26,49 +27,63 @@ export function useScholarDetail(scholarId: string | undefined) {
     awards: AwardRecord[];
   } | null>(null);
 
-  useEffect(() => {
-    if (!scholarId) return;
+  const loadScholar = useCallback(async () => {
+    if (!scholarId) {
+      setScholar(null);
+      setEditableAchievements(null);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
-    fetchScholarDetail(scholarId)
-      .then((data) => {
-        setScholar(data);
-        setEditableAchievements({
-          publications: data.representative_publications ?? [],
-          patents: data.patents ?? [],
-          awards: data.awards ?? [],
-        });
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message ?? "加载失败");
-        setIsLoading(false);
+    try {
+      const data = await fetchScholarDetail(scholarId);
+      setScholar(data);
+      setEditableAchievements({
+        publications: data.representative_publications ?? [],
+        patents: data.patents ?? [],
+        awards: data.awards ?? [],
       });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加载失败");
+    } finally {
+      setIsLoading(false);
+    }
   }, [scholarId]);
+
+  useEffect(() => {
+    void loadScholar();
+  }, [loadScholar]);
+
+  const withScholar = useCallback(
+    async (action: (urlHash: string) => Promise<ScholarDetail>) => {
+      if (!scholar) return null;
+      const updated = await action(scholar.url_hash);
+      setScholar(updated);
+      return updated;
+    },
+    [scholar],
+  );
 
   // -- Field save --
   const handleFieldSave = async (patch: ScholarDetailPatch) => {
-    if (!scholar) return;
-    const updated = await patchScholarDetail(scholar.url_hash, patch);
-    setScholar(updated);
+    await withScholar((urlHash) => patchScholarDetail(urlHash, patch));
   };
 
   // -- Education save --
   const handleEducationSave = async (records: EducationRecord[]) => {
-    if (!scholar) return;
-    const updated = await patchScholarDetail(scholar.url_hash, {
+    await withScholar((urlHash) => patchScholarDetail(urlHash, {
       education: records,
-    });
-    setScholar(updated);
+    }));
   };
 
   // -- Management roles save (modal) --
   const handleManagementRolesSave = async (records: string[]) => {
-    if (!scholar) return;
-    const updated = await patchScholarRelation(scholar.url_hash, {
+    await withScholar((urlHash) => patchScholarRelation(urlHash, {
       joint_management_roles: records,
-    });
-    setScholar(updated);
+    }));
   };
 
   // -- Relation toggle --
@@ -76,25 +91,20 @@ export function useScholarDetail(scholarId: string | undefined) {
     field: "is_advisor_committee" | "is_potential_recruit",
   ) => {
     if (!scholar) return;
-    const updated = await patchScholarRelation(scholar.url_hash, {
+    await withScholar((urlHash) => patchScholarRelation(urlHash, {
       [field]: !scholar[field],
-    });
-    setScholar(updated);
+    }));
   };
 
   // -- Add update --
   const handleAddUpdate = async (data: NewScholarUpdate) => {
-    if (!scholar) return;
-    const updated = await postScholarUpdate(scholar.url_hash, data);
-    setScholar(updated);
+    await withScholar((urlHash) => postScholarUpdate(urlHash, data));
   };
 
   // -- Delete update --
   const handleDeleteUpdate = async (index: number) => {
-    if (!scholar) return;
     try {
-      const updated = await deleteScholarUpdate(scholar.url_hash, index);
-      setScholar(updated);
+      await withScholar((urlHash) => deleteScholarUpdate(urlHash, index));
     } catch (error) {
       console.error("Failed to delete update:", error);
     }
@@ -106,78 +116,45 @@ export function useScholarDetail(scholarId: string | undefined) {
     patents: PatentRecord[];
     awards: AwardRecord[];
   }) => {
-    if (!scholar) return;
-    const updated = await patchScholarAchievements(scholar.url_hash, {
+    await withScholar((urlHash) => patchScholarAchievements(urlHash, {
       representative_publications: data.publications,
       patents: data.patents,
       awards: data.awards,
-    });
-    setScholar(updated);
+    }));
     setEditableAchievements(data);
   };
 
   // -- Exchange records save --
   const handleSaveExchangeRecords = async (records: string[]) => {
-    if (!scholar) return;
-    const updated = await patchScholarRelation(scholar.url_hash, {
+    await withScholar((urlHash) => patchScholarRelation(urlHash, {
       academic_exchange_records: records,
-    });
-    setScholar(updated);
+    }));
   };
 
   // -- Management roles inline save --
   const handleSaveManagementRolesInline = async (roles: string[]) => {
-    if (!scholar) return;
-    const updated = await patchScholarRelation(scholar.url_hash, {
+    await withScholar((urlHash) => patchScholarRelation(urlHash, {
       joint_management_roles: roles,
-    });
-    setScholar(updated);
+    }));
   };
 
   // -- Relation notes save --
   const handleRelationNotesSave = async (val: string) => {
-    if (!scholar) return;
-    const updated = await patchScholarRelation(scholar.url_hash, {
+    await withScholar((urlHash) => patchScholarRelation(urlHash, {
       institute_relation_notes: val,
-    });
-    setScholar(updated);
+    }));
   };
 
   // -- Project category save --
   const handleProjectCategorySave = async (
-    primary: string,
-    sub: string,
-    activityType?: string,
+    projectTags: ScholarProjectTag[],
+    eventTags: ScholarEventTag[],
   ) => {
-    if (!scholar) return;
-    const projectTags =
-      primary || sub
-        ? [{ category: primary.trim(), subcategory: sub.trim() }]
-        : [];
-    const trimmedActivity = activityType?.trim();
-    const categoryMap = new Map(getAllCategories().map((item) => [item.id, item.name]));
-    const matched = trimmedActivity ? getCategoryByType(trimmedActivity) : null;
-    const activityCategory = matched ? categoryMap.get(matched.categoryId) ?? "" : "";
-    const eventTags =
-      activityType === undefined
-        ? scholar.event_tags ?? []
-        : trimmedActivity
-          ? [
-              {
-                category: activityCategory,
-                series: "",
-                event_type: trimmedActivity,
-                event_id: "",
-                event_title: "",
-              },
-            ]
-          : [];
-    const updated = await patchScholarRelation(scholar.url_hash, {
+    await withScholar((urlHash) => patchScholarRelation(urlHash, {
       project_tags: projectTags,
       event_tags: eventTags,
       is_cobuild_scholar: projectTags.length > 0 || eventTags.length > 0,
-    });
-    setScholar(updated);
+    }));
   };
 
   return {

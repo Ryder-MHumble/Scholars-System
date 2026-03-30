@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, List, LayoutGrid } from "lucide-react";
@@ -66,6 +66,11 @@ export default function ProjectListPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+
+  useEffect(() => {
+    const returnTo = `${location.pathname}${location.search || "?tab=projects"}`;
+    window.sessionStorage.setItem("project_list_return_to", returnTo);
+  }, [location.pathname, location.search]);
 
   const activeSubtab = searchParams.get("subtab") ?? "";
   const subtabFilter = SUBTAB_TO_PROJECT_FILTER[activeSubtab] ?? {};

@@ -300,7 +300,7 @@ export function parseEducationFromText(text: string): EducationRecord[] {
         .map((s) => s.trim())
         .filter(Boolean);
       if (commaParts.length >= 2) {
-        let parts = [...commaParts];
+        const parts = [...commaParts];
         const firstDegree = detectDegree(parts[0]);
         const lastDegree = detectDegree(parts[parts.length - 1]);
 

@@ -12,8 +12,7 @@ import {
 import {
   getAllCategories,
   getCategoryByType,
-  getSubcategoriesByCategory,
-  getTypesBySubcategory,
+  getTypesByCategory,
 } from "@/constants/activityCategories";
 import { ComboboxInput } from "@/components/ui/ComboboxInput";
 import {
@@ -82,11 +81,10 @@ export function ActivityFormModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
-  const [availableSubcategories, setAvailableSubcategories] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
+  const availableTypes = useMemo(
+    () => getTypesByCategory(selectedCategory),
+    [selectedCategory],
+  );
 
   const [selectedScholars, setSelectedScholars] = useState<SelectedScholar[]>([]);
 
@@ -99,15 +97,6 @@ export function ActivityFormModal({
     () => new Map(categoryOptions.map((cat) => [cat.id, cat.name])),
     [categoryOptions],
   );
-  const subcategoryNameToId = useMemo(
-    () => new Map(availableSubcategories.map((sub) => [sub.name, sub.id])),
-    [availableSubcategories],
-  );
-  const subcategoryIdToName = useMemo(
-    () => new Map(availableSubcategories.map((sub) => [sub.id, sub.name])),
-    [availableSubcategories],
-  );
-
   useEffect(() => {
     if (!isOpen) return;
 
@@ -133,15 +122,11 @@ export function ActivityFormModal({
             const categoryInfo = getCategoryByType(detail.event_type);
             if (categoryInfo) {
               setSelectedCategory(categoryInfo.categoryId);
-              setSelectedSubcategory(categoryInfo.subcategoryId);
-              setAvailableSubcategories(
-                getSubcategoriesByCategory(categoryInfo.categoryId).map((sub) => ({
-                  id: sub.id,
-                  name: sub.name,
-                })),
-              );
-              setAvailableTypes(getTypesBySubcategory(categoryInfo.subcategoryId));
+            } else {
+              setSelectedCategory(categoryNameToId.get(detail.category ?? "") ?? "");
             }
+          } else {
+            setSelectedCategory(categoryNameToId.get(detail.category ?? "") ?? "");
           }
 
           const scholars = await fetchActivityScholars(activity.id).catch(() => []);
@@ -172,20 +157,16 @@ export function ActivityFormModal({
       } else {
         setFormData(defaultForm);
         setSelectedCategory("");
-        setSelectedSubcategory("");
-        setAvailableSubcategories([]);
-        setAvailableTypes([]);
         setSelectedScholars([]);
       }
       setErrors({});
     };
 
     load();
-  }, [activity, mode, isOpen]);
+  }, [activity, mode, isOpen, categoryNameToId]);
 
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategory(categoryId);
-    setSelectedSubcategory("");
     const categoryName = categoryIdToName.get(categoryId) ?? categoryId;
     setFormData((prev) => ({
       ...prev,
@@ -193,32 +174,10 @@ export function ActivityFormModal({
       event_type: "",
     }));
 
-    const subcategories = getSubcategoriesByCategory(categoryId);
-    setAvailableSubcategories(
-      subcategories.map((sub) => ({ id: sub.id, name: sub.name })),
-    );
-    setAvailableTypes([]);
-
     if (errors.category) {
       setErrors((prev) => {
         const next = { ...prev };
         delete next.category;
-        return next;
-      });
-    }
-  };
-
-  const handleSubcategoryChange = (subcategoryId: string) => {
-    setSelectedSubcategory(subcategoryId);
-    setFormData((prev) => ({ ...prev, event_type: "" }));
-
-    const types = getTypesBySubcategory(subcategoryId);
-    setAvailableTypes(types);
-
-    if (errors.event_type) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.event_type;
         return next;
       });
     }
@@ -344,7 +303,7 @@ export function ActivityFormModal({
                 基本信息
               </h3>
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       一级分类 <span className="text-red-500">*</span>
@@ -367,33 +326,13 @@ export function ActivityFormModal({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      二级分类 <span className="text-red-500">*</span>
-                    </label>
-                    <ComboboxInput
-                      value={subcategoryIdToName.get(selectedSubcategory) ?? ""}
-                      onChange={(nextLabel) =>
-                        handleSubcategoryChange(
-                          subcategoryNameToId.get(nextLabel) ?? "",
-                        )
-                      }
-                      options={availableSubcategories.map((sub) => sub.name)}
-                      disabled={!selectedCategory}
-                      placeholder="请选择二级分类"
-                      error={Boolean(errors.event_type)}
-                      clearable
-                      maxHeight="260px"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       活动类型 <span className="text-red-500">*</span>
                     </label>
                     <ComboboxInput
                       value={formData.event_type}
                       onChange={handleEventTypeChange}
                       options={availableTypes}
-                      disabled={!selectedSubcategory}
+                      disabled={!selectedCategory}
                       placeholder="请选择活动类型"
                       error={Boolean(errors.event_type)}
                       clearable

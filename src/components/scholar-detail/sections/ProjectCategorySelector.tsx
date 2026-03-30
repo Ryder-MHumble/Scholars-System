@@ -1,75 +1,219 @@
-import { useState } from "react";
-import { FolderKanban, Check, Sparkles, Link2, Edit3, ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  FolderKanban,
+  Check,
+  Sparkles,
+  Link2,
+  Edit3,
+  ChevronDown,
+  X,
+  Plus,
+} from "lucide-react";
 import { cn } from "@/utils/cn";
 import {
   PROJECT_CATEGORIES,
   type ProjectCategory,
   type ProjectSubcategory,
   getPrimaryCategoryForSubcategory,
+  normalizeProjectSubcategoryLabel,
 } from "@/constants/projectCategories";
-import { getAllEventTypes } from "@/constants/activityCategories";
+import { getAllCategories, getAllEventTypes, getCategoryByType } from "@/constants/activityCategories";
 import { ComboboxInput } from "@/components/ui/ComboboxInput";
+import type { ScholarEventTag, ScholarProjectTag } from "@/services/scholarApi";
 
 interface ProjectCategorySelectorProps {
-  primaryCategory: string;
-  subcategory: string;
-  activityType: string;
-  onSave: (primary: string, sub: string, activityType: string) => Promise<void>;
+  projectTags: ScholarProjectTag[];
+  eventTags: ScholarEventTag[];
+  onSave: (
+    projectTags: ScholarProjectTag[],
+    eventTags: ScholarEventTag[],
+  ) => Promise<void>;
 }
 
 export function ProjectCategorySelector({
-  primaryCategory,
-  subcategory,
-  activityType,
+  projectTags,
+  eventTags,
   onSave,
 }: ProjectCategorySelectorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedPrimary, setSelectedPrimary] = useState<string>(
-    primaryCategory || "",
-  );
-  const [selectedSub, setSelectedSub] = useState<string>(subcategory || "");
-  const [selectedActivity, setSelectedActivity] = useState<string>(
-    activityType || "",
-  );
+  const [selectedPrimary, setSelectedPrimary] = useState<string>("");
+  const [selectedActivity, setSelectedActivity] = useState<string>("");
+  const [selectedProjectTags, setSelectedProjectTags] = useState<ScholarProjectTag[]>([]);
+  const [selectedEventTags, setSelectedEventTags] = useState<ScholarEventTag[]>([]);
   const [saving, setSaving] = useState(false);
   const activityOptions = getAllEventTypes();
+  const categoryMap = useMemo(
+    () => new Map(getAllCategories().map((item) => [item.id, item.name])),
+    [],
+  );
+
+  const normalizeProjectTags = (tags: ScholarProjectTag[]): ScholarProjectTag[] => {
+    const normalized: ScholarProjectTag[] = [];
+    const seen = new Set<string>();
+    for (const raw of tags ?? []) {
+      const category = String(raw.category ?? "").trim();
+      const subcategory = normalizeProjectSubcategoryLabel(
+        String(raw.subcategory ?? "").trim(),
+      );
+      const key = `${category.toLowerCase()}|${subcategory.toLowerCase()}`;
+      if ((!category && !subcategory) || seen.has(key)) continue;
+      seen.add(key);
+      normalized.push({
+        category,
+        subcategory,
+        project_id: String(raw.project_id ?? "").trim() || undefined,
+        project_title: String(raw.project_title ?? "").trim() || undefined,
+      });
+    }
+    return normalized;
+  };
+
+  const normalizeEventTags = (tags: ScholarEventTag[]): ScholarEventTag[] => {
+    const normalized: ScholarEventTag[] = [];
+    const seen = new Set<string>();
+    for (const raw of tags ?? []) {
+      const eventType = String(raw.event_type ?? "").trim();
+      const category = String(raw.category ?? "").trim();
+      const series = String(raw.series ?? "").trim();
+      const key = `${eventType.toLowerCase()}|${category.toLowerCase()}|${series.toLowerCase()}`;
+      if (!eventType || seen.has(key)) continue;
+      seen.add(key);
+      normalized.push({
+        event_type: eventType,
+        category,
+        series: series || undefined,
+        event_id: String(raw.event_id ?? "").trim() || undefined,
+        event_title: String(raw.event_title ?? "").trim() || undefined,
+      });
+    }
+    return normalized;
+  };
+
+  const buildProjectSignature = (tags: ScholarProjectTag[]) =>
+    normalizeProjectTags(tags)
+      .map((tag) => `${tag.category}|${tag.subcategory}`)
+      .sort()
+      .join("||");
+
+  const buildEventSignature = (tags: ScholarEventTag[]) =>
+    normalizeEventTags(tags)
+      .map((tag) => `${tag.event_type}|${tag.category ?? ""}|${tag.series ?? ""}`)
+      .sort()
+      .join("||");
+
+  useEffect(() => {
+    const normalized = normalizeProjectTags(projectTags ?? []);
+    setSelectedProjectTags(normalized);
+    const first = normalized[0];
+    setSelectedPrimary(first?.category ?? "");
+  }, [projectTags]);
+
+  useEffect(() => {
+    setSelectedEventTags(normalizeEventTags(eventTags ?? []));
+  }, [eventTags]);
 
   const handlePrimaryChange = (primary: ProjectCategory) => {
     setSelectedPrimary(primary);
-    // Reset subcategory when primary changes
-    setSelectedSub("");
   };
 
-  const handleSubChange = (sub: ProjectSubcategory) => {
-    setSelectedSub(sub);
-    // Auto-set primary category based on subcategory
+  const handleSubToggle = (sub: ProjectSubcategory) => {
     const primary = getPrimaryCategoryForSubcategory(sub);
-    if (primary) {
-      setSelectedPrimary(primary);
-    }
+    const resolvedPrimary = primary ?? selectedPrimary;
+    if (!resolvedPrimary) return;
+    setSelectedPrimary(resolvedPrimary);
+    setSelectedProjectTags((prev) => {
+      const normalizedPrev = normalizeProjectTags(prev);
+      const exists = normalizedPrev.some(
+        (tag) => tag.category === resolvedPrimary && tag.subcategory === sub,
+      );
+      if (exists) {
+        return normalizedPrev.filter(
+          (tag) => !(tag.category === resolvedPrimary && tag.subcategory === sub),
+        );
+      }
+      return [
+        ...normalizedPrev,
+        { category: resolvedPrimary, subcategory: sub },
+      ];
+    });
+  };
+
+  const handleAddActivity = () => {
+    const trimmed = selectedActivity.trim();
+    if (!trimmed) return;
+    const matched = getCategoryByType(trimmed);
+    const categoryName = matched ? categoryMap.get(matched.categoryId) ?? "" : "";
+    setSelectedEventTags((prev) => {
+      const normalizedPrev = normalizeEventTags(prev);
+      const exists = normalizedPrev.some(
+        (tag) => tag.event_type.toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (exists) return normalizedPrev;
+      return [
+        ...normalizedPrev,
+        {
+          category: categoryName,
+          series: "",
+          event_type: trimmed,
+          event_id: "",
+          event_title: "",
+        },
+      ];
+    });
+    setSelectedActivity("");
+  };
+
+  const handleRemoveProjectTag = (tag: ScholarProjectTag) => {
+    setSelectedProjectTags((prev) =>
+      prev.filter(
+        (item) =>
+          !(
+            item.category === tag.category &&
+            normalizeProjectSubcategoryLabel(item.subcategory) ===
+              normalizeProjectSubcategoryLabel(tag.subcategory)
+          ),
+      ),
+    );
+  };
+
+  const handleRemoveEventTag = (tag: ScholarEventTag) => {
+    setSelectedEventTags((prev) =>
+      prev.filter(
+        (item) =>
+          item.event_type.toLowerCase() !== tag.event_type.toLowerCase(),
+      ),
+    );
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(selectedPrimary, selectedSub, selectedActivity);
+      await onSave(
+        normalizeProjectTags(selectedProjectTags),
+        normalizeEventTags(selectedEventTags),
+      );
     } finally {
       setSaving(false);
     }
   };
 
+  const projectSignature = buildProjectSignature(selectedProjectTags);
+  const eventSignature = buildEventSignature(selectedEventTags);
+  const originalProjectSignature = buildProjectSignature(projectTags ?? []);
+  const originalEventSignature = buildEventSignature(eventTags ?? []);
   const hasChanges =
-    selectedPrimary !== primaryCategory ||
-    selectedSub !== subcategory ||
-    selectedActivity !== activityType;
-  const hasAnyCategory = Boolean(
-    selectedPrimary || selectedSub || selectedActivity,
+    projectSignature !== originalProjectSignature ||
+    eventSignature !== originalEventSignature;
+  const hasAnyCategory =
+    selectedProjectTags.length > 0 || selectedEventTags.length > 0;
+  const selectedProjectTagKeys = new Set(
+    selectedProjectTags.map(
+      (tag) =>
+        `${tag.category.toLowerCase()}|${normalizeProjectSubcategoryLabel(
+          tag.subcategory,
+        ).toLowerCase()}`,
+    ),
   );
-  const currentProjectText = selectedPrimary
-    ? selectedSub
-      ? `${selectedPrimary} / ${selectedSub}`
-      : selectedPrimary
-    : selectedSub;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -146,28 +290,54 @@ export function ProjectCategorySelector({
               <div className="flex flex-wrap gap-2">
                 {PROJECT_CATEGORIES[
                   selectedPrimary as ProjectCategory
-                ].subcategories.map((sub) => (
+                ].subcategories.map((sub) => {
+                  const key = `${selectedPrimary.toLowerCase()}|${normalizeProjectSubcategoryLabel(sub).toLowerCase()}`;
+                  const selected = selectedProjectTagKeys.has(key);
+                  return (
                   <button
                     key={sub}
-                    onClick={() => handleSubChange(sub as ProjectSubcategory)}
+                    onClick={() => handleSubToggle(sub as ProjectSubcategory)}
                     className={cn(
                       "px-3 py-1.5 rounded-lg border text-sm transition-all",
-                      selectedSub === sub
+                      selected
                         ? "bg-primary-100 text-primary-700 border-primary-200 font-medium"
                         : "bg-white text-gray-600 border-gray-200 hover:border-primary-200 hover:bg-primary-50",
                     )}
                   >
                     {sub}
                   </button>
-                ))}
+                  );
+                })}
               </div>
+            </div>
+          )}
+
+          {selectedProjectTags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedProjectTags.map((tag, idx) => (
+                <span
+                  key={`${tag.category}-${tag.subcategory}-${idx}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs text-primary-700"
+                >
+                  {tag.category}
+                  {tag.subcategory ? ` / ${tag.subcategory}` : ""}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveProjectTag(tag)}
+                    className="text-primary-500 hover:text-primary-700"
+                    aria-label="移除项目标签"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
             </div>
           )}
 
           <button
             onClick={() => {
               setSelectedPrimary("");
-              setSelectedSub("");
+              setSelectedProjectTags([]);
             }}
             className="mt-4 text-xs text-gray-500 hover:text-gray-700"
           >
@@ -187,7 +357,38 @@ export function ProjectCategorySelector({
             clearable
           />
           <button
-            onClick={() => setSelectedActivity("")}
+            type="button"
+            onClick={handleAddActivity}
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-200 text-cyan-700 hover:bg-cyan-50 text-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            添加活动分类
+          </button>
+          {selectedEventTags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedEventTags.map((tag, idx) => (
+                <span
+                  key={`${tag.event_type}-${idx}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs text-cyan-700"
+                >
+                  {tag.event_type}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveEventTag(tag)}
+                    className="text-cyan-500 hover:text-cyan-700"
+                    aria-label="移除活动标签"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => {
+              setSelectedActivity("");
+              setSelectedEventTags([]);
+            }}
             className="mt-3 text-xs text-gray-500 hover:text-gray-700"
           >
             清空活动分类
@@ -201,16 +402,23 @@ export function ProjectCategorySelector({
           <Link2 className="w-3.5 h-3.5 text-gray-400" />
           {hasAnyCategory ? (
             <div className="flex flex-wrap gap-2">
-              {currentProjectText && (
-                <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-primary-700">
-                  项目：{currentProjectText}
+              {selectedProjectTags.map((tag, idx) => (
+                <span
+                  key={`project-chip-${tag.category}-${tag.subcategory}-${idx}`}
+                  className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-primary-700"
+                >
+                  项目：{tag.category}
+                  {tag.subcategory ? ` / ${tag.subcategory}` : ""}
                 </span>
-              )}
-              {selectedActivity && (
-                <span className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-cyan-700">
-                  活动：{selectedActivity}
+              ))}
+              {selectedEventTags.map((tag, idx) => (
+                <span
+                  key={`event-chip-${tag.event_type}-${idx}`}
+                  className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-cyan-700"
+                >
+                  活动：{tag.event_type}
                 </span>
-              )}
+              ))}
             </div>
           ) : (
             <span>当前未配置分类</span>

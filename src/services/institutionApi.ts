@@ -5,6 +5,7 @@ import type {
   InstitutionPatchRequest,
   InstitutionTreeResponse,
 } from "@/types/institution";
+import { API_BASE_URL } from "@/services/apiBase";
 
 export interface InstitutionCreateRequest {
   id?: string;
@@ -52,10 +53,7 @@ export interface InstitutionCreateRequest {
   }>;
 }
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://10.1.132.21:8001").replace(
-  /\/$/,
-  "",
-);
+const BASE_URL = API_BASE_URL;
 
 export interface InstitutionTaxonomy {
   total: number;
@@ -96,7 +94,7 @@ export async function fetchInstitutionList(
   },
 ): Promise<InstitutionListResponse> {
   const params = new URLSearchParams({
-    view: "flat",
+    view: filters?.view ?? "flat",
     page: String(page),
     page_size: String(pageSize),
   });
@@ -119,6 +117,54 @@ export async function fetchInstitutionList(
   const res = await fetch(`${BASE_URL}/api/v1/institutions?${params}`);
   if (!res.ok) throw new Error(`机构列表加载失败: ${res.status}`);
   return res.json();
+}
+
+export interface InstitutionHierarchyDepartment {
+  id?: string;
+  name: string;
+  scholar_count: number;
+  org_name?: string | null;
+}
+
+export interface InstitutionHierarchyOrganization {
+  id: string;
+  name: string;
+  entity_type?: string | null;
+  region?: string | null;
+  org_type?: string | null;
+  classification?: string | null;
+  sub_classification?: string | null;
+  scholar_count: number;
+  departments?: InstitutionHierarchyDepartment[];
+}
+
+export async function fetchInstitutionHierarchy(filters?: {
+  entity_type?: string;
+  region?: string;
+  org_type?: string;
+  classification?: string;
+  sub_classification?: string;
+  keyword?: string;
+}): Promise<InstitutionHierarchyOrganization[]> {
+  const params = new URLSearchParams({ view: "hierarchy" });
+  if (filters?.entity_type) {
+    params.set("entity_type", filters.entity_type);
+  } else {
+    params.set("entity_type", "organization");
+  }
+  if (filters?.region) params.set("region", filters.region);
+  if (filters?.org_type) params.set("org_type", filters.org_type);
+  if (filters?.classification)
+    params.set("classification", filters.classification);
+  if (filters?.sub_classification)
+    params.set("sub_classification", filters.sub_classification);
+  if (filters?.keyword) params.set("keyword", filters.keyword);
+
+  const res = await fetch(`${BASE_URL}/api/v1/institutions?${params.toString()}`);
+  if (!res.ok) throw new Error(`机构层级数据加载失败: ${res.status}`);
+  const data = await res.json();
+  if (!Array.isArray(data.organizations)) return [];
+  return data.organizations as InstitutionHierarchyOrganization[];
 }
 
 export async function fetchInstitutionTree(): Promise<InstitutionTreeResponse> {
@@ -311,29 +357,72 @@ export async function suggestInstitution(
 export async function getDepartmentsForUniversity(
   universityName: string,
 ): Promise<string[]> {
-  // First, search for the university to get its ID
-  const searchResult = await searchInstitutions(universityName, { limit: 1 });
+  const name = universityName.trim();
+  if (!name) return [];
 
-  if (searchResult.results.length === 0) {
-    return [];
+  // Prefer hierarchy API, which already returns organization->departments
+  // and avoids missing departments due to global pagination windows.
+  try {
+    const organizations = await fetchInstitutionHierarchy({
+      entity_type: "organization",
+      keyword: name,
+    });
+    const exact = organizations.find(
+      (org) => normalizeName(org.name) === normalizeName(name),
+    );
+    const matched = exact ?? organizations[0];
+    const departments = (matched?.departments ?? [])
+      .map((dept) => String(dept.name ?? "").trim())
+      .filter(Boolean);
+    if (departments.length > 0) {
+      return Array.from(new Set(departments));
+    }
+  } catch {
+    // fallback below
   }
 
-  const university = searchResult.results[0];
-
-  // Then, get all institutions and filter for departments under this university
-  const response = await fetch(
-    `${BASE_URL}/api/v1/institutions?entity_type=department&page_size=200`,
+  // Fallback: search university id, then paginate all department pages
+  // and filter by parent_id.
+  const searchResult = await searchInstitutions(name, { limit: 50 });
+  const orgCandidates = searchResult.results.filter(
+    (item) => item.entity_type === "organization",
   );
+  const university =
+    orgCandidates.find(
+      (item) => normalizeName(item.name) === normalizeName(name),
+    ) ?? orgCandidates[0];
 
-  if (!response.ok) {
-    return [];
+  if (!university) return [];
+
+  const firstRes = await fetch(
+    `${BASE_URL}/api/v1/institutions?entity_type=department&page=1&page_size=200`,
+  );
+  if (!firstRes.ok) return [];
+  const firstData = await firstRes.json();
+
+  const departments: string[] = [];
+  const collectNames = (items: InstitutionSearchResult[]) => {
+    items
+      .filter((dept) => dept.parent_id === university.id)
+      .forEach((dept) => {
+        const trimmed = String(dept.name ?? "").trim();
+        if (trimmed) departments.push(trimmed);
+      });
+  };
+
+  collectNames(Array.isArray(firstData.items) ? firstData.items : []);
+
+  const totalPages = Number(firstData.total_pages ?? 1);
+  for (let page = 2; page <= totalPages; page++) {
+    const res = await fetch(
+      `${BASE_URL}/api/v1/institutions?entity_type=department&page=${page}&page_size=200`,
+    );
+    if (!res.ok) break;
+    const data = await res.json();
+    collectNames(Array.isArray(data.items) ? data.items : []);
   }
 
-  const data = await response.json();
-  // Filter departments that belong to this university
-  return data.items
-    .filter((dept: InstitutionSearchResult) => dept.parent_id === university.id)
-    .map((dept: InstitutionSearchResult) => dept.name);
+  return Array.from(new Set(departments));
 }
 
 function normalizeName(value: string): string {

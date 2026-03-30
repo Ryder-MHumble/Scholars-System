@@ -19,7 +19,11 @@ import {
   type SmartParseResult,
 } from "@/utils/smartExcelParser";
 import { downloadScholarTemplate } from "@/utils/scholarTemplateGenerator";
-import { createScholar, type ScholarCreate } from "@/services/scholarApi";
+import {
+  createScholar,
+  fetchAllScholars,
+  type ScholarCreate,
+} from "@/services/scholarApi";
 
 interface BatchScholarImportModalProps {
   isOpen: boolean;
@@ -28,6 +32,30 @@ interface BatchScholarImportModalProps {
 }
 
 type ModalStep = 1 | 2 | 3;
+type RowStatus = "valid" | "missing_name" | "duplicate_in_file" | "duplicate_in_db";
+
+interface DuplicateRowCheck {
+  index: number;
+  excelRow: number;
+  status: RowStatus;
+  reason?: string;
+  scholar?: ScholarCreate;
+}
+
+interface ExistingScholarDedupIndex {
+  emailKeys: Set<string>;
+  profileKeys: Set<string>;
+  nameUniversityNoContactKeys: Set<string>;
+  nameUniversityEmailKeys: Set<string>;
+  nameUniversityPhoneKeys: Set<string>;
+}
+
+interface DedupKeySet {
+  email?: string;
+  profile?: string;
+  phone?: string;
+  nameUniversity?: string;
+}
 
 // Extract a field value from a parsed row, trying multiple possible key names
 function getField(row: Record<string, unknown>, ...keys: string[]): string {
@@ -38,6 +66,132 @@ function getField(row: Record<string, unknown>, ...keys: string[]): string {
     }
   }
   return "";
+}
+
+function normalizeText(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function normalizeUrl(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return "";
+  return trimmed.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+}
+
+function normalizePhone(value: string): string {
+  return value.replace(/[\s\-()（）+]/g, "").trim();
+}
+
+function toScholarDraft(row: Record<string, unknown>): ScholarCreate {
+  return {
+    name: getField(row, "name", "姓名", "Name"),
+    name_en: getField(row, "nameEn", "name_en", "英文名", "英文姓名") || undefined,
+    position: getField(row, "title", "position", "职称", "职务") || undefined,
+    university:
+      getField(
+        row,
+        "university",
+        "institution",
+        "所属院校",
+        "所属高校",
+        "所属机构",
+        "院校",
+      ) || undefined,
+    department:
+      getField(row, "department", "所属院系", "院系/部门", "院系", "部门") || undefined,
+    email: getField(row, "email", "邮箱", "电子邮箱") || undefined,
+    phone: getField(row, "phone", "电话", "联系电话", "手机") || undefined,
+    office: getField(row, "office", "办公室") || undefined,
+    profile_url:
+      getField(row, "homepage", "profile_url", "个人主页", "主页") || undefined,
+    google_scholar_url:
+      getField(
+        row,
+        "googleScholar",
+        "google_scholar",
+        "google_scholar_url",
+        "Google Scholar",
+        "谷歌学术",
+      ) || undefined,
+    dblp_url: getField(row, "dblp", "dblp_url", "DBLP") || undefined,
+    research_areas: getField(
+      row,
+      "researchFields",
+      "research_areas",
+      "research_fields",
+      "研究方向",
+    )
+      .split(/[,，、;；]/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+    bio: getField(row, "bio", "个人简介", "简介") || undefined,
+    added_by: "user",
+  };
+}
+
+function buildDedupKeys(scholar: ScholarCreate): DedupKeySet {
+  const email = normalizeText(scholar.email || "");
+  const profile = normalizeUrl(scholar.profile_url || "");
+  const phone = normalizePhone(scholar.phone || "");
+  const name = normalizeText(scholar.name || "");
+  const university = normalizeText(scholar.university || "");
+  const nameUniversity = name && university ? `${name}|${university}` : "";
+
+  return {
+    email: email ? `email:${email}` : undefined,
+    profile: profile ? `profile:${profile}` : undefined,
+    phone: phone ? `phone:${phone}` : undefined,
+    nameUniversity: nameUniversity ? `name_uni:${nameUniversity}` : undefined,
+  };
+}
+
+function buildExistingScholarDedupIndex(
+  scholars: Array<{
+    name?: string;
+    university?: string;
+    department?: string;
+    email?: string;
+    profile_url?: string;
+  }>,
+): ExistingScholarDedupIndex {
+  const emailKeys = new Set<string>();
+  const profileKeys = new Set<string>();
+  const nameUniversityNoContactKeys = new Set<string>();
+  const nameUniversityEmailKeys = new Set<string>();
+  const nameUniversityPhoneKeys = new Set<string>();
+
+  for (const scholar of scholars) {
+    const keys = buildDedupKeys({
+      name: scholar.name || "",
+      university: scholar.university || undefined,
+      department: scholar.department || undefined,
+      email: scholar.email || undefined,
+      profile_url: scholar.profile_url || undefined,
+    });
+    if (keys.email) emailKeys.add(keys.email);
+    if (keys.profile) profileKeys.add(keys.profile);
+    if (keys.nameUniversity) {
+      const hasContact = Boolean(keys.email || keys.phone);
+      if (!hasContact) {
+        nameUniversityNoContactKeys.add(keys.nameUniversity);
+      } else {
+        if (keys.email) {
+          nameUniversityEmailKeys.add(`${keys.nameUniversity}|${keys.email}`);
+        }
+        if (keys.phone) {
+          nameUniversityPhoneKeys.add(`${keys.nameUniversity}|${keys.phone}`);
+        }
+      }
+    }
+  }
+
+  return {
+    emailKeys,
+    profileKeys,
+    nameUniversityNoContactKeys,
+    nameUniversityEmailKeys,
+    nameUniversityPhoneKeys,
+  };
 }
 
 const STEP_LABELS = ["了解须知", "上传文件", "核对确认"];
@@ -100,10 +254,17 @@ export function BatchScholarImportModal({
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [rowChecks, setRowChecks] = useState<DuplicateRowCheck[]>([]);
+  const [duplicateCheckError, setDuplicateCheckError] = useState<string | null>(
+    null,
+  );
+  const [existingIndex, setExistingIndex] =
+    useState<ExistingScholarDedupIndex | null>(null);
   const [importResult, setImportResult] = useState<{
     success: boolean;
     successCount: number;
     failedCount: number;
+    skippedCount: number;
     errors: string[];
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -123,17 +284,163 @@ export function BatchScholarImportModal({
     if (droppedFile) await handleFileSelect(droppedFile);
   };
 
+  const loadExistingDedupIndex = async (): Promise<ExistingScholarDedupIndex> => {
+    if (existingIndex) return existingIndex;
+    const scholars = await fetchAllScholars();
+    const nextIndex = buildExistingScholarDedupIndex(scholars);
+    setExistingIndex(nextIndex);
+    return nextIndex;
+  };
+
+  const buildRowChecks = (
+    parsedRows: Record<string, unknown>[],
+    dbIndex: ExistingScholarDedupIndex | null,
+  ): DuplicateRowCheck[] => {
+    const seenEmailKeys = new Set<string>();
+    const seenProfileKeys = new Set<string>();
+    const seenNameUniversityNoContactKeys = new Set<string>();
+    const seenNameUniversityEmailKeys = new Set<string>();
+    const seenNameUniversityPhoneKeys = new Set<string>();
+    const checks: DuplicateRowCheck[] = [];
+
+    for (let index = 0; index < parsedRows.length; index++) {
+      const row = parsedRows[index];
+      const scholar = toScholarDraft(row);
+      const excelRow = index + 2;
+      const name = scholar.name.trim();
+      if (!name) {
+        checks.push({
+          index,
+          excelRow,
+          status: "missing_name",
+          reason: "缺少姓名（必填）",
+        });
+        continue;
+      }
+
+      const keys = buildDedupKeys(scholar);
+      const hasContact = Boolean(keys.email || keys.phone);
+      const inFileReason =
+        (keys.email && seenEmailKeys.has(keys.email) && "与文件内其他行邮箱重复") ||
+        (keys.profile &&
+          seenProfileKeys.has(keys.profile) &&
+          "与文件内其他行主页重复") ||
+        (!hasContact &&
+          keys.nameUniversity &&
+          seenNameUniversityNoContactKeys.has(keys.nameUniversity) &&
+          "与文件内其他行姓名+院校重复（均无联系方式）") ||
+        (hasContact &&
+          keys.nameUniversity &&
+          keys.email &&
+          seenNameUniversityEmailKeys.has(`${keys.nameUniversity}|${keys.email}`) &&
+          "与文件内其他行姓名+院校+邮箱重复") ||
+        (hasContact &&
+          keys.nameUniversity &&
+          keys.phone &&
+          seenNameUniversityPhoneKeys.has(`${keys.nameUniversity}|${keys.phone}`) &&
+          "与文件内其他行姓名+院校+电话重复");
+
+      if (inFileReason) {
+        checks.push({
+          index,
+          excelRow,
+          status: "duplicate_in_file",
+          reason: inFileReason,
+          scholar,
+        });
+        continue;
+      }
+
+      const inDbReason =
+        (dbIndex &&
+          keys.email &&
+          dbIndex.emailKeys.has(keys.email) &&
+          "数据库已存在相同邮箱记录") ||
+        (dbIndex &&
+          keys.profile &&
+          dbIndex.profileKeys.has(keys.profile) &&
+          "数据库已存在相同主页记录") ||
+        (dbIndex &&
+          !hasContact &&
+          keys.nameUniversity &&
+          dbIndex.nameUniversityNoContactKeys.has(keys.nameUniversity) &&
+          "数据库已存在相同姓名+院校记录（均无联系方式）") ||
+        (dbIndex &&
+          hasContact &&
+          keys.nameUniversity &&
+          keys.email &&
+          dbIndex.nameUniversityEmailKeys.has(`${keys.nameUniversity}|${keys.email}`) &&
+          "数据库已存在相同姓名+院校+邮箱记录") ||
+        (dbIndex &&
+          hasContact &&
+          keys.nameUniversity &&
+          keys.phone &&
+          dbIndex.nameUniversityPhoneKeys.has(`${keys.nameUniversity}|${keys.phone}`) &&
+          "数据库已存在相同姓名+院校+电话记录");
+
+      if (inDbReason) {
+        checks.push({
+          index,
+          excelRow,
+          status: "duplicate_in_db",
+          reason: inDbReason,
+          scholar,
+        });
+        continue;
+      }
+
+      if (keys.email) seenEmailKeys.add(keys.email);
+      if (keys.profile) seenProfileKeys.add(keys.profile);
+      if (keys.nameUniversity) {
+        if (!hasContact) {
+          seenNameUniversityNoContactKeys.add(keys.nameUniversity);
+        } else {
+          if (keys.email) {
+            seenNameUniversityEmailKeys.add(`${keys.nameUniversity}|${keys.email}`);
+          }
+          if (keys.phone) {
+            seenNameUniversityPhoneKeys.add(`${keys.nameUniversity}|${keys.phone}`);
+          }
+        }
+      }
+
+      checks.push({
+        index,
+        excelRow,
+        status: "valid",
+        scholar,
+      });
+    }
+
+    return checks;
+  };
+
   const handleFileSelect = async (selectedFile: File) => {
     setFile(selectedFile);
     setIsProcessing(true);
     setParseResult(null);
     setImportResult(null);
+    setRowChecks([]);
+    setDuplicateCheckError(null);
     try {
       const result = await smartParseExcel<Record<string, unknown>>(
         selectedFile,
         "scholar",
       );
       setParseResult(result);
+
+      let dbIndex: ExistingScholarDedupIndex | null = null;
+      let dbError: string | null = null;
+      try {
+        dbIndex = await loadExistingDedupIndex();
+      } catch (err) {
+        dbError =
+          err instanceof Error
+            ? `未能完成数据库重复检测：${err.message}`
+            : "未能完成数据库重复检测";
+      }
+      setDuplicateCheckError(dbError);
+      setRowChecks(buildRowChecks(result.data, dbIndex));
     } catch (err) {
       setParseResult({
         data: [],
@@ -143,6 +450,8 @@ export function BatchScholarImportModal({
         ],
         confidence: 0,
       });
+      setRowChecks([]);
+      setDuplicateCheckError(null);
     } finally {
       setIsProcessing(false);
     }
@@ -159,71 +468,63 @@ export function BatchScholarImportModal({
     setFile(null);
     setParseResult(null);
     setImportResult(null);
+    setRowChecks([]);
+    setDuplicateCheckError(null);
   };
 
   const handleDownloadTemplate = () => {
     downloadScholarTemplate(undefined, "basic");
   };
 
-  // Derive valid/invalid rows from parseResult
+  // Derive row status from parseResult + duplicate analysis
   const rows = parseResult?.data ?? [];
-  const validRows = rows.filter((row) => {
-    const r = row as Record<string, unknown>;
-    return getField(r, "name", "姓名", "Name").length > 0;
-  });
-  const invalidRows = rows.length - validRows.length;
+  const validRows = rowChecks.filter(
+    (item): item is DuplicateRowCheck & { scholar: ScholarCreate } =>
+      item.status === "valid" && Boolean(item.scholar),
+  );
+  const missingNameRows = rowChecks.filter(
+    (item) => item.status === "missing_name",
+  ).length;
+  const duplicateInFileRows = rowChecks.filter(
+    (item) => item.status === "duplicate_in_file",
+  ).length;
+  const duplicateInDbRows = rowChecks.filter(
+    (item) => item.status === "duplicate_in_db",
+  ).length;
+  const skippedRows = rows.length - validRows.length;
+  const duplicateRows = duplicateInFileRows + duplicateInDbRows;
 
   const handleImport = async () => {
     if (!parseResult || validRows.length === 0) return;
     setIsImporting(true);
 
-    const scholars: ScholarCreate[] = validRows.map((row) => {
-      const r = row as Record<string, unknown>;
-      return {
-        name: getField(r, "name", "姓名"),
-        name_en: getField(r, "nameEn", "name_en", "英文名") || undefined,
-        position: getField(r, "title", "position", "职称") || undefined,
-        university:
-          getField(r, "university", "institution", "院校") || undefined,
-        department: getField(r, "department", "院系") || undefined,
-        email: getField(r, "email", "邮箱") || undefined,
-        phone: getField(r, "phone", "电话") || undefined,
-        profile_url:
-          getField(r, "homepage", "profile_url", "主页") || undefined,
-        google_scholar_url:
-          getField(r, "google_scholar", "googleScholar", "谷歌学术") ||
-          undefined,
-        dblp_url: getField(r, "dblp", "dblp_url") || undefined,
-        research_areas: getField(
-          r,
-          "researchFields",
-          "research_areas",
-          "研究方向",
-        )
-          .split(/[,，、;；]/)
-          .map((s) => s.trim())
-          .filter(Boolean),
-        bio: getField(r, "bio", "简介") || undefined,
-        added_by: "user",
-      };
-    });
-
     const errors: string[] = [];
     let successCount = 0;
-    for (let i = 0; i < scholars.length; i++) {
+    let apiDuplicateSkipped = 0;
+    for (const target of validRows) {
       try {
-        await createScholar(scholars[i]);
+        await createScholar(target.scholar);
         successCount++;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "未知错误";
-        errors.push(`第 ${i + 2} 行 (${scholars[i].name}): ${errorMsg}`);
+        const normalized = errorMsg.toLowerCase();
+        const isDuplicate409 =
+          normalized.includes("409") &&
+          (normalized.includes("already exists") ||
+            normalized.includes("duplicate"));
+        if (isDuplicate409) {
+          apiDuplicateSkipped++;
+          continue;
+        }
+        errors.push(`第 ${target.excelRow} 行 (${target.scholar.name}): ${errorMsg}`);
       }
     }
-    const failedCount = scholars.length - successCount;
+    const failedCount = validRows.length - successCount - apiDuplicateSkipped;
     setImportResult({
       success: successCount > 0,
       successCount,
       failedCount,
+      skippedCount: skippedRows + apiDuplicateSkipped,
       errors,
     });
     setIsImporting(false);
@@ -242,12 +543,17 @@ export function BatchScholarImportModal({
     setParseResult(null);
     setIsProcessing(false);
     setIsImporting(false);
+    setRowChecks([]);
+    setDuplicateCheckError(null);
     setImportResult(null);
     onClose();
   };
 
   const canProceedToStep3 =
-    parseResult !== null && !isProcessing && parseResult.data.length > 0;
+    parseResult !== null &&
+    !isProcessing &&
+    parseResult.data.length > 0 &&
+    rowChecks.length === parseResult.data.length;
 
   if (!isOpen) return null;
 
@@ -414,7 +720,7 @@ export function BatchScholarImportModal({
                                 hint: "如 教授、副教授、研究员",
                               },
                               {
-                                label: "所属院校",
+                                label: "所属机构",
                                 required: false,
                                 hint: "机构全称，如 北京大学",
                               },
@@ -429,9 +735,14 @@ export function BatchScholarImportModal({
                                 hint: "学术邮箱地址",
                               },
                               {
-                                label: "研究方向",
+                                label: "电话",
                                 required: false,
-                                hint: "多个方向用逗号/分号分隔",
+                                hint: "联系电话",
+                              },
+                              {
+                                label: "办公室",
+                                required: false,
+                                hint: "办公地点，如 理科楼 301",
                               },
                               {
                                 label: "主页",
@@ -447,6 +758,11 @@ export function BatchScholarImportModal({
                                 label: "DBLP",
                                 required: false,
                                 hint: "DBLP 页面链接",
+                              },
+                              {
+                                label: "研究方向",
+                                required: false,
+                                hint: "多个方向用逗号/分号分隔",
                               },
                               {
                                 label: "简介",
@@ -499,7 +815,8 @@ export function BatchScholarImportModal({
                       <ul className="space-y-2">
                         {[
                           "「姓名」为唯一必填项，缺少姓名的行将自动跳过",
-                          "重复导入同一学者会创建重复记录，请先检查",
+                          "系统会自动去重：文件内重复、数据库已存在记录都会在解析阶段提示并跳过",
+                          "数据库去重规则：先看邮箱/主页；再按姓名+院校（无联系方式）或姓名+院校+邮箱/电话判重",
                           "系统支持中英文列名自动识别",
                           "导入后不可撤销，请核对后再提交",
                         ].map((text, i) => (
@@ -603,7 +920,7 @@ export function BatchScholarImportModal({
                               正在智能识别文件结构...
                             </p>
                             <p className="text-xs text-gray-400 mt-0.5">
-                              自动匹配列名与字段映射
+                              自动匹配列名、并检查重复数据
                             </p>
                           </div>
                         </div>
@@ -642,6 +959,29 @@ export function BatchScholarImportModal({
                                 </span>{" "}
                                 行数据
                               </span>
+                            </div>
+                          )}
+
+                          {duplicateRows > 0 && (
+                            <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                              <div className="flex items-center gap-2 mb-1">
+                                <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                                <span className="text-sm font-medium text-amber-900">
+                                  检测到 {duplicateRows} 行重复数据
+                                </span>
+                              </div>
+                              <p className="text-xs text-amber-700">
+                                文件内重复 {duplicateInFileRows} 行，数据库已存在 {duplicateInDbRows} 行；
+                                以上记录将自动跳过，不会写入数据库。
+                              </p>
+                            </div>
+                          )}
+
+                          {duplicateCheckError && (
+                            <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                              <p className="text-xs text-amber-700">
+                                {duplicateCheckError}。当前仅完成了文件内重复检测。
+                              </p>
                             </div>
                           )}
 
@@ -730,6 +1070,15 @@ export function BatchScholarImportModal({
                             {importResult.successCount}
                           </span>{" "}
                           位学者
+                          {importResult.skippedCount > 0 && (
+                            <>
+                              ，跳过{" "}
+                              <span className="font-bold text-amber-600">
+                                {importResult.skippedCount}
+                              </span>{" "}
+                              位重复/缺失记录
+                            </>
+                          )}
                           {importResult.failedCount > 0 && (
                             <>
                               ，其中{" "}
@@ -760,7 +1109,7 @@ export function BatchScholarImportModal({
                 ) : (
                   <>
                     {/* Stats bar */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-4 gap-3">
                       <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
                         <p className="text-xl font-black text-gray-800">
                           {rows.length}
@@ -777,31 +1126,50 @@ export function BatchScholarImportModal({
                       </div>
                       <div
                         className={`rounded-xl p-3 text-center border ${
-                          invalidRows > 0
+                          skippedRows > 0
                             ? "bg-red-50 border-red-100"
                             : "bg-gray-50 border-gray-100"
                         }`}
                       >
                         <p
-                          className={`text-xl font-black ${invalidRows > 0 ? "text-red-600" : "text-gray-400"}`}
+                          className={`text-xl font-black ${skippedRows > 0 ? "text-red-600" : "text-gray-400"}`}
                         >
-                          {invalidRows}
+                          {skippedRows}
                         </p>
                         <p
-                          className={`text-xs mt-0.5 ${invalidRows > 0 ? "text-red-500" : "text-gray-400"}`}
+                          className={`text-xs mt-0.5 ${skippedRows > 0 ? "text-red-500" : "text-gray-400"}`}
                         >
                           将被跳过
+                        </p>
+                      </div>
+                      <div
+                        className={`rounded-xl p-3 text-center border ${
+                          duplicateRows > 0
+                            ? "bg-amber-50 border-amber-100"
+                            : "bg-gray-50 border-gray-100"
+                        }`}
+                      >
+                        <p
+                          className={`text-xl font-black ${duplicateRows > 0 ? "text-amber-600" : "text-gray-400"}`}
+                        >
+                          {duplicateRows}
+                        </p>
+                        <p
+                          className={`text-xs mt-0.5 ${duplicateRows > 0 ? "text-amber-600" : "text-gray-400"}`}
+                        >
+                          重复记录
                         </p>
                       </div>
                     </div>
 
                     {/* Warning when some rows will be skipped */}
-                    {invalidRows > 0 && (
+                    {skippedRows > 0 && (
                       <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
                         <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-amber-700">
-                          <span className="font-medium">{invalidRows} 行</span>
-                          缺少姓名字段（必填），将在导入时自动跳过。
+                          将跳过 <span className="font-medium">{skippedRows} 行</span>
+                          ：缺少姓名 {missingNameRows} 行、文件内重复{" "}
+                          {duplicateInFileRows} 行、数据库已存在 {duplicateInDbRows} 行。
                           {parseResult.errors.length > 0 && (
                             <> 另有 {parseResult.errors.length} 个格式警告。</>
                           )}
@@ -837,10 +1205,10 @@ export function BatchScholarImportModal({
                                   职称
                                 </th>
                                 <th className="px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap">
-                                  院校
+                                  所属机构
                                 </th>
                                 <th className="px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap">
-                                  院系
+                                  院系/部门
                                 </th>
                                 <th className="px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap">
                                   研究方向
@@ -855,33 +1223,12 @@ export function BatchScholarImportModal({
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                               {rows.map((row, idx) => {
-                                const r = row as Record<string, unknown>;
-                                const name = getField(r, "name", "姓名");
-                                const position = getField(
-                                  r,
-                                  "position",
-                                  "title",
-                                  "职称",
+                                const rowCheck = rowChecks[idx];
+                                const scholar = toScholarDraft(
+                                  row as Record<string, unknown>,
                                 );
-                                const university = getField(
-                                  r,
-                                  "university",
-                                  "institution",
-                                  "院校",
-                                );
-                                const department = getField(
-                                  r,
-                                  "department",
-                                  "院系",
-                                );
-                                const researchAreas = getField(
-                                  r,
-                                  "researchFields",
-                                  "research_areas",
-                                  "研究方向",
-                                );
-                                const email = getField(r, "email", "邮箱");
-                                const isInvalid = !name;
+                                const status = rowCheck?.status ?? "valid";
+                                const isInvalid = status !== "valid";
                                 return (
                                   <tr
                                     key={idx}
@@ -895,9 +1242,9 @@ export function BatchScholarImportModal({
                                       {idx + 1}
                                     </td>
                                     <td className="px-3 py-2 font-medium">
-                                      {name ? (
+                                      {scholar.name ? (
                                         <span className="text-gray-800">
-                                          {name}
+                                          {scholar.name}
                                         </span>
                                       ) : (
                                         <span className="text-red-400 italic">
@@ -906,26 +1253,26 @@ export function BatchScholarImportModal({
                                       )}
                                     </td>
                                     <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-                                      {position || (
+                                      {scholar.position || (
                                         <span className="text-gray-300">—</span>
                                       )}
                                     </td>
                                     <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-                                      {university || (
+                                      {scholar.university || (
                                         <span className="text-gray-300">—</span>
                                       )}
                                     </td>
                                     <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-                                      {department || (
+                                      {scholar.department || (
                                         <span className="text-gray-300">—</span>
                                       )}
                                     </td>
                                     <td className="px-3 py-2 text-gray-600 max-w-[140px]">
                                       <span
                                         className="block truncate"
-                                        title={researchAreas}
+                                        title={(scholar.research_areas || []).join("；")}
                                       >
-                                        {researchAreas || (
+                                        {(scholar.research_areas || []).join("；") || (
                                           <span className="text-gray-300">
                                             —
                                           </span>
@@ -934,7 +1281,7 @@ export function BatchScholarImportModal({
                                     </td>
                                     <td className="px-3 py-2 text-gray-600 max-w-[160px]">
                                       <span className="block truncate">
-                                        {email || (
+                                        {scholar.email || (
                                           <span className="text-gray-300">
                                             —
                                           </span>
@@ -942,18 +1289,23 @@ export function BatchScholarImportModal({
                                       </span>
                                     </td>
                                     <td className="px-3 py-2 text-center">
-                                      {isInvalid ? (
-                                        <span className="inline-flex items-center gap-1 text-red-500 text-xs font-medium">
-                                          ✗{" "}
-                                          <span className="hidden sm:inline">
-                                            跳过
-                                          </span>
-                                        </span>
-                                      ) : (
+                                      {status === "valid" ? (
                                         <span className="inline-flex items-center gap-1 text-green-500 text-xs font-medium">
                                           ✓{" "}
                                           <span className="hidden sm:inline">
-                                            有效
+                                            可导入
+                                          </span>
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className="inline-flex items-center gap-1 text-red-500 text-xs font-medium"
+                                          title={rowCheck?.reason}
+                                        >
+                                          ✗{" "}
+                                          <span className="hidden sm:inline">
+                                            {status === "missing_name" && "缺姓名"}
+                                            {status === "duplicate_in_file" && "文件内重复"}
+                                            {status === "duplicate_in_db" && "库内已存在"}
                                           </span>
                                         </span>
                                       )}
