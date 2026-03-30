@@ -24,12 +24,10 @@ export default function ScholarDetailPageDemo() {
     error,
     editableAchievements,
     handleFieldSave,
-    handleEducationSave,
     handleManagementRolesSave,
     handleAddUpdate,
     handleDeleteUpdate,
     handleAchievementsSave,
-    handleSaveManagementRolesInline,
     handleProjectCategorySave,
   } = useScholarDetail(scholarId);
 
@@ -135,10 +133,6 @@ export default function ScholarDetailPageDemo() {
             {/* Left Sidebar */}
             <DetailLeftSidebar
               scholar={scholar}
-              onFieldSave={handleFieldSave}
-              onEducationSave={handleEducationSave}
-              onManagementRolesSave={handleManagementRolesSave}
-              onManagementRolesInlineSave={handleSaveManagementRolesInline}
               onEditProfile={() => setShowProfileModal(true)}
             />
 

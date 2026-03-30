@@ -62,39 +62,27 @@ export function EditAchievementsModal({
     setBatchInputs((prev) => ({ ...prev, [field]: value }));
   };
 
-  const applyBatchFor = (field: AchievementsTab) => {
-    if (field === "publications") {
-      const parsed = parsePublicationsFromText(batchInputs.publications);
-      if (parsed.length > 0) {
-        setEditedPublications((prev) => [...prev, ...parsed]);
-      }
-    } else if (field === "patents") {
-      const parsed = parsePatentsFromText(batchInputs.patents);
-      if (parsed.length > 0) {
-        setEditedPatents((prev) => [...prev, ...parsed]);
-      }
-    } else {
-      const parsed = parseAwardsFromText(batchInputs.awards);
-      if (parsed.length > 0) {
-        setEditedAwards((prev) => [...prev, ...parsed]);
-      }
-    }
-    setBatchInputs((prev) => ({ ...prev, [field]: "" }));
-  };
-
-  const applyAllBatches = () => {
-    applyBatchFor("publications");
-    applyBatchFor("patents");
-    applyBatchFor("awards");
-  };
-
   const handleSubmit = async () => {
+    const batchPublications = batchInputs.publications.trim()
+      ? parsePublicationsFromText(batchInputs.publications)
+      : [];
+    const batchPatents = batchInputs.patents.trim()
+      ? parsePatentsFromText(batchInputs.patents)
+      : [];
+    const batchAwards = batchInputs.awards.trim()
+      ? parseAwardsFromText(batchInputs.awards)
+      : [];
+
+    const finalPublications = [...editedPublications, ...batchPublications];
+    const finalPatents = [...editedPatents, ...batchPatents];
+    const finalAwards = [...editedAwards, ...batchAwards];
+
     setIsSubmitting(true);
     try {
       await onSubmit({
-        publications: editedPublications,
-        patents: editedPatents,
-        awards: editedAwards,
+        publications: finalPublications,
+        patents: finalPatents,
+        awards: finalAwards,
       });
     } finally {
       setIsSubmitting(false);
@@ -246,6 +234,9 @@ export function EditAchievementsModal({
           <p className="mt-2 text-xs text-gray-500">
             支持同时导入论文、专利、奖项，点击顶部“保存全部”后一次性提交三类数据。
           </p>
+          <p className="mt-1 text-[11px] text-gray-400">
+            无需先点击“批量导入”里的按钮；保存时会自动识别并导入文本框内容。
+          </p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
@@ -258,7 +249,6 @@ export function EditAchievementsModal({
                   count={parsedBatchCounts.publications}
                   placeholder={'[1] Authors, "Title", Venue (2025)\n[2] ...'}
                   onChange={(v) => handleBatchChange("publications", v)}
-                  onApply={() => applyBatchFor("publications")}
                 />
                 <BatchImportCard
                   title="专利批量导入"
@@ -266,7 +256,6 @@ export function EditAchievementsModal({
                   count={parsedBatchCounts.patents}
                   placeholder={"[1] 发明人.专利标题, ZL202511129049.1\n[2] ..."}
                   onChange={(v) => handleBatchChange("patents", v)}
-                  onApply={() => applyBatchFor("patents")}
                 />
                 <BatchImportCard
                   title="奖项批量导入"
@@ -274,19 +263,12 @@ export function EditAchievementsModal({
                   count={parsedBatchCounts.awards}
                   placeholder={"[1] 2025年度XX一等奖\n[2] ..."}
                   onChange={(v) => handleBatchChange("awards", v)}
-                  onApply={() => applyBatchFor("awards")}
                 />
               </div>
               <div className="flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={applyAllBatches}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-blue-200 text-blue-700 bg-white hover:bg-blue-50"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  一键导入全部（{parsedBatchCounts.publications}/
-                  {parsedBatchCounts.patents}/{parsedBatchCounts.awards}）
-                </button>
+                <p className="text-[11px] text-gray-400">
+                  粘贴后自动识别预览，保存时自动导入到对应列表。
+                </p>
               </div>
             </div>
           )}
@@ -584,14 +566,12 @@ function BatchImportCard({
   count,
   placeholder,
   onChange,
-  onApply,
 }: {
   title: string;
   value: string;
   count: number;
   placeholder: string;
   onChange: (value: string) => void;
-  onApply: () => void;
 }) {
   return (
     <div className="rounded-lg border border-blue-100 bg-white p-3 space-y-2">
@@ -603,13 +583,7 @@ function BatchImportCard({
         placeholder={placeholder}
         className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none font-mono"
       />
-      <button
-        type="button"
-        onClick={onApply}
-        className="w-full px-2.5 py-1.5 text-xs rounded border border-blue-200 text-blue-700 hover:bg-blue-50"
-      >
-        导入 {count} 条
-      </button>
+      <p className="text-[11px] text-gray-500">自动识别 {count} 条</p>
     </div>
   );
 }

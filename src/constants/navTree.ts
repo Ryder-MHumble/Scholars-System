@@ -44,6 +44,7 @@ export const NAV_TREE: NavNode[] = [
         ],
       },
       { id: "research_inst", label: "科研院所", tab: "institutions", subtab: "research_institutes" },
+      { id: "companies", label: "公司", tab: "institutions", subtab: "companies" },
       { id: "industry_assoc", label: "行业学会", tab: "institutions", subtab: "industry_associations" },
     ],
   },

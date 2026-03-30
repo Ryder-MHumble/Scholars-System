@@ -120,6 +120,15 @@ export default function ProjectListPage() {
     return items;
   }, [items, activeCategory, activeSubcategory]);
 
+  const displayedScholarCount = useMemo(() => {
+    // When project filters are active, backend `total` is the full matched count.
+    // Avoid showing current-page length as global count.
+    if (activeCategory || activeSubcategory) {
+      return total;
+    }
+    return filteredScholars.length;
+  }, [activeCategory, activeSubcategory, total, filteredScholars.length]);
+
   return (
     <div className="h-full overflow-hidden flex bg-gray-50">
       <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -138,7 +147,7 @@ export default function ProjectListPage() {
                 <p className="text-sm text-gray-500 mt-1">
                   共{" "}
                   <span className="font-semibold text-gray-700">
-                    {filteredScholars.length}
+                    {displayedScholarCount}
                   </span>{" "}
                   位学者
                 </p>

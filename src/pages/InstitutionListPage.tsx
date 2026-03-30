@@ -85,7 +85,7 @@ const EXCEL_COLUMNS: ExcelColumn[] = [
     hint: "完整中文名称，如 北京大学",
   },
   { key: "region", label: "地区", hint: "填写：国内 或 国际" },
-  { key: "org_type", label: "机构类型", hint: "高校 / 研究机构 / 行业学会" },
+  { key: "org_type", label: "机构类型", hint: "高校 / 研究机构 / 行业学会 / 企业（或公司）" },
   {
     key: "classification",
     label: "分类",
@@ -125,6 +125,7 @@ function mapSubtabToFilters(subtab: string | null): {
       classification: "其他高校",
     },
     research_institutes: { org_type: "研究机构" },
+    companies: { org_type: "企业" },
     industry_associations: { org_type: "行业学会" },
   };
   return mapping[subtab || ""] || {};

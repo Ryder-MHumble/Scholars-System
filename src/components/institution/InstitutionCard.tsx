@@ -264,47 +264,50 @@ export function InstitutionCard({
           </div>
         </div>
 
-        <div className="relative min-w-0 p-3.5 md:p-4 flex flex-col">
+        <div className="relative min-w-0 p-3.5 md:p-4 flex h-full flex-col">
           <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-slate-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
             <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-500 transition-colors" />
           </div>
 
           <div className="min-w-0 pr-8">
-            <h3 className="text-[22px] font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors truncate">
+            <h3 className="truncate text-[21px] font-black leading-tight text-slate-900 transition-colors group-hover:text-blue-600">
               {institution.name}
             </h3>
             {institution.org_name && (
-              <p className="text-[12px] text-slate-400 mt-1 truncate font-medium">
+              <p className="mt-1 truncate text-[12px] font-medium leading-5 text-slate-400">
                 {institution.org_name}
               </p>
             )}
           </div>
 
-          <div className="mt-auto pt-3 flex items-center justify-between gap-2 min-w-0">
-            <div className="min-w-0 flex items-end gap-2">
+          <div className="mt-auto min-w-0 border-t border-slate-100 pt-3">
+            <div className="flex min-w-0 items-end gap-2">
               <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
                 <Users className="w-3.5 h-3.5 text-blue-500" />
               </div>
-              <div className="flex items-baseline gap-1 min-w-0">
-                <span className="text-[42px] font-black text-slate-800 leading-none">
+              <div className="flex min-w-0 items-baseline gap-1.5">
+                <span className="truncate text-3xl font-black leading-none text-slate-800 md:text-[34px]">
                   {institution.scholar_count}
                 </span>
-                <span className="text-[12px] text-slate-400 font-semibold tracking-wide mb-0.5">
+                <span className="mb-0.5 text-[12px] font-semibold tracking-wide text-slate-400">
                   学者
                 </span>
               </div>
             </div>
 
-            {hasDepartments && (
-              <span className="shrink-0 max-w-[48%] truncate text-[11px] text-slate-500 font-semibold bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-full whitespace-nowrap">
-                {institution.departments!.length} 个子机构
-              </span>
-            )}
-
-            {!hasDepartments && hasDepartmentField && (
-              <span className="shrink-0 max-w-[48%] truncate inline-flex items-center rounded-full bg-slate-50 border border-slate-100 px-2.5 py-1 text-[11px] text-slate-400 font-medium">
-                暂无院系数据
-              </span>
+            {(hasDepartments || hasDepartmentField) && (
+              <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-2">
+                {hasDepartments && (
+                  <span className="inline-flex max-w-full items-center truncate rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                    {institution.departments!.length} 个子机构
+                  </span>
+                )}
+                {!hasDepartments && hasDepartmentField && (
+                  <span className="inline-flex max-w-full items-center truncate rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                    暂无院系数据
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -9,7 +9,6 @@ import type {
   AwardRecord,
   ScholarProjectTag,
   ScholarEventTag,
-  EducationRecord,
 } from "@/services/scholarApi";
 import {
   createScholar,
@@ -115,29 +114,10 @@ export default function AddScholarDetailPage() {
     }
   };
 
-  // Education save handler
-  const handleEducationSave = async (records: EducationRecord[]) => {
-    try {
-      setScholar((prev) => ({ ...prev, education: records }));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "保存教育背景失败");
-    }
-  };
-
   // Management roles save handlers
   const handleManagementRolesSave = async (records: string[]) => {
     try {
       setScholar((prev) => ({ ...prev, joint_management_roles: records }));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "保存管理角色失败");
-    }
-  };
-
-  const handleManagementRolesInlineSave = async (roles: string[]) => {
-    try {
-      setScholar((prev) => ({ ...prev, joint_management_roles: roles }));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存管理角色失败");
@@ -330,10 +310,7 @@ export default function AddScholarDetailPage() {
             >
               <DetailLeftSidebar
                 scholar={scholar}
-                onFieldSave={handleFieldSave}
-                onEducationSave={handleEducationSave}
-                onManagementRolesSave={handleManagementRolesSave}
-                onManagementRolesInlineSave={handleManagementRolesInlineSave}
+                isManageMode
                 onEditProfile={() => setShowProfileModal(true)}
               />
             </motion.div>
