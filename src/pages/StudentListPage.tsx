@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Download,
@@ -7,7 +7,6 @@ import {
   Filter,
   Pencil,
   Plus,
-  School,
   Search,
   Trash2,
   UserPlus,
@@ -16,9 +15,11 @@ import { cn } from "@/utils/cn";
 import { BaseModal } from "@/components/common/BaseModal";
 import { SelectInput } from "@/components/ui/SelectInput";
 import { ComboboxInput } from "@/components/ui/ComboboxInput";
+import { Pagination } from "@/components/common/Pagination";
 import {
   createStudent,
   deleteStudent,
+  fetchStudentList,
   fetchStudentListAll,
   fetchStudentOptions,
   patchStudent,
@@ -33,6 +34,7 @@ const DEFAULT_YEARS = ["2024", "2025", "2026"];
 const ALL_MENTOR = "全部导师";
 const ALL_UNIVERSITY = "全部高校";
 const ALL_STUDENTS_SUBTAB = "student_all";
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 type StudentForm = {
   name: string;
@@ -95,19 +97,15 @@ function safeText(value: string | null | undefined): string {
   return text || "-";
 }
 
-function normalizeUniversity(value: string | null | undefined): string {
-  return (value ?? "").trim();
+function statusClass(status: string): string {
+  if (status === "毕业") return "bg-emerald-50 text-emerald-700 border-emerald-100";
+  if (status === "实习") return "bg-amber-50 text-amber-700 border-amber-100";
+  return "bg-blue-50 text-blue-700 border-blue-100";
 }
 
 function formatEnrollmentYear(value: string | null | undefined): string {
   const year = parseYear(value);
   return year ? displayGrade(year) : "-";
-}
-
-function statusClass(status: string): string {
-  if (status === "毕业") return "bg-emerald-50 text-emerald-700 border-emerald-100";
-  if (status === "实习") return "bg-amber-50 text-amber-700 border-amber-100";
-  return "bg-blue-50 text-blue-700 border-blue-100";
 }
 
 function StudentFormFields({
@@ -259,6 +257,8 @@ function StudentFormFields({
 }
 
 export default function StudentListPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [years, setYears] = useState<string[]>(DEFAULT_YEARS);
@@ -268,7 +268,10 @@ export default function StudentListPage() {
   const fallbackYear = years[0] ?? DEFAULT_YEARS[0];
   const activeYear = isAllStudents ? null : yearFromUrl ?? fallbackYear;
 
-  const [allStudents, setAllStudents] = useState<StudentRecord[]>([]);
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   const [mentorOptions, setMentorOptions] = useState<string[]>([]);
   const [universityOptions, setUniversityOptions] = useState<string[]>([]);
 
@@ -278,8 +281,12 @@ export default function StudentListPage() {
   const [selectedMentor, setSelectedMentor] = useState(ALL_MENTOR);
   const [selectedUniversity, setSelectedUniversity] = useState(ALL_UNIVERSITY);
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadSeed, setReloadSeed] = useState(0);
 
@@ -293,6 +300,11 @@ export default function StudentListPage() {
   const [showBatchImportModal, setShowBatchImportModal] = useState(false);
 
   useEffect(() => {
+    const returnTo = `${location.pathname}${location.search || "?tab=students"}`;
+    window.sessionStorage.setItem("student_list_return_to", returnTo);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
     if (searchParams.get("tab") !== "students") return;
     if (activeSubtab === ALL_STUDENTS_SUBTAB || yearFromUrl) return;
     const next = new URLSearchParams(searchParams);
@@ -302,7 +314,10 @@ export default function StudentListPage() {
   }, [searchParams, setSearchParams, activeSubtab, yearFromUrl]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSearchKeyword(searchInput.trim()), 260);
+    const timer = window.setTimeout(() => {
+      setSearchKeyword(searchInput.trim());
+      setPage(1);
+    }, 260);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
@@ -311,6 +326,8 @@ export default function StudentListPage() {
     setSelectedUniversity(ALL_UNIVERSITY);
     setSearchInput("");
     setSearchKeyword("");
+    setUniversitySearch("");
+    setPage(1);
   }, [activeSubtab]);
 
   useEffect(() => {
@@ -339,79 +356,110 @@ export default function StudentListPage() {
     setIsLoading(true);
     setError(null);
 
-    fetchStudentListAll(
+    fetchStudentList(
       {
         enrollment_year: activeYear ?? undefined,
         mentor_name: selectedMentor === ALL_MENTOR ? undefined : selectedMentor,
+        home_university:
+          selectedUniversity === ALL_UNIVERSITY ? undefined : selectedUniversity,
         keyword: searchKeyword || undefined,
-        page_size: 500,
+        page,
+        page_size: pageSize,
       },
       controller.signal,
     )
-      .then((items) => {
+      .then((res) => {
         if (controller.signal.aborted) return;
-        setAllStudents(items ?? []);
-        setIsLoading(false);
+        setStudents(res.items ?? []);
+        setTotal(res.total ?? 0);
+        setTotalPages(Math.max(res.total_pages ?? 1, 1));
+        if (res.page && res.page !== page) {
+          setPage(res.page);
+        }
       })
       .catch((err) => {
         if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : "学生数据加载失败");
-        setAllStudents([]);
-        setIsLoading(false);
+        setStudents([]);
+        setTotal(0);
+        setTotalPages(1);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       });
 
     return () => controller.abort();
-  }, [activeYear, selectedMentor, searchKeyword, reloadSeed]);
+  }, [
+    activeYear,
+    selectedMentor,
+    selectedUniversity,
+    searchKeyword,
+    page,
+    pageSize,
+    reloadSeed,
+  ]);
 
-  const yearScopedStudents = useMemo(() => {
-    if (isAllStudents) return allStudents;
-    return allStudents.filter((item) => parseYear(item.enrollment_year) === activeYear);
-  }, [allStudents, isAllStudents, activeYear]);
-
-  const universityCounts = useMemo(() => {
-    const map = new Map<string, number>();
-    yearScopedStudents.forEach((item) => {
-      const uni = normalizeUniversity(item.home_university);
-      if (!uni) return;
-      map.set(uni, (map.get(uni) ?? 0) + 1);
-    });
-    return Array.from(map.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  }, [yearScopedStudents]);
-
-  const filteredUniversityCounts = useMemo(() => {
-    const keyword = universitySearch.trim().toLowerCase();
-    if (!keyword) return universityCounts;
-    return universityCounts.filter((item) =>
-      item.name.toLowerCase().includes(keyword),
-    );
-  }, [universityCounts, universitySearch]);
-
-  const studentsForRender = useMemo(() => {
-    if (selectedUniversity === ALL_UNIVERSITY) return yearScopedStudents;
-    return yearScopedStudents.filter(
-      (item) => normalizeUniversity(item.home_university) === selectedUniversity,
-    );
-  }, [yearScopedStudents, selectedUniversity]);
-
-  useEffect(() => {
-    if (selectedUniversity === ALL_UNIVERSITY) return;
-    const exists = universityCounts.some((u) => u.name === selectedUniversity);
-    if (!exists) setSelectedUniversity(ALL_UNIVERSITY);
-  }, [selectedUniversity, universityCounts]);
-
-  const mentorsInCurrent = useMemo(() => {
+  const mentorsInCurrentPage = useMemo(() => {
     const set = new Set<string>();
-    yearScopedStudents.forEach((item) => {
+    students.forEach((item) => {
       const mentor = (item.mentor_name || item.scholar_name || "").trim();
       if (mentor) set.add(mentor);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [yearScopedStudents]);
+  }, [students]);
 
-  const mentorSelectOptions =
-    mentorsInCurrent.length > 0 ? mentorsInCurrent : mentorOptions;
+  const mentorSelectOptions = useMemo(
+    () => Array.from(new Set([...mentorOptions, ...mentorsInCurrentPage])),
+    [mentorOptions, mentorsInCurrentPage],
+  );
+
+  const universitiesInCurrentPage = useMemo(() => {
+    const set = new Set<string>();
+    students.forEach((item) => {
+      const name = (item.home_university ?? "").trim();
+      if (name) set.add(name);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [students]);
+
+  const universitySelectOptions = useMemo(
+    () => Array.from(new Set([...universityOptions, ...universitiesInCurrentPage])),
+    [universityOptions, universitiesInCurrentPage],
+  );
+
+  const universityCountsInCurrentPage = useMemo(() => {
+    const map = new Map<string, number>();
+    students.forEach((item) => {
+      const name = (item.home_university ?? "").trim();
+      if (!name) return;
+      map.set(name, (map.get(name) ?? 0) + 1);
+    });
+    return map;
+  }, [students]);
+
+  const sidebarUniversities = useMemo(() => {
+    const list = selectedUniversity !== ALL_UNIVERSITY
+      ? Array.from(new Set([...universitySelectOptions, selectedUniversity]))
+      : universitySelectOptions;
+    const keyword = universitySearch.trim().toLowerCase();
+    if (!keyword) return list;
+    return list.filter((name) => name.toLowerCase().includes(keyword));
+  }, [selectedUniversity, universitySelectOptions, universitySearch]);
+
+  const yearTabs = useMemo(
+    () => sortYears(activeYear ? [...years, activeYear] : years),
+    [years, activeYear],
+  );
+
+  const scopeLabel = isAllStudents
+    ? "全部学生"
+    : displayGrade(activeYear || fallbackYear);
+
+  const mentorLabel = selectedMentor === ALL_MENTOR ? "全部导师" : selectedMentor;
+  const universityLabel =
+    selectedUniversity === ALL_UNIVERSITY ? "全部高校" : selectedUniversity;
 
   const handleSelectAllStudents = () => {
     const next = new URLSearchParams(searchParams);
@@ -455,6 +503,15 @@ export default function StudentListPage() {
     setShowStudentModal(true);
   };
 
+  const handleOpenDetail = (student: StudentRecord) => {
+    navigate(`/students/${student.id}`, {
+      state: {
+        from: location,
+        studentSnapshot: student,
+      },
+    });
+  };
+
   const handleSubmitStudent = async () => {
     if (!studentForm.name.trim()) {
       window.alert("请填写学生姓名");
@@ -492,6 +549,7 @@ export default function StudentListPage() {
           ...payloadBase,
           added_by: "frontend",
         } satisfies StudentCreatePayload);
+        setPage(1);
       }
 
       setShowStudentModal(false);
@@ -510,11 +568,38 @@ export default function StudentListPage() {
     setIsMutating(true);
     try {
       await deleteStudent(student.id);
+      if (students.length === 1 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+      }
       setReloadSeed((v) => v + 1);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "删除学生失败");
     } finally {
       setIsMutating(false);
+    }
+  };
+
+  const handleExportFiltered = async () => {
+    setIsExporting(true);
+    try {
+      const all = await fetchStudentListAll({
+        enrollment_year: activeYear ?? undefined,
+        mentor_name: selectedMentor === ALL_MENTOR ? undefined : selectedMentor,
+        home_university:
+          selectedUniversity === ALL_UNIVERSITY ? undefined : selectedUniversity,
+        keyword: searchKeyword || undefined,
+        page_size: 500,
+      });
+
+      if (all.length === 0) {
+        window.alert("当前筛选条件下暂无数据可导出");
+        return;
+      }
+      exportStudentsToExcel(all);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "导出失败");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -530,27 +615,13 @@ export default function StudentListPage() {
     handleSelectYear(year);
   };
 
-  const yearTabs = useMemo(
-    () => sortYears(activeYear ? [...years, activeYear] : years),
-    [years, activeYear],
-  );
-
-  const scopeLabel = isAllStudents
-    ? "全部学生"
-    : displayGrade(activeYear || fallbackYear);
-
-  const mentorLabel = selectedMentor === ALL_MENTOR ? "全部导师" : selectedMentor;
-
   return (
     <div className="h-full overflow-hidden flex bg-gray-50">
-      <aside className="w-52 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col overflow-hidden">
+      <aside className="hidden md:flex w-56 bg-white border-r border-gray-200 shrink-0 flex-col overflow-hidden">
         <div className="px-3.5 py-3 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-800 inline-flex items-center gap-1.5">
-              <School className="w-4 h-4 text-gray-500" />
-              共建高校
-            </h3>
-            <span className="text-xs text-gray-500">{universityCounts.length} 所</span>
+            <h3 className="text-sm font-semibold text-gray-800">共建高校</h3>
+            <span className="text-xs text-gray-500">{universitySelectOptions.length} 所</span>
           </div>
           <p className="text-[11px] text-gray-400 mt-1 truncate">{scopeLabel}</p>
           <div className="relative mt-2.5">
@@ -563,9 +634,13 @@ export default function StudentListPage() {
             />
           </div>
         </div>
+
         <div className="p-2 overflow-y-auto custom-scrollbar space-y-1">
           <button
-            onClick={() => setSelectedUniversity(ALL_UNIVERSITY)}
+            onClick={() => {
+              setSelectedUniversity(ALL_UNIVERSITY);
+              setPage(1);
+            }}
             className={cn(
               "w-full text-left rounded-lg px-3 py-2 text-sm border transition-colors",
               selectedUniversity === ALL_UNIVERSITY
@@ -575,29 +650,34 @@ export default function StudentListPage() {
           >
             <div className="flex items-center justify-between">
               <span>{ALL_UNIVERSITY}</span>
-              <span className="text-xs text-gray-400">{yearScopedStudents.length}</span>
+              <span className="text-xs text-gray-400">{total}</span>
             </div>
           </button>
 
-          {filteredUniversityCounts.map((uni) => (
+          {sidebarUniversities.map((uni) => (
             <button
-              key={uni.name}
-              onClick={() => setSelectedUniversity(uni.name)}
+              key={uni}
+              onClick={() => {
+                setSelectedUniversity(uni);
+                setPage(1);
+              }}
               className={cn(
                 "w-full rounded-lg px-3 py-2 text-sm border transition-colors text-left",
-                selectedUniversity === uni.name
+                selectedUniversity === uni
                   ? "bg-primary-50 text-primary-700 border-primary-200"
                   : "bg-white text-gray-700 border-transparent hover:bg-gray-50",
               )}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate">{uni.name}</span>
-                <span className="text-xs text-gray-400">{uni.count}</span>
+                <span className="truncate">{uni}</span>
+                <span className="text-xs text-gray-400">
+                  {universityCountsInCurrentPage.get(uni) ?? 0}
+                </span>
               </div>
             </button>
           ))}
 
-          {filteredUniversityCounts.length === 0 && (
+          {sidebarUniversities.length === 0 && (
             <p className="px-3 py-6 text-center text-xs text-gray-400">未找到匹配高校</p>
           )}
         </div>
@@ -610,248 +690,298 @@ export default function StudentListPage() {
           transition={{ duration: 0.25, ease: "easeOut" }}
           className="p-6 md:p-8"
         >
-          <div className="mb-6">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">学生管理</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  当前范围 <span className="font-semibold text-gray-700">{scopeLabel}</span>，共{" "}
-                  <span className="font-semibold text-gray-700">{studentsForRender.length}</span> 人
-                </p>
-              </div>
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">学生管理</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              当前范围 <span className="font-semibold text-gray-700">{scopeLabel}</span>，共{" "}
+              <span className="font-semibold text-gray-700">{total}</span> 人
+            </p>
+          </div>
 
-              <div className="flex items-center gap-2 flex-wrap justify-end">
-                <button
-                  onClick={() => setShowBatchImportModal(true)}
-                  className="h-10 px-3 rounded-lg bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium inline-flex items-center gap-1.5"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  批量添加
-                </button>
-                <button
-                  onClick={() => exportStudentsToExcel(studentsForRender)}
-                  disabled={studentsForRender.length === 0}
-                  className={cn(
-                    "h-10 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5",
-                    studentsForRender.length === 0
-                      ? "bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed"
-                      : "bg-white hover:bg-gray-50 border border-gray-200 text-gray-700",
-                  )}
-                >
-                  <Download className="w-4 h-4" />
-                  导出Excel
-                </button>
-                <button
-                  onClick={() => setShowGradeModal(true)}
-                  className="h-10 px-3 rounded-lg bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium inline-flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  添加年级
-                </button>
-                <button
-                  onClick={handleOpenCreate}
-                  disabled={isMutating}
-                  className="h-10 px-3 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium inline-flex items-center gap-1.5"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  添加学生
-                </button>
-              </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => setShowBatchImportModal(true)}
+              className="h-10 px-3 rounded-lg bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium inline-flex items-center gap-1.5"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              批量添加
+            </button>
+            <button
+              onClick={handleExportFiltered}
+              disabled={isExporting}
+              className={cn(
+                "h-10 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5",
+                isExporting
+                  ? "bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed"
+                  : "bg-white hover:bg-gray-50 border border-gray-200 text-gray-700",
+              )}
+            >
+              <Download className="w-4 h-4" />
+              {isExporting ? "导出中..." : "导出Excel"}
+            </button>
+            <button
+              onClick={() => setShowGradeModal(true)}
+              className="h-10 px-3 rounded-lg bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              添加年级
+            </button>
+            <button
+              onClick={handleOpenCreate}
+              disabled={isMutating}
+              className="h-10 px-3 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium inline-flex items-center gap-1.5"
+            >
+              <UserPlus className="w-4 h-4" />
+              添加学生
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 md:p-5 mb-4 space-y-4">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(300px,1fr)_220px_220px_160px] gap-3">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="搜索学生姓名 / 高校 / 导师 / 专业"
+                className="h-10 w-full pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-300"
+              />
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-[280px] max-w-xl">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="搜索学生姓名 / 高校 / 导师 / 专业"
-                  className="h-10 w-full pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-300"
-                />
-              </div>
+            <ComboboxInput
+              value={selectedMentor === ALL_MENTOR ? "" : selectedMentor}
+              onChange={(value) => {
+                setSelectedMentor(value || ALL_MENTOR);
+                setPage(1);
+              }}
+              options={mentorSelectOptions}
+              placeholder={ALL_MENTOR}
+              clearable
+            />
 
-              <div className="w-full sm:w-72">
-                <ComboboxInput
-                  value={selectedMentor === ALL_MENTOR ? "" : selectedMentor}
-                  onChange={(value) => setSelectedMentor(value || ALL_MENTOR)}
-                  options={mentorSelectOptions}
-                  placeholder={ALL_MENTOR}
-                  clearable
-                />
-              </div>
-            </div>
+            <ComboboxInput
+              value={selectedUniversity === ALL_UNIVERSITY ? "" : selectedUniversity}
+              onChange={(value) => {
+                setSelectedUniversity(value || ALL_UNIVERSITY);
+                setPage(1);
+              }}
+              options={universitySelectOptions}
+              placeholder={ALL_UNIVERSITY}
+              clearable
+            />
 
-            <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <SelectInput
+              value={String(pageSize)}
+              onChange={(value) => {
+                setPageSize(Number(value));
+                setPage(1);
+              }}
+              className="h-10"
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  每页 {size} 条
+                </option>
+              ))}
+            </SelectInput>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleSelectAllStudents}
+              className={cn(
+                "h-8 px-3.5 rounded-full border text-sm transition-colors",
+                isAllStudents
+                  ? "bg-primary-600 text-white border-primary-600 shadow-sm"
+                  : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
+              )}
+            >
+              全部学生
+            </button>
+            {yearTabs.map((year) => (
               <button
-                onClick={handleSelectAllStudents}
+                key={year}
+                onClick={() => handleSelectYear(year)}
                 className={cn(
                   "h-8 px-3.5 rounded-full border text-sm transition-colors",
-                  isAllStudents
+                  !isAllStudents && activeYear === year
                     ? "bg-primary-600 text-white border-primary-600 shadow-sm"
                     : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
                 )}
               >
-                全部学生
+                {displayGrade(year)}
               </button>
-              {yearTabs.map((year) => (
-                <button
-                  key={year}
-                  onClick={() => handleSelectYear(year)}
-                  className={cn(
-                    "h-8 px-3.5 rounded-full border text-sm transition-colors",
-                    !isAllStudents && activeYear === year
-                      ? "bg-primary-600 text-white border-primary-600 shadow-sm"
-                      : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
-                  )}
-                >
-                  {displayGrade(year)}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-3 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
-              <span className="inline-flex items-center gap-1 rounded-full bg-white border border-gray-200 px-2.5 py-1">
-                <Filter className="w-3 h-3" />
-                导师：{mentorLabel}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-white border border-gray-200 px-2.5 py-1">
-                高校：{selectedUniversity}
-              </span>
-            </div>
+            ))}
           </div>
 
-          <AnimatePresence mode="wait">
-            {isLoading ? (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="bg-white rounded-2xl border border-gray-100 h-60 flex items-center justify-center text-sm text-gray-400"
+          <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 border border-gray-200 px-2.5 py-1">
+              <Filter className="w-3 h-3" />
+              导师：{mentorLabel}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 border border-gray-200 px-2.5 py-1">
+              高校：{universityLabel}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 border border-gray-200 px-2.5 py-1">
+              第 {page} / {totalPages} 页
+            </span>
+          </div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {isLoading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="bg-white rounded-2xl border border-gray-100 h-72 flex items-center justify-center text-sm text-gray-400"
+            >
+              加载中...
+            </motion.div>
+          ) : error ? (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="bg-white rounded-2xl border border-red-100 h-72 flex flex-col items-center justify-center text-sm text-red-500 px-4"
+            >
+              <p>{error}</p>
+              <button
+                onClick={() => setReloadSeed((v) => v + 1)}
+                className="mt-2 text-primary-600 hover:underline"
               >
-                加载中...
-              </motion.div>
-            ) : error ? (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="bg-white rounded-2xl border border-red-100 h-60 flex flex-col items-center justify-center text-sm text-red-500 px-4"
-              >
-                <p>{error}</p>
-                <button
-                  onClick={() => setReloadSeed((v) => v + 1)}
-                  className="mt-2 text-primary-600 hover:underline"
-                >
-                  重试
-                </button>
-              </motion.div>
-            ) : studentsForRender.length === 0 ? (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="bg-white rounded-2xl border border-gray-100 h-60 flex items-center justify-center text-sm text-gray-400"
-              >
-                暂无可展示学生
-              </motion.div>
-            ) : (
-              <motion.div
-                key="list"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2 }}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-              >
-                <div className="overflow-x-auto max-h-[calc(100vh-260px)] overflow-y-auto custom-scrollbar">
-                  <table className="min-w-[980px] w-full text-left border-collapse">
-                    <thead className="sticky top-0 z-10">
-                      <tr className="border-b border-gray-100">
-                        <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/80">
-                          姓名
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/80">
-                          年级
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/80">
-                          共建高校
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/80">
-                          导师
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/80">
-                          学号
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/80">
-                          邮箱
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/80">
-                          专业
-                        </th>
-                        <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/80 text-right">
-                          操作
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-sm">
-                      {studentsForRender.map((student, index) => (
-                        <tr
-                          key={student.id}
-                          className={cn(
-                            "group border-b border-gray-50 last:border-b-0 hover:bg-primary-50/40 transition-colors",
-                            index % 2 === 0 ? "bg-white" : "bg-gray-50/25",
-                          )}
-                        >
-                          <td className="px-5 py-3.5 border-l-2 border-transparent group-hover:border-primary-400 transition-colors">
-                            <p className="font-semibold text-gray-800">{safeText(student.name)}</p>
+                重试
+              </button>
+            </motion.div>
+          ) : students.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="bg-white rounded-2xl border border-gray-100 h-72 flex items-center justify-center text-sm text-gray-400"
+            >
+              当前筛选条件下暂无学生
+            </motion.div>
+          ) : (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+            >
+              <div className="overflow-x-auto max-h-[calc(100vh-360px)] overflow-y-auto custom-scrollbar">
+                <table className="min-w-[1100px] w-full text-left border-collapse">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-gray-100">
+                      <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/90">
+                        学生
+                      </th>
+                      <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/90">
+                        导师
+                      </th>
+                      <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/90">
+                        共建高校
+                      </th>
+                      <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/90">
+                        年级
+                      </th>
+                      <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/90">
+                        专业
+                      </th>
+                      <th className="px-4 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/90">
+                        联系方式
+                      </th>
+                      <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/90 text-right">
+                        操作
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {students.map((student, index) => (
+                      <tr
+                        key={student.id}
+                        onClick={() => handleOpenDetail(student)}
+                        className={cn(
+                          "group border-b border-gray-50 last:border-b-0 hover:bg-primary-50/40 transition-colors cursor-pointer",
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50/20",
+                        )}
+                        title="单击进入学生详情"
+                      >
+                        <td className="px-5 py-3.5 border-l-2 border-transparent group-hover:border-primary-400 transition-colors">
+                          <p className="font-semibold text-gray-800 group-hover:text-primary-700 transition-colors">
+                            {safeText(student.name)}
+                          </p>
+                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                             <span
                               className={cn(
-                                "inline-flex mt-1 text-[11px] px-1.5 py-0.5 rounded-full border",
+                                "inline-flex text-[11px] px-1.5 py-0.5 rounded-full border",
                                 statusClass(student.status || "在读"),
                               )}
                             >
                               {student.status || "在读"}
                             </span>
-                          </td>
-                          <td className="px-4 py-3.5 text-gray-600">
-                            {formatEnrollmentYear(student.enrollment_year)}
-                          </td>
-                          <td className="px-4 py-3.5 text-gray-600">{safeText(student.home_university)}</td>
-                          <td className="px-4 py-3.5 text-gray-600">{safeText(student.mentor_name)}</td>
-                          <td className="px-4 py-3.5 text-gray-600">{safeText(student.student_no)}</td>
-                          <td className="px-4 py-3.5 text-gray-600">{safeText(student.email)}</td>
-                          <td className="px-4 py-3.5 text-gray-600">{safeText(student.major)}</td>
-                          <td className="px-5 py-3.5 text-right">
-                            <div className="inline-flex items-center gap-1.5">
-                              <button
-                                onClick={() => handleOpenEdit(student)}
-                                disabled={isMutating}
-                                className="h-8 px-2.5 text-xs rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-1"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                                编辑
-                              </button>
-                              <button
-                                onClick={() => handleDeleteStudent(student)}
-                                disabled={isMutating}
-                                className="h-8 px-2.5 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 inline-flex items-center gap-1"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                删除
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                            <span className="text-[11px] text-gray-400">学号 {safeText(student.student_no)}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-600">
+                          {safeText(student.mentor_name || student.scholar_name)}
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-600">{safeText(student.home_university)}</td>
+                        <td className="px-4 py-3.5 text-gray-600">
+                          {formatEnrollmentYear(student.enrollment_year)}
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-600">{safeText(student.major)}</td>
+                        <td className="px-4 py-3.5 text-gray-600">
+                          <p>{safeText(student.email)}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{safeText(student.phone)}</p>
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEdit(student);
+                              }}
+                              disabled={isMutating}
+                              className="h-8 px-2.5 text-xs rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-1"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              编辑
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDeleteStudent(student);
+                              }}
+                              disabled={isMutating}
+                              className="h-8 px-2.5 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 inline-flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              删除
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                totalItems={total}
+                onPageChange={setPage}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
         </motion.div>
       </div>
 
@@ -929,14 +1059,17 @@ export default function StudentListPage() {
           form={studentForm}
           setForm={setStudentForm}
           mentorOptions={mentorSelectOptions}
-          universityOptions={universityOptions}
+          universityOptions={universitySelectOptions}
         />
       </BaseModal>
 
       <BatchStudentImportModal
         isOpen={showBatchImportModal}
         onClose={() => setShowBatchImportModal(false)}
-        onSuccess={() => setReloadSeed((v) => v + 1)}
+        onSuccess={() => {
+          setPage(1);
+          setReloadSeed((v) => v + 1);
+        }}
         defaultEnrollmentYear={activeYear ?? undefined}
       />
     </div>

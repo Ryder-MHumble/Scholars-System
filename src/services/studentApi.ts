@@ -78,6 +78,15 @@ export interface StudentFilterOptions {
   mentors: string[];
 }
 
+export interface StudentPaperRecord {
+  id?: string;
+  title: string;
+  venue?: string;
+  year?: string | number;
+  compliance_status?: string;
+  compliance_note?: string;
+}
+
 export async function fetchStudentList(
   filters: StudentListFilters = {},
   signal?: AbortSignal,
@@ -145,6 +154,40 @@ export async function fetchStudentOptions(
   if (!res.ok)
     throw new Error(`Failed to fetch student options: ${res.status}`);
   return res.json();
+}
+
+export async function fetchStudentDetail(
+  studentId: string,
+  signal?: AbortSignal,
+): Promise<StudentRecord> {
+  const res = await fetch(`${BASE_URL}/api/v1/students/${studentId}`, {
+    signal,
+  });
+  if (!res.ok) throw new Error(`Failed to fetch student detail: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchStudentPapers(
+  studentId: string,
+  signal?: AbortSignal,
+): Promise<StudentPaperRecord[]> {
+  const candidates = [
+    `${BASE_URL}/api/v1/students/${studentId}/papers`,
+    `${BASE_URL}/api/v1/students/${studentId}/publications`,
+  ];
+
+  for (const url of candidates) {
+    const res = await fetch(url, { signal });
+    if (res.status === 404) continue;
+    if (!res.ok) throw new Error(`Failed to fetch student papers: ${res.status}`);
+
+    const data = await res.json();
+    if (Array.isArray(data)) return data as StudentPaperRecord[];
+    if (Array.isArray(data?.items)) return data.items as StudentPaperRecord[];
+    return [];
+  }
+
+  return [];
 }
 
 export async function createStudent(

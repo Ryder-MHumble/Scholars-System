@@ -6,6 +6,7 @@ import AddScholarDetailPage from "./pages/AddScholarDetailPage";
 import InstitutionDetailPage from "./pages/InstitutionDetailPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
+import StudentDetailPage from "./pages/StudentDetailPage";
 import { InstitutionPickerPage } from "./pages/InstitutionPickerPage";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
@@ -41,6 +42,10 @@ export default function App() {
               <Route
                 path="activities/:activityId"
                 element={<ActivityDetailPage />}
+              />
+              <Route
+                path="students/:studentId"
+                element={<StudentDetailPage />}
               />
             </Routes>
           </AnimatePresence>
