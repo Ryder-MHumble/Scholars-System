@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { useScholarDetail } from "@/hooks/useScholarDetail";
 import { PageSkeleton } from "@/components/scholar-detail/shared/SkeletonLoader";
-import { AddUpdateModal } from "@/components/scholar-detail/modals/AddUpdateModal";
 import { EditAchievementsModal } from "@/components/scholar-detail/modals/EditAchievementsModal";
 import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfileModal";
 import { ContactModal } from "@/components/scholar-detail/modals/ContactModal";
@@ -25,15 +24,12 @@ export default function ScholarDetailPageDemo() {
     editableAchievements,
     handleFieldSave,
     handleManagementRolesSave,
-    handleAddUpdate,
-    handleDeleteUpdate,
     handleAchievementsSave,
     handleProjectCategorySave,
   } = useScholarDetail(scholarId);
 
   // Modal visibility states
   const [showContactModal, setShowContactModal] = useState(false);
-  const [showAddUpdate, setShowAddUpdate] = useState(false);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
@@ -73,14 +69,6 @@ export default function ScholarDetailPageDemo() {
             phone={scholar.phone}
             profileUrl={scholar.profile_url}
             onClose={() => setShowContactModal(false)}
-          />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showAddUpdate && (
-          <AddUpdateModal
-            onClose={() => setShowAddUpdate(false)}
-            onSubmit={handleAddUpdate}
           />
         )}
       </AnimatePresence>
@@ -145,7 +133,6 @@ export default function ScholarDetailPageDemo() {
             >
               <ProjectCategorySelector
                 projectTags={scholar.project_tags ?? []}
-                eventTags={scholar.event_tags ?? []}
                 onSave={handleProjectCategorySave}
               />
 
@@ -163,8 +150,6 @@ export default function ScholarDetailPageDemo() {
             >
               <RightSidebar
                 scholar={scholar}
-                onShowAddUpdate={() => setShowAddUpdate(true)}
-                onDeleteUpdate={handleDeleteUpdate}
               />
             </motion.div>
           </div>

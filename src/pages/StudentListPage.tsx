@@ -263,6 +263,7 @@ export default function StudentListPage() {
 
   const [years, setYears] = useState<string[]>(DEFAULT_YEARS);
   const activeSubtab = searchParams.get("subtab");
+  const universityFromUrl = (searchParams.get("university") ?? "").trim();
   const isAllStudents = activeSubtab === ALL_STUDENTS_SUBTAB;
   const yearFromUrl = subtabToYear(activeSubtab);
   const fallbackYear = years[0] ?? DEFAULT_YEARS[0];
@@ -323,12 +324,12 @@ export default function StudentListPage() {
 
   useEffect(() => {
     setSelectedMentor(ALL_MENTOR);
-    setSelectedUniversity(ALL_UNIVERSITY);
+    setSelectedUniversity(universityFromUrl || ALL_UNIVERSITY);
     setSearchInput("");
     setSearchKeyword("");
     setUniversitySearch("");
     setPage(1);
-  }, [activeSubtab]);
+  }, [activeSubtab, universityFromUrl]);
 
   useEffect(() => {
     let cancelled = false;

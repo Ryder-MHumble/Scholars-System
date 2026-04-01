@@ -257,6 +257,7 @@ export async function fetchActivities(
   eventType?: string,
   series?: string,
   category?: string,
+  scholarId?: string,
 ): Promise<ActivityListResponse> {
   const params = new URLSearchParams({
     page: String(page),
@@ -265,6 +266,7 @@ export async function fetchActivities(
   if (category) params.set("category", category);
   if (eventType) params.set("event_type", eventType);
   if (series) params.set("series", series);
+  if (scholarId) params.set("scholar_id", scholarId);
 
   const res = await fetch(`${BASE_URL}/api/v1/events/?${params}`);
   if (!res.ok) throw new Error(`Failed to fetch activities: ${res.status}`);
@@ -329,6 +331,7 @@ export async function deleteActivity(eventId: string): Promise<void> {
 
 export interface ActivityScholarDetail {
   scholar_id: string;
+  scholar_url_hash?: string;
   name: string;
   university?: string;
   department?: string;
@@ -338,13 +341,171 @@ export interface ActivityScholarDetail {
   photo_url?: string;
 }
 
+interface BackendEventScholarItem {
+  scholar_id?: string;
+  scholar_url_hash?: string;
+  url_hash?: string;
+  id?: string;
+  name?: string;
+  scholar_name?: string;
+  display_name?: string;
+  university?: string;
+  institution?: string;
+  department?: string;
+  position?: string;
+  title?: string;
+  email?: string;
+  photo_url?: string;
+  avatar_url?: string;
+  research_areas?: unknown;
+  scholar?: {
+    url_hash?: string;
+    id?: string;
+    name?: string;
+    university?: string;
+    department?: string;
+    position?: string;
+    email?: string;
+    photo_url?: string;
+    avatar_url?: string;
+    research_areas?: unknown;
+  };
+}
+
+interface BackendScholarListItem {
+  url_hash?: string;
+  name?: string;
+  university?: string;
+  department?: string;
+  position?: string;
+  email?: string;
+  photo_url?: string;
+  research_areas?: unknown;
+}
+
+interface BackendScholarListResponse {
+  total_pages?: number;
+  items?: BackendScholarListItem[];
+}
+
+function parseResearchAreas(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const areas = raw
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean);
+  return areas.length > 0 ? areas : undefined;
+}
+
+function normalizeEventScholarItem(raw: BackendEventScholarItem): ActivityScholarDetail {
+  const nested = raw.scholar ?? {};
+  const scholarId = String(
+    raw.scholar_id ??
+      raw.scholar_url_hash ??
+      raw.url_hash ??
+      nested.url_hash ??
+      nested.id ??
+      raw.id ??
+      "",
+  ).trim();
+  const scholarUrlHash = String(
+    raw.scholar_url_hash ?? raw.url_hash ?? nested.url_hash ?? "",
+  ).trim();
+  const name = String(
+    raw.name ?? raw.scholar_name ?? raw.display_name ?? nested.name ?? "",
+  ).trim();
+
+  return {
+    scholar_id: scholarId,
+    scholar_url_hash: scholarUrlHash || undefined,
+    name: name || "未命名学者",
+    university: String(raw.university ?? raw.institution ?? nested.university ?? "").trim() || undefined,
+    department: String(raw.department ?? nested.department ?? "").trim() || undefined,
+    position: String(raw.position ?? raw.title ?? nested.position ?? "").trim() || undefined,
+    email: String(raw.email ?? nested.email ?? "").trim() || undefined,
+    photo_url: String(raw.photo_url ?? raw.avatar_url ?? nested.photo_url ?? nested.avatar_url ?? "").trim() || undefined,
+    research_areas: parseResearchAreas(raw.research_areas ?? nested.research_areas),
+  };
+}
+
+async function fetchActivityScholarsViaScholarList(
+  eventId: string,
+): Promise<ActivityScholarDetail[]> {
+  const firstRes = await fetch(
+    `${BASE_URL}/api/v1/scholars?page=1&page_size=200&participated_event_id=${encodeURIComponent(eventId)}`,
+  );
+  if (!firstRes.ok) {
+    throw new Error(`Failed to fetch activity scholars from scholar list: ${firstRes.status}`);
+  }
+
+  const firstData: BackendScholarListResponse = await firstRes.json();
+  const totalPages = Math.max(1, Number(firstData.total_pages ?? 1));
+  const allItems: BackendScholarListItem[] = [...(firstData.items ?? [])];
+
+  if (totalPages > 1) {
+    const pageRequests: Promise<BackendScholarListResponse>[] = [];
+    for (let page = 2; page <= totalPages; page += 1) {
+      pageRequests.push(
+        fetch(
+          `${BASE_URL}/api/v1/scholars?page=${page}&page_size=200&participated_event_id=${encodeURIComponent(eventId)}`,
+        ).then(async (res) => {
+          if (!res.ok) {
+            throw new Error(
+              `Failed to fetch activity scholars page ${page}: ${res.status}`,
+            );
+          }
+          return res.json() as Promise<BackendScholarListResponse>;
+        }),
+      );
+    }
+    const pageData = await Promise.all(pageRequests);
+    pageData.forEach((data) => {
+      allItems.push(...(data.items ?? []));
+    });
+  }
+
+  const scholars: ActivityScholarDetail[] = [];
+  for (const item of allItems) {
+    const urlHash = String(item.url_hash ?? "").trim();
+    if (!urlHash) continue;
+    const name = String(item.name ?? "").trim();
+    scholars.push({
+      scholar_id: urlHash,
+      scholar_url_hash: urlHash,
+      name: name || "未命名学者",
+      university: String(item.university ?? "").trim() || undefined,
+      department: String(item.department ?? "").trim() || undefined,
+      position: String(item.position ?? "").trim() || undefined,
+      email: String(item.email ?? "").trim() || undefined,
+      photo_url: String(item.photo_url ?? "").trim() || undefined,
+      research_areas: parseResearchAreas(item.research_areas),
+    });
+  }
+  return scholars;
+}
+
 export async function fetchActivityScholars(
   eventId: string,
 ): Promise<ActivityScholarDetail[]> {
+  try {
+    const scholarsFromList = await fetchActivityScholarsViaScholarList(eventId);
+    if (scholarsFromList.length > 0) {
+      return scholarsFromList;
+    }
+  } catch {
+    // Fallback to /events/{id}/scholars for compatibility with older backends.
+  }
+
   const res = await fetch(`${BASE_URL}/api/v1/events/${eventId}/scholars`);
-  if (!res.ok)
+  if (!res.ok) {
     throw new Error(`Failed to fetch activity scholars: ${res.status}`);
-  return res.json();
+  }
+  const raw = await res.json();
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((item) => normalizeEventScholarItem(item as BackendEventScholarItem))
+    .filter((item) => item.scholar_id || item.name);
 }
 
 export async function addActivityScholar(
@@ -370,6 +531,182 @@ export async function removeActivityScholar(
   );
   if (!res.ok)
     throw new Error(`Failed to remove scholar from activity: ${res.status}`);
+}
+
+const SCHOLAR_ACTIVITY_CACHE_TTL_MS = 2 * 60 * 1000;
+const scholarActivityCache = new Map<
+  string,
+  { expiresAt: number; items: ActivityEvent[] }
+>();
+const scholarActivityInFlight = new Map<string, Promise<ActivityEvent[]>>();
+
+function normalizeScholarKey(raw: unknown): string {
+  return String(raw ?? "").trim().toLowerCase();
+}
+
+function sortActivitiesByDateDesc(items: ActivityEvent[]): ActivityEvent[] {
+  return [...items].sort((a, b) => {
+    const aTime = new Date(a.event_date).getTime();
+    const bTime = new Date(b.event_date).getTime();
+    const safeATime = Number.isNaN(aTime) ? 0 : aTime;
+    const safeBTime = Number.isNaN(bTime) ? 0 : bTime;
+    return safeBTime - safeATime;
+  });
+}
+
+async function fetchActivitiesByScholarId(
+  scholarId: string,
+): Promise<ActivityEvent[]> {
+  const firstPage = await fetchActivities(1, 100, undefined, undefined, undefined, scholarId);
+  const allItems: ActivityEvent[] = [...firstPage.items];
+
+  if (firstPage.total_pages > 1) {
+    const requests: Promise<ActivityListResponse>[] = [];
+    for (let page = 2; page <= firstPage.total_pages; page += 1) {
+      requests.push(fetchActivities(page, 100, undefined, undefined, undefined, scholarId));
+    }
+    const pageResults = await Promise.all(requests);
+    pageResults.forEach((pageResult) => {
+      allItems.push(...pageResult.items);
+    });
+  }
+
+  return allItems;
+}
+
+async function fetchAllActivitiesForScholarScan(): Promise<ActivityEvent[]> {
+  const firstPage = await fetchActivities(1, 100);
+  const allItems: ActivityEvent[] = [...firstPage.items];
+
+  if (firstPage.total_pages > 1) {
+    const requests: Promise<ActivityListResponse>[] = [];
+    for (let page = 2; page <= firstPage.total_pages; page += 1) {
+      requests.push(fetchActivities(page, 100));
+    }
+    const pageResults = await Promise.all(requests);
+    pageResults.forEach((pageResult) => {
+      allItems.push(...pageResult.items);
+    });
+  }
+
+  return allItems;
+}
+
+async function eventContainsScholar(
+  eventId: string,
+  targetScholarKey: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/events/${eventId}/scholars`);
+    if (!res.ok) return false;
+    const raw = await res.json();
+    if (!Array.isArray(raw)) return false;
+
+    return raw.some((item) => {
+      // Old backend shape: ["url_hash_1", "url_hash_2", ...]
+      if (typeof item === "string" || typeof item === "number") {
+        return normalizeScholarKey(item) === targetScholarKey;
+      }
+      if (!item || typeof item !== "object") return false;
+      const record = item as BackendEventScholarItem;
+      const nested = record.scholar ?? {};
+      const candidates = [
+        record.scholar_url_hash,
+        record.url_hash,
+        nested.url_hash,
+        record.scholar_id,
+        record.id,
+        nested.id,
+      ];
+      return candidates.some(
+        (candidate) => normalizeScholarKey(candidate) === targetScholarKey,
+      );
+    });
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchScholarActivities(
+  scholarUrlHash: string,
+): Promise<ActivityEvent[]> {
+  const key = normalizeScholarKey(scholarUrlHash);
+  if (!key) return [];
+
+  const now = Date.now();
+  const cached = scholarActivityCache.get(key);
+  if (cached && cached.expiresAt > now) {
+    return cached.items;
+  }
+
+  const pending = scholarActivityInFlight.get(key);
+  if (pending) {
+    return pending;
+  }
+
+  const request = (async () => {
+    // Fast path: leverage backend filtering directly when available.
+    try {
+      const directMatches = await fetchActivitiesByScholarId(key);
+      if (directMatches.length > 0) {
+        const directSorted = sortActivitiesByDateDesc(directMatches);
+        scholarActivityCache.set(key, {
+          expiresAt: Date.now() + SCHOLAR_ACTIVITY_CACHE_TTL_MS,
+          items: directSorted,
+        });
+        return directSorted;
+      }
+    } catch {
+      // Fallback to reverse scan for compatibility.
+    }
+
+    const allActivities = await fetchAllActivitiesForScholarScan();
+    const candidates = allActivities.filter(
+      (activity) => Number(activity.scholar_count ?? 0) > 0,
+    );
+    if (candidates.length === 0) {
+      scholarActivityCache.set(key, {
+        expiresAt: Date.now() + SCHOLAR_ACTIVITY_CACHE_TTL_MS,
+        items: [],
+      });
+      return [];
+    }
+
+    const matches: ActivityEvent[] = [];
+    const batchSize = 8;
+
+    for (let i = 0; i < candidates.length; i += batchSize) {
+      const batch = candidates.slice(i, i + batchSize);
+      const checked = await Promise.all(
+        batch.map(async (activity) => {
+          const isMatch = await eventContainsScholar(activity.id, key);
+          return isMatch ? activity : null;
+        }),
+      );
+      checked.forEach((item) => {
+        if (item) matches.push(item);
+      });
+    }
+
+    const unique = new Map<string, ActivityEvent>();
+    matches.forEach((item) => {
+      unique.set(item.id, item);
+    });
+    const sorted = sortActivitiesByDateDesc(Array.from(unique.values()));
+
+    scholarActivityCache.set(key, {
+      expiresAt: Date.now() + SCHOLAR_ACTIVITY_CACHE_TTL_MS,
+      items: sorted,
+    });
+    return sorted;
+  })();
+
+  scholarActivityInFlight.set(key, request);
+  try {
+    return await request;
+  } finally {
+    scholarActivityInFlight.delete(key);
+  }
 }
 
 // ============================================================================

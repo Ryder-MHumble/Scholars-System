@@ -65,7 +65,6 @@ interface InstitutionListViewState {
 }
 
 const INSTITUTION_LIST_RETURN_TO_KEY = "institution_list_return_to";
-const INSTITUTION_LIST_VIEW_STATE_KEY = "institution_list_view_state";
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, "");
@@ -141,14 +140,7 @@ export default function InstitutionListPage() {
   const restoreStateFromLocation =
     (location.state as { restoreInstitutionListState?: InstitutionListViewState })
       ?.restoreInstitutionListState ?? null;
-  let restoreStateFromSession: InstitutionListViewState | null = null;
-  try {
-    const raw = window.sessionStorage.getItem(INSTITUTION_LIST_VIEW_STATE_KEY);
-    restoreStateFromSession = raw ? (JSON.parse(raw) as InstitutionListViewState) : null;
-  } catch {
-    restoreStateFromSession = null;
-  }
-  const restoreState = restoreStateFromLocation ?? restoreStateFromSession;
+  const restoreState = restoreStateFromLocation;
 
   const apiFilters = useMemo(() => mapSubtabToFilters(subtab), [subtab]);
   const [searchQuery, setSearchQuery] = useState(
@@ -186,6 +178,11 @@ export default function InstitutionListPage() {
   const [moduleTotal, setModuleTotal] = useState(0);
   const [moduleLoading, setModuleLoading] = useState(false);
   const [moduleError, setModuleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSearchInput("");
+    setSearchQuery("");
+  }, [subtab]);
 
   const listFilters = useMemo(
     () => ({
@@ -398,13 +395,6 @@ export default function InstitutionListPage() {
     window.sessionStorage.setItem(INSTITUTION_LIST_RETURN_TO_KEY, returnTo);
   }, [location.pathname, location.search]);
 
-  useEffect(() => {
-    window.sessionStorage.setItem(
-      INSTITUTION_LIST_VIEW_STATE_KEY,
-      JSON.stringify(buildListState()),
-    );
-  }, [buildListState]);
-
   const filteredInstitutions = useMemo<InstitutionListItem[]>(() => {
     if (isModuleSubtab) return moduleInstitutions;
     if (!Array.isArray(institutions)) return [];
@@ -425,9 +415,11 @@ export default function InstitutionListPage() {
     if (Array.isArray(filteredInstitutions)) {
       filteredInstitutions.forEach((inst) => {
         const normalizedSub =
-          inst.sub_classification === "京内高校"
+          inst.sub_classification === "境内高校"
             ? "京内高校"
-            : inst.sub_classification;
+            : inst.sub_classification === "京外C9"
+              ? "京外C9高校"
+              : inst.sub_classification;
         if (normalizedSub && normalizedSub in grouped) {
           grouped[normalizedSub as JointSubcategory].push(inst);
           return;

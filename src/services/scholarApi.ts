@@ -482,9 +482,7 @@ function normalizeScholarProjectFields<T extends ScholarProjectFields>(
     participated_event_ids: normalizeParticipatedEventIds(
       scholar.participated_event_ids,
     ),
-    is_cobuild_scholar: Boolean(
-      mergedTags.length > 0 || eventTags.length > 0 || scholar.is_cobuild_scholar,
-    ),
+    is_cobuild_scholar: mergedTags.length > 0,
     project_category: first.category,
     project_subcategory: first.subcategory,
   };
@@ -513,8 +511,7 @@ function buildRelationPayload(data: RelationPatch): Record<string, unknown> {
 
   if (payload.is_cobuild_scholar === undefined) {
     const hasProjectTags = Array.isArray(payload.project_tags) && payload.project_tags.length > 0;
-    const hasEventTags = Array.isArray(payload.event_tags) && payload.event_tags.length > 0;
-    payload.is_cobuild_scholar = hasProjectTags || hasEventTags;
+    payload.is_cobuild_scholar = hasProjectTags;
   }
 
   delete payload.project_category;

@@ -179,24 +179,12 @@ function UniversityLogo({
 
   if (logoSrc && !imgFailed) {
     return (
-      <div
-        className={
-          isHero
-            ? "w-full h-full rounded-2xl bg-white flex items-center justify-center overflow-hidden"
-            : "w-14 h-14 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center overflow-hidden shrink-0 p-1"
-        }
-      >
-        <img
-          src={logoSrc}
-          alt={`${name} logo`}
-          className={
-            isHero
-              ? "w-full h-full object-contain scale-[1.12]"
-              : "w-full h-full object-contain"
-          }
-          onError={() => setImgFailed(true)}
-        />
-      </div>
+      <img
+        src={logoSrc}
+        alt={`${name} logo`}
+        className={isHero ? "w-full h-full object-contain" : "w-14 h-14 object-contain shrink-0"}
+        onError={() => setImgFailed(true)}
+      />
     );
   }
 
@@ -204,8 +192,8 @@ function UniversityLogo({
     <div
       className={
         isHero
-          ? `w-full h-full rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`
-          : `w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0 shadow-md`
+          ? `w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`
+          : `w-14 h-14 bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`
       }
     >
       <span
@@ -253,15 +241,13 @@ export function InstitutionCard({
       className="group relative bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-slate-200 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer overflow-hidden"
     >
       <div className="grid min-h-[150px] h-full grid-cols-[104px_minmax(0,1fr)] md:grid-cols-[116px_minmax(0,1fr)]">
-        <div className="relative bg-gradient-to-b from-slate-50/70 to-white border-r border-slate-100 flex items-center justify-center p-2">
-          <div className="relative w-[84px] h-[84px] md:w-[92px] md:h-[92px] rounded-2xl bg-white border border-slate-100 shadow-sm p-1 flex items-center justify-center">
-            <UniversityLogo
-              name={institution.name}
-              id={institution.id}
-              avatar={institution.avatar}
-              mode="hero"
-            />
-          </div>
+        <div className="relative border-r border-slate-100 flex items-center justify-center overflow-hidden">
+          <UniversityLogo
+            name={institution.name}
+            id={institution.id}
+            avatar={institution.avatar}
+            mode="hero"
+          />
         </div>
 
         <div className="relative min-w-0 p-3.5 md:p-4 flex h-full flex-col">

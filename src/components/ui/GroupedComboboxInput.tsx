@@ -16,6 +16,7 @@ interface GroupedComboboxInputProps {
   disabled?: boolean;
   clearable?: boolean;
   maxHeight?: string;
+  showAllOnFocus?: boolean;
 }
 
 export function GroupedComboboxInput({
@@ -27,6 +28,7 @@ export function GroupedComboboxInput({
   disabled,
   clearable = true,
   maxHeight = "400px",
+  showAllOnFocus = false,
 }: GroupedComboboxInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState(value);
@@ -130,7 +132,7 @@ export function GroupedComboboxInput({
   };
 
   const handleInputFocus = () => {
-    setSearchText(value);
+    setSearchText(showAllOnFocus ? "" : value);
     setIsOpen(true);
     setHighlightedIndex(-1);
   };

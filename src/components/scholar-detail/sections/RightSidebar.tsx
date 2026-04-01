@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   GraduationCap,
@@ -9,8 +10,7 @@ import {
   Trash2,
   Loader2,
   ClipboardList,
-  ExternalLink,
-  X,
+  ArrowUpRight,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import {
@@ -23,14 +23,11 @@ import {
   type StudentPatch,
   type ScholarDetail,
 } from "@/services/scholarApi";
-import { getUpdateTypeLabel } from "@/constants/updateTypes";
-import { listItem } from "@/utils/animations";
+import { fetchScholarActivities, type ActivityEvent } from "@/services/activityApi";
 import { SelectInput } from "@/components/ui/SelectInput";
 
 interface Props {
   scholar: ScholarDetail;
-  onShowAddUpdate: () => void;
-  onDeleteUpdate: (index: number) => Promise<void>;
 }
 
 const degreeColor: Record<string, string> = {
@@ -60,11 +57,23 @@ const emptyAddForm = (): StudentCreate => ({
   notes: "",
 });
 
-export function RightSidebar({
-  scholar,
-  onShowAddUpdate,
-  onDeleteUpdate,
-}: Props) {
+function formatActivityDate(event: ActivityEvent): string {
+  const date = new Date(event.event_date);
+  if (Number.isNaN(date.getTime())) return "日期待定";
+  const dateLabel = date.toLocaleDateString("zh-CN");
+  const timeLabel =
+    event.event_time?.trim() ||
+    (() => {
+      const h = date.getHours();
+      const m = date.getMinutes();
+      if (h === 0 && m === 0) return "";
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    })();
+  return timeLabel ? `${dateLabel} ${timeLabel}` : dateLabel;
+}
+
+export function RightSidebar({ scholar }: Props) {
+  const location = useLocation();
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -73,9 +82,32 @@ export function RightSidebar({
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState<StudentCreate>(emptyAddForm());
   const [isSaving, setIsSaving] = useState(false);
+  const [scholarActivities, setScholarActivities] = useState<ActivityEvent[]>([]);
+  const [isActivityLoading, setIsActivityLoading] = useState(true);
 
   // Check if scholar is adjunct supervisor
   const isAdjunctSupervisor = Boolean(scholar.adjunct_supervisor?.status);
+
+  useEffect(() => {
+    let isActive = true;
+    setIsActivityLoading(true);
+    fetchScholarActivities(scholar.url_hash)
+      .then((items) => {
+        if (!isActive) return;
+        setScholarActivities(items);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setScholarActivities([]);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setIsActivityLoading(false);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [scholar.url_hash]);
 
   useEffect(() => {
     if (!isAdjunctSupervisor) {
@@ -162,7 +194,7 @@ export function RightSidebar({
 
   return (
     <aside className="w-80 shrink-0 space-y-4">
-      {/* Scholar Updates Card */}
+      {/* Scholar Activities Card */}
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -173,74 +205,51 @@ export function RightSidebar({
           <ClipboardList className="w-4 h-4 text-primary-600" />
           <h3 className="text-sm font-semibold text-gray-900">学者活动</h3>
           <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-            {scholar.recent_updates.length} 条
+            {scholarActivities.length} 条
           </span>
-          <button
-            onClick={onShowAddUpdate}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 rounded-full transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-            添加
-          </button>
         </div>
 
         <div className="px-5 py-3 max-h-[400px] overflow-y-auto custom-scrollbar">
-          {scholar.recent_updates.length > 0 ? (
+          {isActivityLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
+            </div>
+          ) : scholarActivities.length > 0 ? (
             <div className="space-y-3">
-              {scholar.recent_updates.map((update, i) => (
-                <motion.div
-                  key={i}
-                  variants={listItem}
-                  className="p-3 border border-gray-100 hover:border-primary-200 rounded-lg transition-all duration-200"
+              {scholarActivities.map((activity) => (
+                <Link
+                  key={activity.id}
+                  to={`/activities/${activity.id}`}
+                  state={{
+                    from: {
+                      pathname: location.pathname,
+                      search: location.search,
+                    },
+                  }}
+                  className="block p-3 border border-gray-100 hover:border-primary-200 rounded-lg transition-all duration-200 hover:bg-primary-50/30"
                 >
-                  <div className="flex items-start justify-between mb-1.5">
-                    <span className="text-xs font-medium text-gray-900 line-clamp-1">
-                      {update.title ||
-                        getUpdateTypeLabel(update.update_type ?? "general")}
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <span className="text-xs font-medium text-gray-900 line-clamp-2">
+                      {activity.title || "未命名活动"}
                     </span>
-                    {update.added_by?.startsWith("user:") && (
-                      <button
-                        onClick={() => onDeleteUpdate(i)}
-                        className="ml-1 p-0.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors shrink-0"
-                        title="删除"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
+                    <ArrowUpRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                   </div>
-                  {update.content && (
-                    <p className="text-xs text-gray-600 leading-relaxed line-clamp-2 mb-1.5">
-                      {update.content}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                    {update.update_type && (
-                      <span className="bg-gray-100 px-1.5 py-0.5 rounded">
-                        {getUpdateTypeLabel(update.update_type)}
-                      </span>
-                    )}
-                    {update.published_at && (
-                      <span>{update.published_at.slice(0, 10)}</span>
-                    )}
-                    {update.source_url && (
-                      <a
-                        href={update.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline flex items-center gap-0.5"
-                      >
-                        <ExternalLink className="w-2.5 h-2.5" />
-                        来源
-                      </a>
-                    )}
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500">
+                    <span className="bg-gray-100 px-1.5 py-0.5 rounded">
+                      {activity.event_type || "活动"}
+                    </span>
+                    <span className="bg-gray-100 px-1.5 py-0.5 rounded">
+                      {activity.category || "未分类"}
+                    </span>
+                    <span>{formatActivityDate(activity)}</span>
                   </div>
-                </motion.div>
+                </Link>
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2 py-8">
               <ClipboardList className="w-8 h-8 text-gray-200" />
-              <p className="text-sm text-gray-400">暂无动态更新</p>
+              <p className="text-sm text-gray-400">暂无关联活动</p>
             </div>
           )}
         </div>

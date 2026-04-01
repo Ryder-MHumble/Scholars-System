@@ -1,4 +1,5 @@
 import { BASE_URL } from "@/services/scholarApi";
+import { ACADEMIC_MONITOR_BASE_URL } from "@/services/apiBase";
 
 export interface StudentRecord {
   id: string;
@@ -79,13 +80,73 @@ export interface StudentFilterOptions {
 }
 
 export interface StudentPaperRecord {
+  paper_uid?: string;
+  doi?: string | null;
+  arxiv_id?: string | null;
+  abstract?: string | null;
+  publication_date?: string | null;
+  source?: string | null;
+  authors?: string[];
+  affiliations?: string[];
+  matched_tokens?: string[];
+  assessed_at?: string | null;
+  created_at?: string | null;
   id?: string;
   title: string;
   venue?: string;
   year?: string | number;
   compliance_status?: string;
   compliance_note?: string;
+  affiliation_status?: string | null;
+  compliance_reason?: string | null;
 }
+
+export interface AcademicStudentSummary {
+  target_key: string;
+  name: string;
+  target_type: string;
+  paper_count: number;
+  compliant_count: number;
+  non_compliant_count: number;
+  unknown_count: number;
+}
+
+export interface AcademicStudentsResponse {
+  items: AcademicStudentSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface AcademicPaperUpsertPayload {
+  title: string;
+  doi?: string | null;
+  arxiv_id?: string | null;
+  abstract?: string | null;
+  publication_date?: string | null;
+  source?: string | null;
+  authors?: string[];
+  affiliations?: string[];
+  affiliation_status?: string | null;
+  compliance_reason?: string | null;
+  matched_tokens?: string[];
+  assessed_at?: string | null;
+}
+
+export interface AcademicPaperCompliancePayload {
+  affiliation_status?: string | null;
+  compliance_reason?: string | null;
+  matched_tokens?: string[];
+  assessed_at?: string | null;
+}
+
+export interface AcademicStudentPapersResponse {
+  items: StudentPaperRecord[];
+  total: number;
+}
+
+const ACADEMIC_V1_BASE = `${ACADEMIC_MONITOR_BASE_URL}/api/v1`;
 
 export async function fetchStudentList(
   filters: StudentListFilters = {},
@@ -220,4 +281,96 @@ export async function deleteStudent(studentId: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`Failed to delete student: ${res.status}`);
+}
+
+export async function fetchAcademicStudents(
+  keyword?: string,
+  page = 1,
+  pageSize = 100,
+  signal?: AbortSignal,
+): Promise<AcademicStudentsResponse> {
+  const sp = new URLSearchParams();
+  if (keyword?.trim()) sp.set("keyword", keyword.trim());
+  sp.set("page", String(page));
+  sp.set("page_size", String(pageSize));
+
+  const res = await fetch(
+    `${ACADEMIC_V1_BASE}/students?${sp.toString()}`,
+    { signal },
+  );
+  if (!res.ok) throw new Error(`Failed to fetch academic students: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchAcademicStudentPapers(
+  targetKey: string,
+  signal?: AbortSignal,
+): Promise<AcademicStudentPapersResponse> {
+  const res = await fetch(
+    `${ACADEMIC_V1_BASE}/students/${encodeURIComponent(targetKey)}/papers`,
+    { signal },
+  );
+  if (!res.ok) throw new Error(`Failed to fetch academic papers: ${res.status}`);
+  return res.json();
+}
+
+export async function createAcademicPaper(
+  targetKey: string,
+  payload: AcademicPaperUpsertPayload,
+): Promise<{ status: string; paper_uid: string }> {
+  const res = await fetch(
+    `${ACADEMIC_V1_BASE}/students/${encodeURIComponent(targetKey)}/papers`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) throw new Error(`Failed to create paper: ${res.status}`);
+  return res.json();
+}
+
+export async function updateAcademicPaper(
+  targetKey: string,
+  paperUid: string,
+  payload: AcademicPaperUpsertPayload,
+): Promise<{ status: string; paper_uid: string }> {
+  const res = await fetch(
+    `${ACADEMIC_V1_BASE}/students/${encodeURIComponent(targetKey)}/papers/${encodeURIComponent(paperUid)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) throw new Error(`Failed to update paper: ${res.status}`);
+  return res.json();
+}
+
+export async function updateAcademicPaperCompliance(
+  targetKey: string,
+  paperUid: string,
+  payload: AcademicPaperCompliancePayload,
+): Promise<{ status: string; paper_uid: string }> {
+  const res = await fetch(
+    `${ACADEMIC_V1_BASE}/students/${encodeURIComponent(targetKey)}/papers/${encodeURIComponent(paperUid)}/compliance`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) throw new Error(`Failed to update compliance: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteAcademicPaper(
+  targetKey: string,
+  paperUid: string,
+): Promise<void> {
+  const res = await fetch(
+    `${ACADEMIC_V1_BASE}/students/${encodeURIComponent(targetKey)}/papers/${encodeURIComponent(paperUid)}`,
+    { method: "DELETE" },
+  );
+  if (!res.ok) throw new Error(`Failed to delete paper: ${res.status}`);
 }

@@ -141,7 +141,7 @@ export function ActivityScholarsModal({
                 <ScholarSearchPicker
                   onSelect={handleAddScholar}
                   placeholder="输入学者姓名、院校或研究方向搜索..."
-                  excludeIds={scholars.map((s) => s.scholar_id)}
+                  excludeIds={scholars.map((s) => s.scholar_id).filter(Boolean)}
                 />
                 <p className="mt-2 text-xs text-gray-500">
                   💡 从学者库中搜索添加，搜索不到可点击「新增学者到学者库」
@@ -166,16 +166,27 @@ export function ActivityScholarsModal({
                   </div>
                 ) : scholars.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3">
-                    {scholars.map((scholar, index) => (
-                      <motion.div
-                        key={scholar.scholar_id}
+                    {scholars.map((scholar, index) => {
+                      const scholarLinkId = String(
+                        scholar.scholar_url_hash ?? scholar.scholar_id ?? "",
+                      ).trim();
+                      const scholarKey = String(
+                        scholar.scholar_id || scholar.scholar_url_hash || scholar.name,
+                      ).trim();
+                      return (
+                        <motion.div
+                        key={`${scholarKey}-${index}`}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                         exit={{ opacity: 0, x: -10 }}
                         className="flex items-start gap-4 p-4 bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all group"
                       >
-                        <ScholarAvatar name={scholar.name} size={48} />
+                        <ScholarAvatar
+                          name={scholar.name}
+                          photoUrl={scholar.photo_url}
+                          size={48}
+                        />
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-3">
@@ -241,15 +252,24 @@ export function ActivityScholarsModal({
                             </div>
 
                             <div className="flex items-center gap-2">
-                              <a
-                                href={`/scholars/${scholar.scholar_id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                                title="查看详情"
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
+                              {scholarLinkId ? (
+                                <a
+                                  href={`/scholars/${scholarLinkId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                  title="查看详情"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              ) : (
+                                <span
+                                  className="p-2 text-gray-300 rounded-lg"
+                                  title="缺少学者详情ID"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </span>
+                              )}
                               <button
                                 onClick={() =>
                                   handleRemoveScholar(scholar.scholar_id)
@@ -263,7 +283,8 @@ export function ActivityScholarsModal({
                           </div>
                         </div>
                       </motion.div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-16 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">

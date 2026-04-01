@@ -11,6 +11,10 @@ import { useUniversityCounts } from "@/hooks/useUniversityCounts";
 import type { UniNode } from "@/components/common/UniversitySidebarTree";
 import { parseSubtabFilter } from "@/utils/institutionClassifier";
 import { exportScholarsToExcel } from "@/utils/scholarExporter";
+import {
+  PROJECT_CATEGORIES,
+  normalizeProjectSubcategoryLabel,
+} from "@/constants/projectCategories";
 
 const PAGE_SIZE = 20;
 
@@ -54,26 +58,29 @@ const PROJECT_PARENT_CATEGORY_MAP: Record<string, string> = {
   talent: "人才引育",
 };
 
-const MENTOR_FILTER_OPTIONS = [
-  "全部",
-  "全部共建导师",
-  "科技教育委员会",
-  "学术委员会",
-  "教学委员会",
-  "学院学生高校导师",
-  "全职导师",
-  "产业导师",
-  "兼职导师",
-  "科研立项",
-  "卓工公派",
-] as const;
+interface MentorTypeGroup {
+  label: string;
+  options: string[];
+}
 
-const MENTOR_SUBCATEGORY_ALIASES: Record<string, string[]> = {
-  科技教育委员会: ["科技育青委员会"],
-  科技育青委员会: ["科技教育委员会"],
-  学院学生高校导师: ["学院学生事务导师"],
-  学院学生事务导师: ["学院学生高校导师"],
-};
+const PROJECT_PRIMARY_OPTIONS = Object.keys(PROJECT_CATEGORIES);
+const MENTOR_FILTER_GROUPS: MentorTypeGroup[] = [
+  { label: "通用", options: ["全部", "全部共建导师"] },
+  ...PROJECT_PRIMARY_OPTIONS.map((category) => ({
+    label: category,
+    options: [
+      category,
+      ...Array.from(
+        PROJECT_CATEGORIES[category as keyof typeof PROJECT_CATEGORIES]
+          .subcategories,
+      ),
+    ],
+  })),
+];
+
+const MENTOR_FILTER_OPTIONS: string[] = Array.from(
+  new Set(MENTOR_FILTER_GROUPS.flatMap((group) => group.options)),
+);
 
 function normalizeLabel(value: string): string {
   return value.trim().replace(/\s+/g, "");
@@ -83,14 +90,18 @@ function getScholarMentorSubcategories(item: ScholarListItem): string[] {
   const result: string[] = [];
   const seen = new Set<string>();
   for (const tag of item.project_tags ?? []) {
-    const sub = String(tag.subcategory ?? "").trim();
+    const sub = normalizeProjectSubcategoryLabel(
+      String(tag.subcategory ?? "").trim(),
+    );
     if (!sub) continue;
     const key = normalizeLabel(sub);
     if (seen.has(key)) continue;
     seen.add(key);
     result.push(sub);
   }
-  const legacySubcategory = String(item.project_subcategory ?? "").trim();
+  const legacySubcategory = normalizeProjectSubcategoryLabel(
+    String(item.project_subcategory ?? "").trim(),
+  );
   if (legacySubcategory) {
     const legacyKey = normalizeLabel(legacySubcategory);
     if (!seen.has(legacyKey)) {
@@ -101,10 +112,37 @@ function getScholarMentorSubcategories(item: ScholarListItem): string[] {
   return result;
 }
 
+function getScholarProjectCategories(item: ScholarListItem): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const tag of item.project_tags ?? []) {
+    const category = String(tag.category ?? "").trim();
+    if (!category) continue;
+    const key = normalizeLabel(category);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(category);
+  }
+  const legacyCategory = String(item.project_category ?? "").trim();
+  if (legacyCategory) {
+    const key = normalizeLabel(legacyCategory);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(legacyCategory);
+    }
+  }
+  return result;
+}
+
 function isCobuildScholar(item: ScholarListItem): boolean {
+  const hasProjectTags = (item.project_tags?.length ?? 0) > 0;
+  const hasLegacyProjectCategory = Boolean(
+    String(item.project_category ?? "").trim() ||
+      String(item.project_subcategory ?? "").trim(),
+  );
   return (
-    Boolean(item.is_cobuild_scholar) ||
-    (item.project_tags?.length ?? 0) > 0 ||
+    hasProjectTags ||
+    hasLegacyProjectCategory ||
     Boolean(item.adjunct_supervisor?.status)
   );
 }
@@ -113,18 +151,24 @@ function matchesMentorType(item: ScholarListItem, mentorType: string): boolean {
   if (!mentorType || mentorType === "全部") return true;
   if (mentorType === "全部共建导师") return isCobuildScholar(item);
 
+  if (PROJECT_PRIMARY_OPTIONS.includes(mentorType)) {
+    const target = normalizeLabel(mentorType);
+    const categories = getScholarProjectCategories(item).map(normalizeLabel);
+    return categories.includes(target);
+  }
+
+  const normalizedMentorType =
+    normalizeProjectSubcategoryLabel(mentorType) || mentorType;
+
   if (mentorType === "兼职导师") {
     const subs = getScholarMentorSubcategories(item).map(normalizeLabel);
     if (subs.includes(normalizeLabel("兼职导师"))) return true;
     return Boolean(item.adjunct_supervisor?.status);
   }
 
-  const target = normalizeLabel(mentorType);
-  const aliases = (MENTOR_SUBCATEGORY_ALIASES[mentorType] ?? []).map(
-    normalizeLabel,
-  );
+  const target = normalizeLabel(normalizedMentorType);
   const subs = getScholarMentorSubcategories(item).map(normalizeLabel);
-  return subs.some((value) => value === target || aliases.includes(value));
+  return subs.includes(target);
 }
 
 function buildUniNodesFromScholars(items: ScholarListItem[]): UniNode[] {
@@ -654,6 +698,10 @@ export function useScholarList() {
     clearAll,
     mentorType,
     mentorTypeOptions: [...MENTOR_FILTER_OPTIONS],
+    mentorTypeGroups: MENTOR_FILTER_GROUPS.map((group) => ({
+      label: group.label,
+      options: [...group.options],
+    })),
     handleChangeMentorType,
 
     // Data & pagination

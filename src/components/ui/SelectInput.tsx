@@ -50,6 +50,7 @@ export function SelectInput({
       disabled={disabled}
       className={className}
       clearable={Boolean(placeholder)}
+      showAllOnFocus
     />
   );
 }

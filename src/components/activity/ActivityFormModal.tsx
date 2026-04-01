@@ -130,13 +130,19 @@ export function ActivityFormModal({
           }
 
           const scholars = await fetchActivityScholars(activity.id).catch(() => []);
-          setSelectedScholars(
-            scholars.map((s) => ({
-              scholar_id: s.scholar_id,
+          const mappedScholars: SelectedScholar[] = [];
+          for (const s of scholars) {
+            const scholarId = String(
+              s.scholar_url_hash ?? s.scholar_id ?? "",
+            ).trim();
+            if (!scholarId) continue;
+            mappedScholars.push({
+              scholar_id: scholarId,
               name: s.name,
               institution: s.university,
-            })),
-          );
+            });
+          }
+          setSelectedScholars(mappedScholars);
         } catch {
           setFormData({
             ...defaultForm,

@@ -14,7 +14,6 @@ import {
   type AwardRecord,
   type EducationRecord,
   type ScholarProjectTag,
-  type ScholarEventTag,
 } from "@/services/scholarApi";
 
 export function useScholarDetail(scholarId: string | undefined) {
@@ -148,12 +147,10 @@ export function useScholarDetail(scholarId: string | undefined) {
   // -- Project category save --
   const handleProjectCategorySave = async (
     projectTags: ScholarProjectTag[],
-    eventTags: ScholarEventTag[],
   ) => {
     await withScholar((urlHash) => patchScholarRelation(urlHash, {
       project_tags: projectTags,
-      event_tags: eventTags,
-      is_cobuild_scholar: projectTags.length > 0 || eventTags.length > 0,
+      is_cobuild_scholar: projectTags.length > 0,
     }));
   };
 

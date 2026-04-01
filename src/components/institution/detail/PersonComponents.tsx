@@ -130,17 +130,17 @@ export function LeadershipCardList({ leaders }: { leaders: LeadershipMember[] })
   }
 
   const renderCardContent = (leader: LeadershipMember) => (
-    <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-4 min-h-[148px]">
+    <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-3 min-h-[108px]">
       <div className="h-full py-0.5">
         <LeaderAvatar name={leader.name} avatarUrl={leader.avatar_url} />
       </div>
       <div className="min-w-0 h-full flex flex-col">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[17px] font-bold text-slate-800 leading-tight truncate">
+            <p className="text-[15px] font-bold text-slate-800 leading-tight truncate">
               {leader.name}
             </p>
-            <p className="mt-0.5 text-sm font-semibold text-blue-700">{leader.role}</p>
+            <p className="mt-0.5 text-[13px] font-semibold text-blue-700 line-clamp-1">{leader.role}</p>
           </div>
           {leader.profile_url ? (
             <div className="inline-flex items-center gap-1 text-[11px] text-slate-400 shrink-0">
@@ -150,7 +150,7 @@ export function LeadershipCardList({ leaders }: { leaders: LeadershipMember[] })
           ) : null}
         </div>
 
-        <p className="mt-2.5 text-sm leading-6 text-slate-600 break-words overflow-hidden line-clamp-4 flex-1">
+        <p className="mt-1.5 text-[12px] leading-5 text-slate-600 break-words overflow-hidden line-clamp-3 flex-1">
           {getLeaderSnippet(leader)}
         </p>
       </div>
@@ -158,7 +158,7 @@ export function LeadershipCardList({ leaders }: { leaders: LeadershipMember[] })
   );
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
       {leaders.map((leader, i) => (
         leader.profile_url ? (
           <motion.a
@@ -170,7 +170,7 @@ export function LeadershipCardList({ leaders }: { leaders: LeadershipMember[] })
             target="_blank"
             rel="noreferrer"
             title="点击查看个人主页"
-            className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 hover:bg-white hover:shadow-md transition-all cursor-pointer"
+            className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 hover:bg-white hover:shadow-md transition-all cursor-pointer"
           >
             {renderCardContent(leader)}
           </motion.a>
@@ -180,7 +180,7 @@ export function LeadershipCardList({ leaders }: { leaders: LeadershipMember[] })
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2, delay: i * 0.04 }}
-            className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+            className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
           >
             {renderCardContent(leader)}
           </motion.article>

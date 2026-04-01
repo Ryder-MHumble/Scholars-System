@@ -13,6 +13,7 @@ interface ComboboxInputProps {
   maxHeight?: string;
   onSearch?: (query: string) => void;
   className?: string;
+  showAllOnFocus?: boolean;
 }
 
 export function ComboboxInput({
@@ -25,6 +26,7 @@ export function ComboboxInput({
   clearable = true,
   maxHeight = "300px",
   className,
+  showAllOnFocus = false,
 }: ComboboxInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState(value);
@@ -111,7 +113,7 @@ export function ComboboxInput({
   };
 
   const handleInputFocus = () => {
-    setSearchText(value);
+    setSearchText(showAllOnFocus ? "" : value);
     setIsOpen(true);
     setHighlightedIndex(-1);
   };

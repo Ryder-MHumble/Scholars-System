@@ -17,21 +17,15 @@ import { ActivityBatchImportModal } from "@/components/activity/ActivityBatchImp
 import { ActivityCard } from "@/components/activity/ActivityCard";
 import { ActivityCalendar } from "@/components/activity/ActivityCalendar";
 import { ActivityCalendarPanel } from "@/components/activity/ActivityCalendarPanel";
-import { SUBTAB_TO_SERIES } from "@/constants/activityTypes";
+import { SUBTAB_TO_CATEGORY, SUBTAB_TO_SERIES } from "@/constants/activityTypes";
 import {
   createActivity,
   deleteActivity,
   fetchActivities,
-  fetchActivityStats,
 } from "@/services/activityApi";
-import {
-  fetchAllScholars,
-  type ScholarListItem,
-} from "@/services/scholarApi";
 import type {
   ActivityEvent,
   ActivityCreateRequest,
-  ActivityStats,
 } from "@/services/activityApi";
 
 interface ActivityListViewState {
@@ -66,6 +60,7 @@ export default function ActivityListPage() {
   const today = new Date();
 
   const subtab = searchParams.get("subtab") ?? "";
+  const activeCategory = SUBTAB_TO_CATEGORY[subtab] ?? "";
   const activeSeries = SUBTAB_TO_SERIES[subtab] ?? "";
   const restoreStateFromLocation =
     (
@@ -109,10 +104,7 @@ export default function ActivityListPage() {
     restoreState?.subtab === subtab ? restoreState.searchQuery : "",
   );
   const [allActivities, setAllActivities] = useState<ActivityEvent[]>([]);
-  const [allScholars, setAllScholars] = useState<ScholarListItem[]>([]);
-  const [scholarLoading, setScholarLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<ActivityStats | null>(null);
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [batchImportModalOpen, setBatchImportModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -148,9 +140,6 @@ export default function ActivityListPage() {
           await Promise.allSettled(
             untitledItems.map((item) => deleteActivity(item.id)),
           );
-          fetchActivityStats()
-            .then(setStats)
-            .catch(() => {});
         }
         setAllActivities(allItems.filter((item) => !isUntitledActivity(item)));
       } catch (err) {
@@ -194,7 +183,7 @@ export default function ActivityListPage() {
       return "";
     });
     autoJumped.current = false;
-  }, [activeSeries, restoreState, subtab]);
+  }, [activeSeries, activeCategory, restoreState, subtab]);
 
   useEffect(() => {
     if (pendingSeriesResetRef.current && activeType !== "") {
@@ -202,8 +191,8 @@ export default function ActivityListPage() {
     }
     pendingSeriesResetRef.current = false;
     autoJumped.current = false;
-    void loadActivities(activeType, activeSeries);
-  }, [activeType, activeSeries, loadActivities]);
+    void loadActivities(activeType, activeSeries, activeCategory);
+  }, [activeType, activeSeries, activeCategory, loadActivities]);
 
   useEffect(() => {
     if (
@@ -222,22 +211,6 @@ export default function ActivityListPage() {
       });
     });
   }, [loading, restoreState, subtab]);
-
-  useEffect(() => {
-    fetchActivityStats()
-      .then(setStats)
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setScholarLoading(true);
-    fetchAllScholars(undefined, controller.signal)
-      .then((items) => setAllScholars(items))
-      .catch(() => setAllScholars([]))
-      .finally(() => setScholarLoading(false));
-    return () => controller.abort();
-  }, []);
 
   const dayActivities = useMemo<Record<number, ActivityEvent[]>>(() => {
     const map: Record<number, ActivityEvent[]> = {};
@@ -296,42 +269,20 @@ export default function ActivityListPage() {
     return list;
   }, [allActivities, searchQuery, sortOrder]);
 
-  const taggedScholars = useMemo(() => {
-    const keyword = searchQuery.trim().toLowerCase();
-    return allScholars.filter((scholar) => {
-      const tags = scholar.event_tags ?? [];
-      if (tags.length === 0) return false;
-      if (activeType) {
-        const hit = tags.some(
-          (tag) =>
-            tag.event_type === activeType ||
-            tag.series === activeType ||
-            tag.category === activeType,
-        );
-        if (!hit) return false;
-      }
-      if (activeSeries) {
-        const hit = tags.some(
-          (tag) =>
-            tag.event_type === activeSeries ||
-            tag.series === activeSeries ||
-            tag.category === activeSeries,
-        );
-        if (!hit) return false;
-      }
-      if (!keyword) return true;
-      const fields = [
-        scholar.name,
-        scholar.university,
-        scholar.department,
-        scholar.position,
-        ...(scholar.research_areas ?? []),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return fields.includes(keyword);
-    });
-  }, [allScholars, activeType, activeSeries, searchQuery]);
+  const typeStats = useMemo(
+    () =>
+      Array.from(
+        allActivities.reduce<Map<string, number>>((map, item) => {
+          const eventType = String(item.event_type ?? "").trim();
+          if (!eventType) return map;
+          map.set(eventType, (map.get(eventType) ?? 0) + 1);
+          return map;
+        }, new Map()),
+      )
+        .map(([event_type, count]) => ({ event_type, count }))
+        .sort((a, b) => b.count - a.count),
+    [allActivities],
+  );
 
   const panelTitle = selectedDay
     ? `${currentYear}年${currentMonth + 1}月${selectedDay}日`
@@ -358,10 +309,7 @@ export default function ActivityListPage() {
       setIsSubmitting(true);
       setActionError(null);
       await createActivity(data);
-      await loadActivities(activeType, activeSeries);
-      fetchActivityStats()
-        .then(setStats)
-        .catch(() => {});
+      await loadActivities(activeType, activeSeries, activeCategory);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "操作失败");
       throw err;
@@ -406,20 +354,11 @@ export default function ActivityListPage() {
     );
   }, [buildListState]);
 
-  const openActivityScholars = (activity: ActivityEvent) => {
-    const params = new URLSearchParams({
-      tab: "scholars",
-      participated_event_id: String(activity.id),
-      page: "1",
-    });
-    const title = String(activity.title ?? "").trim();
-    if (title) {
-      params.set("event_title", title);
-    }
-    navigate(`/?${params.toString()}`, {
+  const openActivityDetail = (activity: ActivityEvent) => {
+    navigate(`/activities/${activity.id}`, {
       state: {
         from: location,
-        fromActivityList: buildListState(),
+        restoreActivityListState: buildListState(),
       },
     });
   };
@@ -438,7 +377,7 @@ export default function ActivityListPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
-              {activeSeries || "学术活动"}
+              {activeSeries || activeCategory || "学术活动"}
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">
               共{" "}
@@ -488,53 +427,6 @@ export default function ActivityListPage() {
           </div>
         </div>
 
-        {/* Tagged scholars in current activity category */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">分类关联学者</h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {scholarLoading ? "加载中..." : `当前条件下 ${taggedScholars.length} 位`}
-              </p>
-            </div>
-          </div>
-          {scholarLoading ? (
-            <p className="text-xs text-gray-400">正在加载学者数据...</p>
-          ) : taggedScholars.length === 0 ? (
-            <p className="text-xs text-gray-400">当前活动分类下暂无关联学者</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {taggedScholars.slice(0, 12).map((scholar) => (
-                <button
-                  key={scholar.url_hash}
-                  onClick={() =>
-                    navigate(`/scholars/${scholar.url_hash}`, {
-                      state: { from: location },
-                    })
-                  }
-                  className="text-left border border-gray-200 rounded-lg p-3 hover:border-primary-300 hover:bg-primary-50/30 transition-colors"
-                >
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {scholar.name}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1 truncate">
-                    {scholar.university || "未知机构"}
-                  </p>
-                  {(scholar.event_tags ?? []).length > 0 && (
-                    <p className="text-[11px] text-primary-600 mt-1 truncate">
-                      {(scholar.event_tags ?? [])
-                        .map((tag) => tag.event_type || tag.series || tag.category)
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .join(" · ")}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Type filter + Search */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex flex-wrap gap-2 items-center flex-1">
@@ -551,7 +443,7 @@ export default function ActivityListPage() {
             >
               全部
             </button>
-            {stats?.by_type.map((t) => (
+            {typeStats.map((t) => (
               <button
                 key={t.event_type}
                 onClick={() => {
@@ -617,7 +509,7 @@ export default function ActivityListPage() {
               {cardActivities.map((activity, i) => (
                 <div
                   key={activity.id}
-                  onClick={() => openActivityScholars(activity)}
+                  onClick={() => openActivityDetail(activity)}
                   className="cursor-pointer"
                 >
                   <ActivityCard activity={activity} index={i} />
@@ -642,7 +534,7 @@ export default function ActivityListPage() {
               activities={panelActivities}
               selectedDay={selectedDay}
               onClearDay={() => setSelectedDay(null)}
-              onActivityClick={openActivityScholars}
+              onActivityClick={openActivityDetail}
             />
           </div>
         )}
@@ -664,10 +556,7 @@ export default function ActivityListPage() {
         isOpen={batchImportModalOpen}
         onClose={() => setBatchImportModalOpen(false)}
         onSuccess={() => {
-          loadActivities(activeType, activeSeries);
-          fetchActivityStats()
-            .then(setStats)
-            .catch(() => {});
+          loadActivities(activeType, activeSeries, activeCategory);
         }}
       />
     </div>

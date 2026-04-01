@@ -8,7 +8,6 @@ import type {
   PatentRecord,
   AwardRecord,
   ScholarProjectTag,
-  ScholarEventTag,
 } from "@/services/scholarApi";
 import {
   createScholar,
@@ -146,13 +145,11 @@ export default function AddScholarDetailPage() {
 
   const handleProjectCategorySave = async (
     projectTags: ScholarProjectTag[],
-    eventTags: ScholarEventTag[],
   ) => {
     setScholar((prev) => ({
       ...prev,
       project_tags: projectTags,
-      event_tags: eventTags,
-      is_cobuild_scholar: projectTags.length > 0 || eventTags.length > 0,
+      is_cobuild_scholar: projectTags.length > 0,
     }));
   };
 
@@ -189,10 +186,7 @@ export default function AddScholarDetailPage() {
         education: scholar.education || [],
         bio: scholar.bio || undefined,
         project_tags: scholar.project_tags || [],
-        event_tags: scholar.event_tags || [],
-        is_cobuild_scholar:
-          (scholar.project_tags?.length ?? 0) > 0 ||
-          (scholar.event_tags?.length ?? 0) > 0,
+        is_cobuild_scholar: (scholar.project_tags?.length ?? 0) > 0,
         added_by: "user",
       };
 
@@ -324,7 +318,6 @@ export default function AddScholarDetailPage() {
             >
               <ProjectCategorySelector
                 projectTags={scholar.project_tags ?? []}
-                eventTags={scholar.event_tags ?? []}
                 onSave={handleProjectCategorySave}
               />
 

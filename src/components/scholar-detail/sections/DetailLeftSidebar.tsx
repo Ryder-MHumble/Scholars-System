@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -35,6 +35,11 @@ export function DetailLeftSidebar({
   onEditProfile,
 }: DetailLeftSidebarProps) {
   const [bioExpanded, setBioExpanded] = useState(false);
+  const [photoLoadError, setPhotoLoadError] = useState(false);
+
+  useEffect(() => {
+    setPhotoLoadError(false);
+  }, [scholar.photo_url]);
 
   const bioText = scholar.bio ?? "";
   const bioNeedsExpand = bioText.length > BIO_LIMIT;
@@ -68,11 +73,12 @@ export function DetailLeftSidebar({
         <div className="p-6">
           <div className="flex items-center gap-4 mb-5">
             <div className="flex-shrink-0 relative">
-              {scholar.photo_url ? (
+              {scholar.photo_url && !photoLoadError ? (
                 <img
                   src={scholar.photo_url}
                   alt={scholar.name}
                   className="w-[120px] h-[120px] rounded-2xl object-cover border border-gray-200 shadow-sm"
+                  onError={() => setPhotoLoadError(true)}
                 />
               ) : (
                 <div className="w-[120px] h-[120px] rounded-2xl flex items-center justify-center text-4xl font-bold bg-primary-600 text-white shadow-sm">

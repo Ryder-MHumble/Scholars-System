@@ -40,3 +40,18 @@ export const SUBTAB_TO_SERIES: Record<string, string> = {
   joint_symposium: "共建高校座谈会",
   committee_meeting: "委员会会议",
 };
+
+// Maps URL subtab values (from left navigation) to activity category values
+export const SUBTAB_TO_CATEGORY: Record<string, string> = {
+  education: "教育培养",
+  research: "科研学术",
+  talent: "人才引育",
+  opening_ceremony: "教育培养",
+  joint_symposium: "教育培养",
+  committee_meeting: "教育培养",
+  ai_scientist_summit: "科研学术",
+  xai_forum: "科研学术",
+  academic_conference: "科研学术",
+  youth_forum: "人才引育",
+  intl_summer_school: "人才引育",
+};

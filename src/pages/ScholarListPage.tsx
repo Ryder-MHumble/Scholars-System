@@ -19,7 +19,7 @@ import { ScholarTable } from "@/components/common/ScholarTable";
 import { BatchScholarImportModal } from "@/components/scholar/BatchScholarImportModal";
 import { InstitutionFilterPanel } from "@/components/scholar/InstitutionFilterPanel";
 import { useScholarList } from "@/hooks/useScholarList";
-import { SelectInput } from "@/components/ui/SelectInput";
+import { GroupedComboboxInput } from "@/components/ui/GroupedComboboxInput";
 
 type ViewMode = "list" | "grid";
 
@@ -42,7 +42,7 @@ export default function ScholarListPage() {
     hasAnyFilter,
     clearAll,
     mentorType,
-    mentorTypeOptions,
+    mentorTypeGroups,
     handleChangeMentorType,
     items,
     page,
@@ -142,17 +142,14 @@ export default function ScholarListPage() {
                   <p className="text-xs font-semibold text-gray-500 mb-2">
                     共建导师类别
                   </p>
-                  <SelectInput
+                  <GroupedComboboxInput
                     value={mentorType}
                     onChange={handleChangeMentorType}
-                    className="w-full"
-                  >
-                    {mentorTypeOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </SelectInput>
+                    groups={mentorTypeGroups}
+                    placeholder="选择项目分类"
+                    showAllOnFocus
+                    clearable
+                  />
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap xl:justify-end">
