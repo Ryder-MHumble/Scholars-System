@@ -677,6 +677,11 @@ export default function InstitutionDetailPage() {
           onOpenScholarList={() =>
             navigate(`/?tab=scholars&university=${encodeURIComponent(institution.name)}`)
           }
+          onOpenMentorList={() =>
+            navigate(
+              `/?tab=scholars&university=${encodeURIComponent(institution.name)}&mentor_type=${encodeURIComponent("全部共建导师")}`,
+            )
+          }
           onOpenStudentYear={(year) =>
             navigate(
               `/?tab=students&subtab=student_grade_${year}&university=${encodeURIComponent(institution.name)}`,
@@ -1051,6 +1056,7 @@ function HeroHeader({
   institution,
   yearStudentMetrics,
   onOpenScholarList,
+  onOpenMentorList,
   onOpenStudentYear,
   onOpenStudentAll,
   onBack,
@@ -1060,6 +1066,7 @@ function HeroHeader({
   institution: InstitutionDetail;
   yearStudentMetrics: Array<{ year: string; value: number }>;
   onOpenScholarList: () => void;
+  onOpenMentorList: () => void;
   onOpenStudentYear: (year: string) => void;
   onOpenStudentAll: () => void;
   onBack: () => void;
@@ -1190,6 +1197,9 @@ function HeroHeader({
                 icon={UserCog}
                 label="导师数"
                 value={institution.mentor_count}
+                hint="共建导师"
+                clickable
+                onClick={onOpenMentorList}
               />
             </div>
           </div>

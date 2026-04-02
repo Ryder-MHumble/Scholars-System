@@ -284,7 +284,7 @@ export default function StudentDetailPage() {
   const [targetKey, setTargetKey] = useState<string | null>(null);
   const [targetHint, setTargetHint] = useState<string | null>(null);
 
-  const [isEditingStudent, setIsEditingStudent] = useState(false);
+  const [studentEditorOpen, setStudentEditorOpen] = useState(false);
   const [studentSaving, setStudentSaving] = useState(false);
   const [studentForm, setStudentForm] = useState<StudentUpdatePayload>({});
 
@@ -492,12 +492,33 @@ export default function StudentDetailPage() {
     try {
       const updated = await patchStudent(student.id, studentForm);
       setStudent(updated);
-      setIsEditingStudent(false);
+      setStudentEditorOpen(false);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "学生信息保存失败");
     } finally {
       setStudentSaving(false);
     }
+  };
+
+  const openStudentEditor = () => {
+    if (!student) return;
+    setStudentForm({
+      scholar_id: student.scholar_id || "",
+      mentor_name: student.mentor_name || "",
+      student_no: student.student_no || "",
+      name: student.name || "",
+      home_university: student.home_university || "",
+      major: student.major || "",
+      degree_type: student.degree_type || "",
+      enrollment_year: parseYear(student.enrollment_year) || "",
+      expected_graduation_year: parseYear(student.expected_graduation_year) || "",
+      status: student.status || "在读",
+      email: student.email || "",
+      phone: student.phone || "",
+      notes: student.notes || "",
+      updated_by: "scholars-system",
+    });
+    setStudentEditorOpen(true);
   };
 
   const handleSavePaper = async () => {
@@ -663,10 +684,10 @@ export default function StudentDetailPage() {
               actions={
                 <button
                   type="button"
-                  onClick={() => setIsEditingStudent((v) => !v)}
+                  onClick={openStudentEditor}
                   className="inline-flex items-center gap-1 text-[11px] text-slate-600 hover:text-primary-600"
                 >
-                  <Pencil className="w-3.5 h-3.5" /> {isEditingStudent ? "取消" : "编辑"}
+                  <Pencil className="w-3.5 h-3.5" /> 编辑资料
                 </button>
               }
             >
@@ -681,65 +702,13 @@ export default function StudentDetailPage() {
                 </div>
               </div>
 
-              {isEditingStudent ? (
-                <div className="mt-3 grid grid-cols-1 gap-2">
-                  {[
-                    ["学生姓名", "name"],
-                    ["导师姓名", "mentor_name"],
-                    ["导师ID", "scholar_id"],
-                    ["学号", "student_no"],
-                    ["共建高校", "home_university"],
-                    ["专业", "major"],
-                    ["培养类型", "degree_type"],
-                    ["入学年份", "enrollment_year"],
-                    ["预计毕业年份", "expected_graduation_year"],
-                    ["状态", "status"],
-                    ["邮箱", "email"],
-                    ["电话", "phone"],
-                  ].map(([label, key]) => (
-                    <label key={key} className="text-xs text-slate-500">
-                      {label}
-                      <input
-                        value={String((studentForm as Record<string, unknown>)[key] ?? "")}
-                        onChange={(e) =>
-                          setStudentForm((prev) => ({
-                            ...prev,
-                            [key]: e.target.value,
-                          }))
-                        }
-                        className="mt-1 w-full h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700"
-                      />
-                    </label>
-                  ))}
-                  <label className="text-xs text-slate-500">
-                    备注
-                    <textarea
-                      value={studentForm.notes ?? ""}
-                      onChange={(e) =>
-                        setStudentForm((prev) => ({ ...prev, notes: e.target.value }))
-                      }
-                      rows={3}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm text-slate-700"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    disabled={studentSaving}
-                    onClick={() => void handleSaveStudent()}
-                    className="mt-1 h-9 rounded-lg bg-primary-600 text-white text-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
-                  >
-                    <Save className="w-3.5 h-3.5" /> {studentSaving ? "保存中..." : "保存学生信息"}
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-3">
-                  <LabelValue label="导师" value={safeText(mentorName)} />
-                  <LabelValue label="共建高校" value={safeText(student.home_university)} />
-                  <LabelValue label="年级" value={formatEnrollmentYear(student.enrollment_year)} />
-                  <LabelValue label="学号" value={safeText(student.student_no)} />
-                  <LabelValue label="预计毕业" value={safeText(graduationYear)} />
-                </div>
-              )}
+              <div className="mt-3">
+                <LabelValue label="导师" value={safeText(mentorName)} />
+                <LabelValue label="共建高校" value={safeText(student.home_university)} />
+                <LabelValue label="年级" value={formatEnrollmentYear(student.enrollment_year)} />
+                <LabelValue label="学号" value={safeText(student.student_no)} />
+                <LabelValue label="预计毕业" value={safeText(graduationYear)} />
+              </div>
             </Panel>
 
             <Panel title="联系方式" compact>
@@ -958,6 +927,72 @@ export default function StudentDetailPage() {
           </motion.aside>
         </div>
       </div>
+
+      <Modal
+        open={studentEditorOpen}
+        title="编辑学生资料"
+        onClose={() => setStudentEditorOpen(false)}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {[
+            ["学生姓名", "name"],
+            ["导师姓名", "mentor_name"],
+            ["导师ID", "scholar_id"],
+            ["学号", "student_no"],
+            ["共建高校", "home_university"],
+            ["专业", "major"],
+            ["培养类型", "degree_type"],
+            ["入学年份", "enrollment_year"],
+            ["预计毕业年份", "expected_graduation_year"],
+            ["状态", "status"],
+            ["邮箱", "email"],
+            ["电话", "phone"],
+          ].map(([label, key]) => (
+            <label key={key} className="text-xs text-gray-500">
+              {label}
+              <input
+                value={String((studentForm as Record<string, unknown>)[key] ?? "")}
+                onChange={(e) =>
+                  setStudentForm((prev) => ({
+                    ...prev,
+                    [key]: e.target.value,
+                  }))
+                }
+                className="mt-1 w-full h-9 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+              />
+            </label>
+          ))}
+          <label className="text-xs text-gray-500 md:col-span-2">
+            备注
+            <textarea
+              value={studentForm.notes ?? ""}
+              onChange={(e) =>
+                setStudentForm((prev) => ({ ...prev, notes: e.target.value }))
+              }
+              rows={3}
+              className="mt-1 w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700"
+            />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setStudentEditorOpen(false)}
+            className="h-8 px-3 rounded-md border border-gray-200 text-xs text-gray-700"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            disabled={studentSaving}
+            onClick={() => void handleSaveStudent()}
+            className="h-8 px-3 rounded-md bg-primary-600 text-white text-xs inline-flex items-center gap-1.5 disabled:opacity-60"
+          >
+            <Save className="w-3.5 h-3.5" />
+            {studentSaving ? "保存中..." : "保存"}
+          </button>
+        </div>
+      </Modal>
 
       <Modal
         open={paperModalOpen}

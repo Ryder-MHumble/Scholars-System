@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertTriangle,
   Download,
   FileSpreadsheet,
   Filter,
-  Pencil,
   Plus,
   Search,
   Trash2,
@@ -19,13 +19,13 @@ import { Pagination } from "@/components/common/Pagination";
 import {
   createStudent,
   deleteStudent,
+  fetchAcademicStudents,
   fetchStudentList,
   fetchStudentListAll,
   fetchStudentOptions,
-  patchStudent,
+  type AcademicStudentSummary,
   type StudentCreatePayload,
   type StudentRecord,
-  type StudentUpdatePayload,
 } from "@/services/studentApi";
 import { BatchStudentImportModal } from "@/components/student/BatchStudentImportModal";
 import { exportStudentsToExcel } from "@/utils/studentExcel";
@@ -34,7 +34,7 @@ const DEFAULT_YEARS = ["2024", "2025", "2026"];
 const ALL_MENTOR = "全部导师";
 const ALL_UNIVERSITY = "全部高校";
 const ALL_STUDENTS_SUBTAB = "student_all";
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const PAGE_SIZE = 20;
 
 type StudentForm = {
   name: string;
@@ -272,6 +272,15 @@ export default function StudentListPage() {
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [allUniversitiesTotal, setAllUniversitiesTotal] = useState(0);
+  const [universityTotalCounts, setUniversityTotalCounts] = useState<Record<string, number>>(
+    {},
+  );
+  const [problemPaperOnly, setProblemPaperOnly] = useState(false);
+  const [problemPaperNameIndex, setProblemPaperNameIndex] = useState<Record<string, true>>({});
+  const [problemPaperTargetIndex, setProblemPaperTargetIndex] = useState<Record<string, true>>({});
+  const [problemPaperIndexReady, setProblemPaperIndexReady] = useState(false);
+  const [problemPaperIndexError, setProblemPaperIndexError] = useState<string | null>(null);
 
   const [mentorOptions, setMentorOptions] = useState<string[]>([]);
   const [universityOptions, setUniversityOptions] = useState<string[]>([]);
@@ -283,7 +292,6 @@ export default function StudentListPage() {
   const [selectedUniversity, setSelectedUniversity] = useState(ALL_UNIVERSITY);
 
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -295,7 +303,6 @@ export default function StudentListPage() {
   const [gradeInput, setGradeInput] = useState("");
 
   const [showStudentModal, setShowStudentModal] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null);
   const [studentForm, setStudentForm] = useState<StudentForm>(EMPTY_FORM);
 
   const [showBatchImportModal, setShowBatchImportModal] = useState(false);
@@ -354,22 +361,116 @@ export default function StudentListPage() {
 
   useEffect(() => {
     const controller = new AbortController();
+    setProblemPaperIndexReady(false);
+    setProblemPaperIndexError(null);
+
+    const loadProblemPaperIndex = async () => {
+      try {
+        const pageSize = 200;
+        const firstPage = await fetchAcademicStudents(undefined, 1, pageSize, controller.signal);
+        if (controller.signal.aborted) return;
+
+        const allItems: AcademicStudentSummary[] = [...(firstPage.items ?? [])];
+        const totalPages = Math.max(firstPage.total_pages ?? 1, 1);
+        for (let nextPage = 2; nextPage <= totalPages; nextPage += 1) {
+          if (controller.signal.aborted) return;
+          const pageData = await fetchAcademicStudents(
+            undefined,
+            nextPage,
+            pageSize,
+            controller.signal,
+          );
+          allItems.push(...(pageData.items ?? []));
+        }
+
+        const byName: Record<string, true> = {};
+        const byTarget: Record<string, true> = {};
+        allItems.forEach((item) => {
+          if (Number(item.non_compliant_count ?? 0) <= 0) return;
+          const name = (item.name ?? "").trim();
+          const targetKey = (item.target_key ?? "").trim();
+          if (name) byName[name] = true;
+          if (targetKey) byTarget[targetKey] = true;
+        });
+
+        setProblemPaperNameIndex(byName);
+        setProblemPaperTargetIndex(byTarget);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setProblemPaperNameIndex({});
+        setProblemPaperTargetIndex({});
+        setProblemPaperIndexError(err instanceof Error ? err.message : "问题论文索引加载失败");
+      } finally {
+        if (!controller.signal.aborted) {
+          setProblemPaperIndexReady(true);
+        }
+      }
+    };
+
+    void loadProblemPaperIndex();
+    return () => controller.abort();
+  }, [reloadSeed]);
+
+  const hasProblemPaper = (student: StudentRecord): boolean => {
+    const studentId = (student.id ?? "").trim();
+    if (studentId && problemPaperTargetIndex[studentId]) return true;
+    const studentName = (student.name ?? "").trim();
+    return Boolean(studentName && problemPaperNameIndex[studentName]);
+  };
+
+  useEffect(() => {
+    if (problemPaperOnly && !problemPaperIndexReady) {
+      setIsLoading(true);
+      return undefined;
+    }
+
+    const controller = new AbortController();
     setIsLoading(true);
     setError(null);
 
-    fetchStudentList(
-      {
+    const loadStudents = async () => {
+      const commonFilters = {
         enrollment_year: activeYear ?? undefined,
         mentor_name: selectedMentor === ALL_MENTOR ? undefined : selectedMentor,
         home_university:
           selectedUniversity === ALL_UNIVERSITY ? undefined : selectedUniversity,
         keyword: searchKeyword || undefined,
-        page,
-        page_size: pageSize,
-      },
-      controller.signal,
-    )
-      .then((res) => {
+      };
+
+      try {
+        if (problemPaperOnly) {
+          const allStudents = await fetchStudentListAll(
+            {
+              ...commonFilters,
+              page_size: 500,
+            },
+            controller.signal,
+          );
+          if (controller.signal.aborted) return;
+
+          const filtered = allStudents.filter(hasProblemPaper);
+          const nextTotal = filtered.length;
+          const nextTotalPages = Math.max(Math.ceil(nextTotal / PAGE_SIZE), 1);
+          const safePage = Math.min(page, nextTotalPages);
+          const start = (safePage - 1) * PAGE_SIZE;
+
+          setStudents(filtered.slice(start, start + PAGE_SIZE));
+          setTotal(nextTotal);
+          setTotalPages(nextTotalPages);
+          if (safePage !== page) {
+            setPage(safePage);
+          }
+          return;
+        }
+
+        const res = await fetchStudentList(
+          {
+            ...commonFilters,
+            page,
+            page_size: PAGE_SIZE,
+          },
+          controller.signal,
+        );
         if (controller.signal.aborted) return;
         setStudents(res.items ?? []);
         setTotal(res.total ?? 0);
@@ -377,20 +478,20 @@ export default function StudentListPage() {
         if (res.page && res.page !== page) {
           setPage(res.page);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : "学生数据加载失败");
         setStudents([]);
         setTotal(0);
         setTotalPages(1);
-      })
-      .finally(() => {
+      } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
         }
-      });
+      }
+    };
 
+    void loadStudents();
     return () => controller.abort();
   }, [
     activeYear,
@@ -398,8 +499,57 @@ export default function StudentListPage() {
     selectedUniversity,
     searchKeyword,
     page,
-    pageSize,
     reloadSeed,
+    problemPaperOnly,
+    problemPaperIndexReady,
+    problemPaperNameIndex,
+    problemPaperTargetIndex,
+  ]);
+
+  useEffect(() => {
+    if (problemPaperOnly && !problemPaperIndexReady) return undefined;
+
+    const controller = new AbortController();
+
+    fetchStudentListAll(
+      {
+        enrollment_year: activeYear ?? undefined,
+        mentor_name: selectedMentor === ALL_MENTOR ? undefined : selectedMentor,
+        keyword: searchKeyword || undefined,
+        page_size: 500,
+      },
+      controller.signal,
+    )
+      .then((allStudents) => {
+        if (controller.signal.aborted) return;
+        const sourceStudents = problemPaperOnly
+          ? allStudents.filter(hasProblemPaper)
+          : allStudents;
+        const counts: Record<string, number> = {};
+        sourceStudents.forEach((item) => {
+          const university = (item.home_university ?? "").trim();
+          if (!university) return;
+          counts[university] = (counts[university] ?? 0) + 1;
+        });
+        setUniversityTotalCounts(counts);
+        setAllUniversitiesTotal(sourceStudents.length);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setUniversityTotalCounts({});
+        setAllUniversitiesTotal(0);
+      });
+
+    return () => controller.abort();
+  }, [
+    activeYear,
+    selectedMentor,
+    searchKeyword,
+    reloadSeed,
+    problemPaperOnly,
+    problemPaperIndexReady,
+    problemPaperNameIndex,
+    problemPaperTargetIndex,
   ]);
 
   const mentorsInCurrentPage = useMemo(() => {
@@ -429,16 +579,6 @@ export default function StudentListPage() {
     () => Array.from(new Set([...universityOptions, ...universitiesInCurrentPage])),
     [universityOptions, universitiesInCurrentPage],
   );
-
-  const universityCountsInCurrentPage = useMemo(() => {
-    const map = new Map<string, number>();
-    students.forEach((item) => {
-      const name = (item.home_university ?? "").trim();
-      if (!name) return;
-      map.set(name, (map.get(name) ?? 0) + 1);
-    });
-    return map;
-  }, [students]);
 
   const sidebarUniversities = useMemo(() => {
     const list = selectedUniversity !== ALL_UNIVERSITY
@@ -477,29 +617,9 @@ export default function StudentListPage() {
   };
 
   const handleOpenCreate = () => {
-    setEditingStudent(null);
     setStudentForm({
       ...EMPTY_FORM,
       enrollment_year: activeYear ?? "",
-    });
-    setShowStudentModal(true);
-  };
-
-  const handleOpenEdit = (student: StudentRecord) => {
-    setEditingStudent(student);
-    setStudentForm({
-      name: student.name || "",
-      enrollment_year: parseYear(student.enrollment_year) || "",
-      student_no: student.student_no || "",
-      home_university: student.home_university || "",
-      mentor_name: student.mentor_name || student.scholar_name || "",
-      major: student.major || "",
-      degree_type: student.degree_type || "",
-      expected_graduation_year: student.expected_graduation_year || "",
-      email: student.email || "",
-      phone: student.phone || "",
-      notes: student.notes || "",
-      status: student.status || "在读",
     });
     setShowStudentModal(true);
   };
@@ -540,21 +660,13 @@ export default function StudentListPage() {
 
     setIsMutating(true);
     try {
-      if (editingStudent) {
-        await patchStudent(editingStudent.id, {
-          ...payloadBase,
-          updated_by: "frontend",
-        } satisfies StudentUpdatePayload);
-      } else {
-        await createStudent({
-          ...payloadBase,
-          added_by: "frontend",
-        } satisfies StudentCreatePayload);
-        setPage(1);
-      }
+      await createStudent({
+        ...payloadBase,
+        added_by: "frontend",
+      } satisfies StudentCreatePayload);
+      setPage(1);
 
       setShowStudentModal(false);
-      setEditingStudent(null);
       setStudentForm(EMPTY_FORM);
       setReloadSeed((v) => v + 1);
     } catch (err) {
@@ -592,16 +704,29 @@ export default function StudentListPage() {
         page_size: 500,
       });
 
-      if (all.length === 0) {
+      const exportedStudents = problemPaperOnly
+        ? all.filter(hasProblemPaper)
+        : all;
+
+      if (exportedStudents.length === 0) {
         window.alert("当前筛选条件下暂无数据可导出");
         return;
       }
-      exportStudentsToExcel(all);
+      exportStudentsToExcel(exportedStudents);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "导出失败");
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleResetPrimaryFilters = () => {
+    setSearchInput("");
+    setSearchKeyword("");
+    setSelectedMentor(ALL_MENTOR);
+    setSelectedUniversity(ALL_UNIVERSITY);
+    setProblemPaperOnly(false);
+    setPage(1);
   };
 
   const handleAddGrade = () => {
@@ -651,7 +776,7 @@ export default function StudentListPage() {
           >
             <div className="flex items-center justify-between">
               <span>{ALL_UNIVERSITY}</span>
-              <span className="text-xs text-gray-400">{total}</span>
+              <span className="text-xs text-gray-400">{allUniversitiesTotal}</span>
             </div>
           </button>
 
@@ -672,7 +797,7 @@ export default function StudentListPage() {
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate">{uni}</span>
                 <span className="text-xs text-gray-400">
-                  {universityCountsInCurrentPage.get(uni) ?? 0}
+                  {universityTotalCounts[uni] ?? 0}
                 </span>
               </div>
             </button>
@@ -739,15 +864,15 @@ export default function StudentListPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 md:p-5 mb-4 space-y-4">
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(300px,1fr)_220px_220px_160px] gap-3">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 md:p-5 mb-4">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,1fr)_220px_auto] gap-3 items-center">
             <div className="relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="搜索学生姓名 / 高校 / 导师 / 专业"
-                className="h-10 w-full pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-300"
+                placeholder="搜索学生姓名 / 导师 / 专业"
+                className="h-11 w-full pl-9 pr-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-300"
               />
             </div>
 
@@ -762,34 +887,32 @@ export default function StudentListPage() {
               clearable
             />
 
-            <ComboboxInput
-              value={selectedUniversity === ALL_UNIVERSITY ? "" : selectedUniversity}
-              onChange={(value) => {
-                setSelectedUniversity(value || ALL_UNIVERSITY);
-                setPage(1);
-              }}
-              options={universitySelectOptions}
-              placeholder={ALL_UNIVERSITY}
-              clearable
-            />
-
-            <SelectInput
-              value={String(pageSize)}
-              onChange={(value) => {
-                setPageSize(Number(value));
-                setPage(1);
-              }}
-              className="h-10"
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>
-                  每页 {size} 条
-                </option>
-              ))}
-            </SelectInput>
+            <div className="flex items-center justify-end gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  setProblemPaperOnly((prev) => !prev);
+                  setPage(1);
+                }}
+                className={cn(
+                  "h-11 px-3.5 rounded-xl border text-sm inline-flex items-center gap-1.5 transition-colors",
+                  problemPaperOnly
+                    ? "border-rose-300 bg-rose-50 text-rose-700"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
+                )}
+              >
+                <AlertTriangle className="w-4 h-4" />
+                问题论文
+              </button>
+              <button
+                onClick={handleResetPrimaryFilters}
+                className="h-11 px-3.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700"
+              >
+                清空条件
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="mt-4 flex items-center gap-2 flex-wrap">
             <button
               onClick={handleSelectAllStudents}
               className={cn(
@@ -817,17 +940,33 @@ export default function StudentListPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+          <div className="mt-3 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
             <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 border border-gray-200 px-2.5 py-1">
               <Filter className="w-3 h-3" />
               导师：{mentorLabel}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 border border-gray-200 px-2.5 py-1">
-              高校：{universityLabel}
+              范围：{universityLabel}
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1",
+                problemPaperOnly
+                  ? "border-rose-200 bg-rose-50 text-rose-700"
+                  : "border-gray-200 bg-gray-50 text-gray-500",
+              )}
+            >
+              <AlertTriangle className="w-3 h-3" />
+              {problemPaperOnly ? "仅问题论文学生" : "全部论文状态"}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 border border-gray-200 px-2.5 py-1">
-              第 {page} / {totalPages} 页
+              共 {total} 人
             </span>
+            {problemPaperIndexError && (
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-700">
+                问题论文索引不可用
+              </span>
+            )}
           </div>
         </div>
 
@@ -944,30 +1083,17 @@ export default function StudentListPage() {
                           <p className="text-xs text-gray-400 mt-0.5">{safeText(student.phone)}</p>
                         </td>
                         <td className="px-5 py-3.5 text-right">
-                          <div className="inline-flex items-center gap-1.5">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenEdit(student);
-                              }}
-                              disabled={isMutating}
-                              className="h-8 px-2.5 text-xs rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-1"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              编辑
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleDeleteStudent(student);
-                              }}
-                              disabled={isMutating}
-                              className="h-8 px-2.5 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 inline-flex items-center gap-1"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              删除
-                            </button>
-                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleDeleteStudent(student);
+                            }}
+                            disabled={isMutating}
+                            title="删除学生"
+                            className="h-8 w-8 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 inline-flex items-center justify-center"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1029,17 +1155,15 @@ export default function StudentListPage() {
         isOpen={showStudentModal}
         onClose={() => {
           setShowStudentModal(false);
-          setEditingStudent(null);
           setStudentForm(EMPTY_FORM);
         }}
-        title={editingStudent ? `编辑学生 · ${editingStudent.name}` : "添加学生"}
+        title="添加学生"
         maxWidth="2xl"
         footer={
           <>
             <button
               onClick={() => {
                 setShowStudentModal(false);
-                setEditingStudent(null);
                 setStudentForm(EMPTY_FORM);
               }}
               className="h-9 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50"
@@ -1051,7 +1175,7 @@ export default function StudentListPage() {
               disabled={isMutating}
               className="h-9 px-3 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium"
             >
-              {isMutating ? "保存中..." : editingStudent ? "保存修改" : "创建学生"}
+              {isMutating ? "保存中..." : "创建学生"}
             </button>
           </>
         }

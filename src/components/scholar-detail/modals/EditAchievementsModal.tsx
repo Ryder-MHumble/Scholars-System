@@ -49,13 +49,33 @@ export function EditAchievementsModal({
     awards: "",
   });
 
-  const parsedBatchCounts = useMemo(
+  const parsedBatchItems = useMemo(
     () => ({
-      publications: parsePublicationsFromText(batchInputs.publications).length,
-      patents: parsePatentsFromText(batchInputs.patents).length,
-      awards: parseAwardsFromText(batchInputs.awards).length,
+      publications: parsePublicationsFromText(batchInputs.publications),
+      patents: parsePatentsFromText(batchInputs.patents),
+      awards: parseAwardsFromText(batchInputs.awards),
     }),
     [batchInputs],
+  );
+  const parsedBatchCounts = useMemo(
+    () => ({
+      publications: parsedBatchItems.publications.length,
+      patents: parsedBatchItems.patents.length,
+      awards: parsedBatchItems.awards.length,
+    }),
+    [parsedBatchItems],
+  );
+  const previewPublications = useMemo(
+    () => [...editedPublications, ...parsedBatchItems.publications],
+    [editedPublications, parsedBatchItems.publications],
+  );
+  const previewPatents = useMemo(
+    () => [...editedPatents, ...parsedBatchItems.patents],
+    [editedPatents, parsedBatchItems.patents],
+  );
+  const previewAwards = useMemo(
+    () => [...editedAwards, ...parsedBatchItems.awards],
+    [editedAwards, parsedBatchItems.awards],
   );
 
   const handleBatchChange = (field: AchievementsTab, value: string) => {
@@ -63,15 +83,9 @@ export function EditAchievementsModal({
   };
 
   const handleSubmit = async () => {
-    const batchPublications = batchInputs.publications.trim()
-      ? parsePublicationsFromText(batchInputs.publications)
-      : [];
-    const batchPatents = batchInputs.patents.trim()
-      ? parsePatentsFromText(batchInputs.patents)
-      : [];
-    const batchAwards = batchInputs.awards.trim()
-      ? parseAwardsFromText(batchInputs.awards)
-      : [];
+    const batchPublications = parsedBatchItems.publications;
+    const batchPatents = parsedBatchItems.patents;
+    const batchAwards = parsedBatchItems.awards;
 
     const finalPublications = [...editedPublications, ...batchPublications];
     const finalPatents = [...editedPatents, ...batchPatents];
@@ -278,19 +292,19 @@ export function EditAchievementsModal({
               active={activeTab === "publications"}
               onClick={() => setActiveTab("publications")}
               icon={BookOpen}
-              label={`代表性论文 (${editedPublications.length})`}
+              label={`代表性论文 (${previewPublications.length})`}
             />
             <TabButton
               active={activeTab === "patents"}
               onClick={() => setActiveTab("patents")}
               icon={Award}
-              label={`专利 (${editedPatents.length})`}
+              label={`专利 (${previewPatents.length})`}
             />
             <TabButton
               active={activeTab === "awards"}
               onClick={() => setActiveTab("awards")}
               icon={Trophy}
-              label={`奖项 (${editedAwards.length})`}
+              label={`奖项 (${previewAwards.length})`}
             />
           </div>
 
@@ -380,6 +394,26 @@ export function EditAchievementsModal({
                   </div>
                 </div>
               ))}
+              {parsedBatchItems.publications.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-blue-600">
+                    批量识别预览（保存后导入） {parsedBatchItems.publications.length} 条
+                  </p>
+                  {parsedBatchItems.publications.map((pub, i) => (
+                    <div
+                      key={`preview-publication-${i}`}
+                      className="p-3 border border-blue-100 bg-blue-50/30 rounded-lg space-y-1"
+                    >
+                      <p className="text-sm font-medium text-gray-800">
+                        {pub.title || "未命名论文"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {[pub.authors, pub.venue, pub.year].filter(Boolean).join(" · ") || "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -452,6 +486,28 @@ export function EditAchievementsModal({
                   </div>
                 </div>
               ))}
+              {parsedBatchItems.patents.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-blue-600">
+                    批量识别预览（保存后导入） {parsedBatchItems.patents.length} 条
+                  </p>
+                  {parsedBatchItems.patents.map((patent, i) => (
+                    <div
+                      key={`preview-patent-${i}`}
+                      className="p-3 border border-blue-100 bg-blue-50/30 rounded-lg space-y-1"
+                    >
+                      <p className="text-sm font-medium text-gray-800">
+                        {patent.title || "未命名专利"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {[patent.patent_no, patent.patent_type, patent.year]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -515,6 +571,26 @@ export function EditAchievementsModal({
                   />
                 </div>
               ))}
+              {parsedBatchItems.awards.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-blue-600">
+                    批量识别预览（保存后导入） {parsedBatchItems.awards.length} 条
+                  </p>
+                  {parsedBatchItems.awards.map((award, i) => (
+                    <div
+                      key={`preview-award-${i}`}
+                      className="p-3 border border-blue-100 bg-blue-50/30 rounded-lg space-y-1"
+                    >
+                      <p className="text-sm font-medium text-gray-800">
+                        {award.title || "未命名奖项"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {[award.level, award.grantor, award.year].filter(Boolean).join(" · ") || "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

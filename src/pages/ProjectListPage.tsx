@@ -7,6 +7,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Pagination } from "@/components/common/Pagination";
 import { ScholarCard } from "@/components/common/ScholarCard";
 import { ScholarTable } from "@/components/common/ScholarTable";
+import { ProjectInstitutionTreePanel } from "@/components/project/ProjectInstitutionTreePanel";
 import { useScholarList } from "@/hooks/useScholarList";
 import type { ScholarListItem } from "@/services/scholarApi";
 
@@ -73,12 +74,19 @@ export default function ProjectListPage() {
   }, [location.pathname, location.search]);
 
   const activeSubtab = searchParams.get("subtab") ?? "";
+  const isFulltimeMentorSubtab = activeSubtab === "fulltime_mentor";
   const subtabFilter = SUBTAB_TO_PROJECT_FILTER[activeSubtab] ?? {};
   const activeCategory = subtabFilter.category ?? searchParams.get("category");
   const activeSubcategory =
     subtabFilter.subcategory ?? searchParams.get("subcategory");
 
   const {
+    filteredUniNodes,
+    uniLoading,
+    activeUni,
+    activeDept,
+    handleSelectUni,
+    handleSelectDept,
     setQuery,
     searchInput,
     setSearchInput,
@@ -93,15 +101,21 @@ export default function ProjectListPage() {
     handleDeleteScholar,
   } = useScholarList();
 
+  useEffect(() => {
+    if (!isFulltimeMentorSubtab) return;
+    if (!activeUni && !activeDept) return;
+    handleSelectUni(null);
+  }, [isFulltimeMentorSubtab, activeUni, activeDept, handleSelectUni]);
+
+  const filteredTotalCount = useMemo(
+    () => filteredUniNodes.reduce((sum, uni) => sum + uni.count, 0),
+    [filteredUniNodes],
+  );
+
   // Filter scholars by selected category/subcategory
   const filteredScholars = useMemo(() => {
     if (!activeCategory && !activeSubcategory) {
-      return items.filter(
-        (scholar) =>
-          scholar.is_cobuild_scholar ||
-          (scholar.project_tags?.length ?? 0) > 0 ||
-          scholar.adjunct_supervisor?.status,
-      );
+      return items;
     }
 
     if (activeSubcategory) {
@@ -120,17 +134,24 @@ export default function ProjectListPage() {
     return items;
   }, [items, activeCategory, activeSubcategory]);
 
-  const displayedScholarCount = useMemo(() => {
-    // When project filters are active, backend `total` is the full matched count.
-    // Avoid showing current-page length as global count.
-    if (activeCategory || activeSubcategory) {
-      return total;
-    }
-    return filteredScholars.length;
-  }, [activeCategory, activeSubcategory, total, filteredScholars.length]);
+  const displayedScholarCount = total;
 
   return (
     <div className="h-full overflow-hidden flex bg-gray-50">
+      {!isFulltimeMentorSubtab && (
+        <div className="w-52 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col overflow-hidden">
+          <ProjectInstitutionTreePanel
+            uniNodes={filteredUniNodes}
+            totalCount={filteredTotalCount}
+            activeUni={activeUni}
+            activeDept={activeDept}
+            onSelectUni={handleSelectUni}
+            onSelectDept={handleSelectDept}
+            loading={uniLoading}
+          />
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
