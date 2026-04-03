@@ -212,19 +212,10 @@ export function EditProfileModal({
       return;
     }
 
-    const importedEducation = educationBatchText.trim()
-      ? parseEducationFromText(educationBatchText.trim())
-      : [];
-    const finalEducation =
-      importedEducation.length > 0 ? importedEducation : editedEducation;
-
-    const importedManagementRoles = rolesBatchText.trim()
-      ? parseManagementRolesFromText(rolesBatchText.trim())
-      : [];
-    const finalManagementRoles =
-      importedManagementRoles.length > 0
-        ? importedManagementRoles
-        : editedManagementRoles;
+    // Always trust the current edited state. Batch text is parsed on input change,
+    // and users may further manually adjust parsed rows before saving.
+    const finalEducation = editedEducation;
+    const finalManagementRoles = editedManagementRoles;
 
     const patch = buildPatch(finalEducation);
     const normalizedRoles = finalManagementRoles
