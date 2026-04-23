@@ -19,12 +19,12 @@ import { Pagination } from "@/components/common/Pagination";
 import {
   createStudent,
   deleteStudent,
-  fetchAcademicStudents,
+  fetchAcademicStudentPapers,
   fetchStudentList,
   fetchStudentListAll,
   fetchStudentOptions,
-  type AcademicStudentSummary,
   type StudentCreatePayload,
+  type StudentPaperRecord,
   type StudentRecord,
 } from "@/services/studentApi";
 import { BatchStudentImportModal } from "@/components/student/BatchStudentImportModal";
@@ -366,35 +366,52 @@ export default function StudentListPage() {
 
     const loadProblemPaperIndex = async () => {
       try {
-        const pageSize = 200;
-        const firstPage = await fetchAcademicStudents(undefined, 1, pageSize, controller.signal);
+        const allItems = await fetchStudentListAll({ page_size: 500 }, controller.signal);
         if (controller.signal.aborted) return;
-
-        const allItems: AcademicStudentSummary[] = [...(firstPage.items ?? [])];
-        const totalPages = Math.max(firstPage.total_pages ?? 1, 1);
-        for (let nextPage = 2; nextPage <= totalPages; nextPage += 1) {
-          if (controller.signal.aborted) return;
-          const pageData = await fetchAcademicStudents(
-            undefined,
-            nextPage,
-            pageSize,
-            controller.signal,
-          );
-          allItems.push(...(pageData.items ?? []));
-        }
-
         const byName: Record<string, true> = {};
         const byTarget: Record<string, true> = {};
-        allItems.forEach((item) => {
-          if (Number(item.non_compliant_count ?? 0) <= 0) return;
-          const name = (item.name ?? "").trim();
-          const targetKey = (item.target_key ?? "").trim();
-          if (name) byName[name] = true;
-          if (targetKey) byTarget[targetKey] = true;
-        });
+        let failedCount = 0;
+        const concurrency = 8;
+
+        const hasProblemPaper = (papers: StudentPaperRecord[]): boolean =>
+          papers.some((paper) => {
+            const affiliation = String(paper.affiliation_status ?? "").trim();
+            const compliance = String(paper.compliance_status ?? "").trim();
+            return (
+              affiliation === "non_compliant" ||
+              compliance === "高风险" ||
+              compliance === "不通过"
+            );
+          });
+
+        for (let idx = 0; idx < allItems.length; idx += concurrency) {
+          if (controller.signal.aborted) return;
+          const chunk = allItems.slice(idx, idx + concurrency);
+          const results = await Promise.allSettled(
+            chunk.map((student) => fetchAcademicStudentPapers(student.id, controller.signal)),
+          );
+
+          results.forEach((result, offset) => {
+            const student = chunk[offset];
+            if (!student) return;
+            if (result.status !== "fulfilled") {
+              failedCount += 1;
+              return;
+            }
+            if (!hasProblemPaper(result.value.items ?? [])) return;
+
+            const studentId = (student.id ?? "").trim();
+            const studentName = (student.name ?? "").trim();
+            if (studentId) byTarget[studentId] = true;
+            if (studentName) byName[studentName] = true;
+          });
+        }
 
         setProblemPaperNameIndex(byName);
         setProblemPaperTargetIndex(byTarget);
+        if (failedCount > 0) {
+          setProblemPaperIndexError(`问题论文索引部分加载失败（${failedCount} 名学生）`);
+        }
       } catch (err) {
         if (controller.signal.aborted) return;
         setProblemPaperNameIndex({});

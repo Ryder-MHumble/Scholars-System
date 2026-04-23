@@ -132,7 +132,7 @@ export default function ScholarListPage() {
                           setQuery(searchInput);
                         }
                       }}
-                      placeholder="输入学者姓名、研究方向，按回车搜索"
+                      placeholder="输入学者姓名、研究方向或职称，按回车搜索"
                       className="w-full h-10 pl-10 pr-4 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-100 transition-all placeholder:text-gray-400"
                     />
                   </div>
@@ -220,6 +220,7 @@ export default function ScholarListPage() {
                 <Info className="w-3.5 h-3.5 mt-0.5 text-gray-400 shrink-0" />
                 <p>
                   使用步骤：先选左侧机构，再选“共建导师类别”，最后输入关键词并回车搜索。
+                  当前支持按姓名、研究方向、职称搜索。
                   视图按钮可在列表/卡片间切换。
                 </p>
               </div>

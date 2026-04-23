@@ -344,31 +344,6 @@ function serializeCobuildTimeline(items: CobuildTimelineItem[]): string {
   return JSON.stringify(normalized);
 }
 
-function resolveYearStudentMetrics(institution: InstitutionDetail): Array<{ year: string; value: number }> {
-  const merged = new Map<string, number>();
-
-  const yearMap = institution.student_counts_by_year ?? {};
-  for (const [year, value] of Object.entries(yearMap)) {
-    if (!/^\d{4}$/.test(year)) continue;
-    const count = Number(value ?? 0);
-    if (!Number.isFinite(count) || count <= 0) continue;
-    merged.set(year, count);
-  }
-
-  if (!merged.has("2024")) {
-    const c24 = Number(institution.student_count_24 ?? 0);
-    if (Number.isFinite(c24) && c24 > 0) merged.set("2024", c24);
-  }
-  if (!merged.has("2025")) {
-    const c25 = Number(institution.student_count_25 ?? 0);
-    if (Number.isFinite(c25) && c25 > 0) merged.set("2025", c25);
-  }
-
-  return Array.from(merged.entries())
-    .sort((a, b) => Number(b[0]) - Number(a[0]))
-    .map(([year, value]) => ({ year, value }));
-}
-
 function applyUnifiedScholarCounts(
   institution: InstitutionDetail,
   hierarchyOrganizations: ScholarUniversityItem[],
@@ -666,25 +641,17 @@ export default function InstitutionDetailPage() {
     (institution.academic_cooperation?.length ?? 0) > 0 ||
     (institution.talent_dual_appointment?.length ?? 0) > 0;
 
-  const yearStudentMetrics = resolveYearStudentMetrics(institution);
-
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)]">
       <div className="max-w-[1680px] mx-auto px-3 md:px-5 py-4 md:py-6 space-y-5">
         <HeroHeader
           institution={institution}
-          yearStudentMetrics={yearStudentMetrics}
           onOpenScholarList={() =>
             navigate(`/?tab=scholars&university=${encodeURIComponent(institution.name)}`)
           }
           onOpenMentorList={() =>
             navigate(
               `/?tab=scholars&university=${encodeURIComponent(institution.name)}&mentor_type=${encodeURIComponent("全部共建导师")}`,
-            )
-          }
-          onOpenStudentYear={(year) =>
-            navigate(
-              `/?tab=students&subtab=student_grade_${year}&university=${encodeURIComponent(institution.name)}`,
             )
           }
           onOpenStudentAll={() =>
@@ -754,14 +721,17 @@ export default function InstitutionDetailPage() {
                 </div>
 
                 {activeWorkbenchTab === "timeline" && (
-                  <button
-                    onClick={openCreateTimeline}
-                    disabled={timelineSaving}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
-                  >
-                    <Plus className="w-4 h-4" />
-                    新增纪要
-                  </button>
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/70 px-2 py-1.5">
+                    <span className="hidden sm:inline text-xs text-blue-700/90 font-medium">时间线维护</span>
+                    <button
+                      onClick={openCreateTimeline}
+                      disabled={timelineSaving}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 disabled:opacity-60"
+                    >
+                      <Plus className="w-4 h-4" />
+                      新增纪要
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -801,7 +771,7 @@ export default function InstitutionDetailPage() {
 
                 {activeWorkbenchTab === "timeline" && (
                   <>
-                    <div className="mb-3 rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#ffffff_60%)] p-4">
+                    <div className="mb-3 rounded-2xl border border-blue-100 bg-[linear-gradient(145deg,#eff6ff_0%,#ffffff_56%)] p-4 shadow-[0_8px_28px_-20px_rgba(59,130,246,0.5)]">
                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div className="min-w-0">
                           <p className="text-[15px] font-semibold text-slate-800">共建纪要时间线</p>
@@ -810,11 +780,11 @@ export default function InstitutionDetailPage() {
                           </p>
                         </div>
                         <div className="inline-flex items-center gap-2 shrink-0">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                          <span className="inline-flex h-8 items-center gap-1 rounded-full border border-blue-200 bg-white px-3 text-xs font-semibold text-blue-700">
                             <ClipboardList className="w-3.5 h-3.5" />
                             共 {timelineCount} 条纪要
                           </span>
-                          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500">
+                          <span className="inline-flex h-8 items-center rounded-full border border-slate-200 bg-white px-3 text-xs text-slate-500">
                             按时间倒序
                           </span>
                         </div>
@@ -830,7 +800,7 @@ export default function InstitutionDetailPage() {
                         <button
                           type="button"
                           onClick={openCreateTimeline}
-                          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                          className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3.5 text-sm font-semibold text-blue-700 hover:bg-blue-50"
                         >
                           <Plus className="w-4 h-4" />
                           立即新增第一条
@@ -854,12 +824,12 @@ export default function InstitutionDetailPage() {
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                   <h3 className="text-[15px] font-bold text-slate-800 leading-snug">{item.title}</h3>
-                                  <div className="inline-flex items-center gap-1.5">
+                                  <div className="inline-flex items-center gap-2">
                                     <button
                                       type="button"
                                       onClick={() => openEditTimeline(item)}
                                       disabled={timelineSaving}
-                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-700 hover:bg-white"
+                                      className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 hover:border-blue-200 hover:text-blue-700"
                                     >
                                       <PencilLine className="w-3 h-3" />
                                       编辑
@@ -868,7 +838,7 @@ export default function InstitutionDetailPage() {
                                       type="button"
                                       onClick={() => void handleDeleteTimeline(item)}
                                       disabled={timelineSaving}
-                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50"
+                                      className="inline-flex h-7 items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
                                     >
                                       <Trash2 className="w-3 h-3" />
                                       删除
@@ -1054,44 +1024,23 @@ export default function InstitutionDetailPage() {
 
 function HeroHeader({
   institution,
-  yearStudentMetrics,
   onOpenScholarList,
   onOpenMentorList,
-  onOpenStudentYear,
   onOpenStudentAll,
   onBack,
   onEdit,
   onDelete,
 }: {
   institution: InstitutionDetail;
-  yearStudentMetrics: Array<{ year: string; value: number }>;
   onOpenScholarList: () => void;
   onOpenMentorList: () => void;
-  onOpenStudentYear: (year: string) => void;
   onOpenStudentAll: () => void;
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const mergedYearMetrics = new Map<string, number>();
-  yearStudentMetrics.forEach((item) => {
-    mergedYearMetrics.set(item.year, item.value);
-  });
-  if (!mergedYearMetrics.has("2024") && institution.student_count_24 != null) {
-    mergedYearMetrics.set("2024", Number(institution.student_count_24));
-  }
-  if (!mergedYearMetrics.has("2025") && institution.student_count_25 != null) {
-    mergedYearMetrics.set("2025", Number(institution.student_count_25));
-  }
-
-  if (mergedYearMetrics.size === 0) {
-    mergedYearMetrics.set("2024", Number(institution.student_count_24 ?? 0));
-    mergedYearMetrics.set("2025", Number(institution.student_count_25 ?? 0));
-  }
-
-  const displayYearStudentMetrics = Array.from(mergedYearMetrics.entries())
-    .sort((a, b) => Number(b[0]) - Number(a[0]))
-    .map(([year, value]) => ({ year, value }));
+  const isCompanyInstitution =
+    institution.org_type === "企业" || institution.type === "company";
 
   return (
     <motion.header
@@ -1174,33 +1123,26 @@ function HeroHeader({
                 clickable
                 onClick={onOpenScholarList}
               />
-              {displayYearStudentMetrics.map((item) => (
+              {!isCompanyInstitution && (
                 <HeroMetricCard
-                  key={item.year}
                   icon={GraduationCap}
-                  label={`${item.year.slice(-2)}级学生`}
-                  value={item.value}
-                  hint="查看学生"
+                  label="学生总数"
+                  value={institution.student_count_total}
+                  hint="学生总览"
                   clickable
-                  onClick={() => onOpenStudentYear(item.year)}
+                  onClick={onOpenStudentAll}
                 />
-              ))}
-              <HeroMetricCard
-                icon={BookOpen}
-                label="学生总数"
-                value={institution.student_count_total}
-                hint="学生总览"
-                clickable
-                onClick={onOpenStudentAll}
-              />
-              <HeroMetricCard
-                icon={UserCog}
-                label="导师数"
-                value={institution.mentor_count}
-                hint="共建导师"
-                clickable
-                onClick={onOpenMentorList}
-              />
+              )}
+              {!isCompanyInstitution && (
+                <HeroMetricCard
+                  icon={UserCog}
+                  label="导师数"
+                  value={institution.mentor_count}
+                  hint="共建导师"
+                  clickable
+                  onClick={onOpenMentorList}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1477,16 +1419,6 @@ function InstitutionActivityPanel({ institution }: { institution: InstitutionDet
 
   const featured = displayFeeds[0];
   const listItems = displayFeeds.slice(1);
-  const featuredCoverStyle = featured?.cover_image_url
-    ? {
-      backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.10) 0%, rgba(15,23,42,0.34) 100%), url("${featured.cover_image_url}")`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-    }
-    : {
-      backgroundImage: "linear-gradient(130deg,#dbeafe_0%,#bfdbfe_46%,#93c5fd_100%)",
-    };
-
   return (
     <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
       <div className="px-4 py-3.5 border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)]">
@@ -1507,36 +1439,48 @@ function InstitutionActivityPanel({ institution }: { institution: InstitutionDet
         )}
         {featured ? (
           <article className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <div className="h-40 px-4 py-3 flex items-end" style={featuredCoverStyle}>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-white/90 text-blue-700">
-                  {featured.category}
-                </span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50/95 text-emerald-700 border border-emerald-100">
-                  最新发布
-                </span>
-              </div>
-            </div>
-            <div className="p-4">
-              <h3 className="text-[18px] font-bold text-slate-900 leading-snug">{featured.title}</h3>
-              <p className="mt-2 text-sm text-slate-600 leading-6">{featured.summary}</p>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs text-slate-400">{featured.meta}</span>
-                {featured.url ? (
-                  <a
-                    href={featured.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm text-blue-600 font-semibold hover:text-blue-700 inline-flex items-center gap-1"
-                  >
-                    阅读全文
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </a>
+            <div className="flex min-h-[220px]">
+              <div className="relative w-[40%] min-w-[200px] max-w-[360px] shrink-0 border-r border-slate-100 bg-slate-100">
+                {featured.cover_image_url ? (
+                  <img
+                    src={featured.cover_image_url}
+                    alt={featured.title}
+                    className="h-full w-full object-contain"
+                    loading="lazy"
+                  />
                 ) : (
-                  <span className="text-sm text-slate-400 inline-flex items-center gap-1">
-                    暂无原文链接
-                  </span>
+                  <div className="h-full w-full bg-[linear-gradient(130deg,#dbeafe_0%,#bfdbfe_46%,#93c5fd_100%)]" />
                 )}
+                <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-white/95 text-blue-700">
+                    {featured.category}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50/95 text-emerald-700 border border-emerald-100">
+                    最新发布
+                  </span>
+                </div>
+              </div>
+              <div className="flex-1 p-4">
+                <h3 className="text-[18px] font-bold text-slate-900 leading-snug">{featured.title}</h3>
+                <p className="mt-2 text-sm text-slate-600 leading-6">{featured.summary}</p>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-xs text-slate-400">{featured.meta}</span>
+                  {featured.url ? (
+                    <a
+                      href={featured.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-blue-600 font-semibold hover:text-blue-700 inline-flex items-center gap-1"
+                    >
+                      阅读全文
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </a>
+                  ) : (
+                    <span className="text-sm text-slate-400 inline-flex items-center gap-1">
+                      暂无原文链接
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </article>
@@ -1557,25 +1501,24 @@ function InstitutionActivityPanel({ institution }: { institution: InstitutionDet
             {listItems.map((item) => (
               <article
                 key={item.id}
-                className="rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow-[0_10px_24px_-20px_rgba(15,23,42,0.6)] transition-shadow"
+                className="rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow-[0_10px_24px_-20px_rgba(15,23,42,0.6)] transition-shadow flex min-h-[132px]"
               >
-                <div
-                  className="h-20 px-3 py-2 flex items-start"
-                  style={item.cover_image_url
-                    ? {
-                      backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.12) 0%, rgba(15,23,42,0.38) 100%), url("${item.cover_image_url}")`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                    }
-                    : {
-                      backgroundImage: "linear-gradient(135deg,#e2e8f0_0%,#cbd5e1_100%)",
-                    }}
-                >
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white/90 text-slate-700">
+                <div className="relative w-[132px] shrink-0 border-r border-slate-100 bg-slate-100">
+                  {item.cover_image_url ? (
+                    <img
+                      src={item.cover_image_url}
+                      alt={item.title}
+                      className="h-full w-full object-contain"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-[linear-gradient(135deg,#e2e8f0_0%,#cbd5e1_100%)]" />
+                  )}
+                  <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white/90 text-slate-700">
                     {item.category}
                   </span>
                 </div>
-                <div className="p-3.5">
+                <div className="p-3.5 flex-1">
                   <h4 className="text-[15px] font-semibold text-slate-800 leading-snug line-clamp-2">{item.title}</h4>
                   <p className="mt-1 text-xs text-slate-500 line-clamp-2">{item.summary}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">

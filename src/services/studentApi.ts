@@ -1,5 +1,4 @@
 import { BASE_URL } from "@/services/scholarApi";
-import { ACADEMIC_MONITOR_BASE_URL } from "@/services/apiBase";
 
 export interface StudentRecord {
   id: string;
@@ -146,7 +145,7 @@ export interface AcademicStudentPapersResponse {
   total: number;
 }
 
-const ACADEMIC_V1_BASE = `${ACADEMIC_MONITOR_BASE_URL}/api/v1`;
+const ACADEMIC_V1_BASE = `${BASE_URL}/api/v1`;
 
 export async function fetchStudentList(
   filters: StudentListFilters = {},

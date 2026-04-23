@@ -139,6 +139,11 @@ export interface PublicationRecord {
   year?: string;
   authors?: string;
   url?: string;
+  doi?: string;
+  abstract?: string;
+  publication_date?: string;
+  project_group_name?: string;
+  source_type?: string;
   citation_count?: number;
   is_corresponding?: boolean;
   added_by?: string;

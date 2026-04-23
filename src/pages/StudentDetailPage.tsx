@@ -18,7 +18,6 @@ import {
   fetchStudentDetail,
   fetchStudentListAll,
   patchStudent,
-  fetchAcademicStudents,
   fetchAcademicStudentPapers,
   createAcademicPaper,
   updateAcademicPaper,
@@ -312,49 +311,22 @@ export default function StudentDetailPage() {
     setTargetHint(null);
 
     try {
-      let resolvedTargetKey: string | null = null;
-      let paperResp: { items: StudentPaperRecord[] } | null = null;
-      const hints: string[] = [];
-
-      if (studentRecord.id?.startsWith("student_")) {
-        try {
-          paperResp = await fetchAcademicStudentPapers(studentRecord.id);
-          resolvedTargetKey = studentRecord.id;
-        } catch {
-          resolvedTargetKey = null;
-        }
-      }
-
-      if (!resolvedTargetKey) {
-        const candidates = await fetchAcademicStudents(studentRecord.name, 1, 100);
-        const exact = candidates.items.filter((x) => x.name === studentRecord.name);
-        const matched = (exact.length > 0 ? exact : candidates.items)[0] ?? null;
-        if (matched) {
-          resolvedTargetKey = matched.target_key;
-          if (exact.length > 1) {
-            hints.push("按姓名匹配到多个 academic-monitor 目标，已自动选择第一项");
-          }
-        }
-      }
-
+      const resolvedTargetKey = studentRecord.id?.trim() || null;
       setTargetKey(resolvedTargetKey);
       if (!resolvedTargetKey) {
         setPapers([]);
-        setPapersError("未在 academic-monitor 匹配到该学生，无法加载论文与合规数据。");
-        setTargetHint("请检查学生姓名或先在 academic-monitor 建立该学生目标");
+        setPapersError("未找到可用的学生标识，无法加载论文与合规数据。");
+        setTargetHint("请检查学生数据是否完整（缺少学生ID）");
         return;
       }
 
-      if (!paperResp) {
-        paperResp = await fetchAcademicStudentPapers(resolvedTargetKey);
-      }
+      const paperResp = await fetchAcademicStudentPapers(resolvedTargetKey);
       const normalized = (paperResp.items ?? []).map(normalizePaper);
       setPapers(normalized);
-      hints.unshift(`academic-monitor 目标：${resolvedTargetKey}`);
-      setTargetHint(hints.join("；"));
+      setTargetHint(`后端服务目标：${resolvedTargetKey}`);
     } catch {
       setPapers([]);
-      setPapersError("academic-monitor 接口不可用，无法加载论文与合规数据。");
+      setPapersError("后端服务接口不可用，无法加载论文与合规数据。");
       setTargetHint(null);
       setTargetKey(null);
     } finally {
@@ -523,7 +495,7 @@ export default function StudentDetailPage() {
 
   const handleSavePaper = async () => {
     if (!targetKey) {
-      setSaveError("未匹配 academic-monitor 目标，无法保存论文");
+      setSaveError("缺少学生标识，无法保存论文");
       return;
     }
     if (!paperForm.title.trim()) {
@@ -758,7 +730,7 @@ export default function StudentDetailPage() {
                   <span
                     className="text-[11px] px-2.5 py-1 rounded-full border border-emerald-200 bg-emerald-50/80 text-emerald-700 whitespace-nowrap"
                   >
-                    academic-monitor
+                    后端统一服务
                   </span>
                 </div>
               </div>
@@ -780,7 +752,7 @@ export default function StudentDetailPage() {
                 </div>
               ) : papers.length === 0 ? (
                 <div className="h-52 flex items-center justify-center text-sm text-slate-400">
-                  academic-monitor 中暂无论文与合规数据
+                  该学生暂无论文与合规数据
                 </div>
               ) : (
                 <div className="overflow-auto max-h-[69vh]">

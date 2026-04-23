@@ -238,6 +238,28 @@ function matchesProjectScope(
   return isCobuildScholar(item);
 }
 
+function normalizeSearchToken(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function matchesScholarKeyword(item: ScholarListItem, rawKeyword: string): boolean {
+  const keyword = normalizeSearchToken(rawKeyword);
+  if (!keyword) return true;
+  const haystacks = [
+    item.name,
+    item.name_en,
+    item.position,
+    item.university,
+    item.department,
+    ...(item.research_areas ?? []),
+    ...(item.academic_titles ?? []),
+  ]
+    .map((value) => String(value ?? "").toLowerCase())
+    .filter(Boolean);
+
+  return haystacks.some((text) => text.includes(keyword));
+}
+
 function buildUniNodesFromScholars(items: ScholarListItem[]): UniNode[] {
   const uniMap = new Map<string, { count: number; departments: Map<string, number> }>();
 
@@ -342,8 +364,13 @@ export function useScholarList() {
     () => Boolean(mentorType && mentorType !== "全部"),
     [mentorType],
   );
+  const normalizedQuery = query.trim();
+  const requiresKeywordClientFiltering = normalizedQuery.length > 0;
   const needsClientFiltering =
-    isProjectRootTab || isProjectParentSubtab || requiresMentorTypeFilter;
+    isProjectRootTab ||
+    isProjectParentSubtab ||
+    requiresMentorTypeFilter ||
+    requiresKeywordClientFiltering;
 
   /* University counts — filtered by current subtab */
   const {
@@ -501,7 +528,7 @@ export function useScholarList() {
         {
           university: activeUni ?? undefined,
           department: activeDept ?? undefined,
-          search: query.trim() || undefined,
+          search: undefined,
           participated_event_id: participatedEventId ?? undefined,
           is_adjunct_supervisor:
             mentorType === "兼职导师" ? true : undefined,
@@ -513,9 +540,11 @@ export function useScholarList() {
         controller.signal,
       )
         .then((allItems) => {
-          const filtered = allItems.filter(
-            (item) => matchProjectScope(item) && matchMentorType(item),
-          );
+          const filtered = allItems.filter((item) => {
+            const keywordMatched = matchesScholarKeyword(item, normalizedQuery);
+            if (!keywordMatched) return false;
+            return matchProjectScope(item) && matchMentorType(item);
+          });
           const total = filtered.length;
           const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
           const safePage = Math.min(Math.max(page, 1), totalPages);
@@ -549,7 +578,7 @@ export function useScholarList() {
       {
         university: activeUni ?? undefined,
         department: activeDept ?? undefined,
-        search: query.trim() || undefined,
+        search: normalizedQuery || undefined,
         participated_event_id: participatedEventId ?? undefined,
         is_adjunct_supervisor: mentorType === "兼职导师" ? true : undefined,
         region: apiRegion,
@@ -586,6 +615,7 @@ export function useScholarList() {
     activeSubTab,
     projectFilter.category,
     projectFilter.subcategory,
+    normalizedQuery,
   ]);
 
   /* Sync page to URL — only write when URL value actually differs */
@@ -685,7 +715,7 @@ export function useScholarList() {
       const allScholars = await fetchAllScholars({
         university: activeUni ?? undefined,
         department: activeDept ?? undefined,
-        search: query.trim() || undefined,
+        search: needsClientFiltering ? undefined : normalizedQuery || undefined,
         participated_event_id: participatedEventId ?? undefined,
         is_adjunct_supervisor: mentorType === "兼职导师" ? true : undefined,
         region: apiRegion,
@@ -699,6 +729,8 @@ export function useScholarList() {
       }
 
       const filteredScholars = allScholars.filter((item) => {
+        const keywordMatched = matchesScholarKeyword(item, normalizedQuery);
+        if (!keywordMatched) return false;
         const projectMatched = matchesProjectScope(item, {
           activeTab,
           activeSubTab,

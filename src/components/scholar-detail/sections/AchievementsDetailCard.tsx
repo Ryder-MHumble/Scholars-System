@@ -130,9 +130,20 @@ function PublicationsSection({ scholar }: { scholar: ScholarDetail }) {
                       {pub.year && ` (${pub.year})`}
                     </p>
                   )}
+                  {!pub.venue && pub.project_group_name && (
+                    <p className="text-xs text-gray-500 mb-1">
+                      项目组：{pub.project_group_name}
+                      {pub.year && ` (${pub.year})`}
+                    </p>
+                  )}
                   {pub.authors && (
                     <p className="text-xs text-gray-400 truncate">
                       {pub.authors}
+                    </p>
+                  )}
+                  {pub.doi && (
+                    <p className="mt-1 text-xs text-gray-400 break-all">
+                      DOI: {pub.doi}
                     </p>
                   )}
                 </div>
