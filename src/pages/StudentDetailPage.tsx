@@ -4,28 +4,35 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft,
   CalendarClock,
+  CheckCircle2,
   GraduationCap,
   Mail,
-  Phone,
   Pencil,
-  Save,
-  X,
+  Phone,
   Plus,
-  ShieldCheck,
+  RotateCcw,
+  Save,
   Trash2,
+  X,
+  XCircle,
 } from "lucide-react";
 import {
+  confirmStudentPublicationCandidate,
+  createAcademicPaper,
+  deleteAcademicPaper,
   fetchStudentDetail,
   fetchStudentListAll,
+  fetchStudentPublicationWorkspace,
   patchStudent,
-  fetchAcademicStudentPapers,
-  createAcademicPaper,
+  rejectStudentPublicationCandidate,
+  reopenStudentPublicationCandidate,
   updateAcademicPaper,
-  updateAcademicPaperCompliance,
-  deleteAcademicPaper,
-  type AcademicPaperCompliancePayload,
-  type AcademicPaperUpsertPayload,
+  updateStudentPublicationCandidate,
   type StudentPaperRecord,
+  type StudentPublicationCandidateDecisionPayload,
+  type StudentPublicationCandidatePatchPayload,
+  type StudentPublicationCandidateRecord,
+  type StudentPublicationWorkspaceResponse,
   type StudentRecord,
   type StudentUpdatePayload,
 } from "@/services/studentApi";
@@ -47,11 +54,15 @@ type EditablePaperForm = {
   abstract: string;
 };
 
-type ComplianceForm = {
+type CandidateReviewForm = {
   affiliation_status: string;
   compliance_reason: string;
   matched_tokens_csv: string;
+  checked_affiliations_csv: string;
+  note: string;
 };
+
+type CandidateAction = "confirm" | "reject" | "reopen";
 
 const EMPTY_PAPER_FORM: EditablePaperForm = {
   title: "",
@@ -64,10 +75,12 @@ const EMPTY_PAPER_FORM: EditablePaperForm = {
   abstract: "",
 };
 
-const EMPTY_COMPLIANCE_FORM: ComplianceForm = {
+const EMPTY_REVIEW_FORM: CandidateReviewForm = {
   affiliation_status: "unknown",
   compliance_reason: "",
   matched_tokens_csv: "",
+  checked_affiliations_csv: "",
+  note: "",
 };
 
 function safeText(value: string | null | undefined): string {
@@ -86,6 +99,13 @@ function formatEnrollmentYear(value: string | null | undefined): string {
   return year ? `${year}级` : "-";
 }
 
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("zh-CN");
+}
+
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -99,69 +119,94 @@ function statusClass(status: string): string {
   return "bg-blue-50 text-blue-700 border-blue-100";
 }
 
-function complianceClass(status: string): string {
-  const normalized = status.trim();
-  if (normalized === "通过" || normalized === "已通过") {
-    return "bg-emerald-50 text-emerald-700 border-emerald-100";
-  }
-  if (normalized === "待补材料" || normalized === "待复核") {
-    return "bg-amber-50 text-amber-700 border-amber-100";
-  }
-  if (normalized === "不通过" || normalized === "高风险") {
-    return "bg-red-50 text-red-700 border-red-100";
-  }
-  return "bg-gray-50 text-gray-600 border-gray-200";
+function sourceTypeLabel(value: string | null | undefined): string {
+  const token = (value ?? "").trim();
+  if (token === "monitor_api") return "academic-monitor";
+  if (token === "legacy_migrated") return "历史迁移";
+  if (token === "manual_upload") return "手动录入";
+  if (token === "bulk_import") return "批量导入";
+  return token || "未标记来源";
 }
 
-function classifyCompliance(status: string): "pass" | "pending" | "risk" | "other" {
-  const normalized = status.trim();
-  if (normalized === "通过" || normalized === "已通过") return "pass";
-  if (normalized === "待补材料" || normalized === "待复核") return "pending";
-  if (normalized === "不通过" || normalized === "高风险") return "risk";
-  return "other";
+function affiliationStatusLabel(value: string | null | undefined): string {
+  const token = (value ?? "").trim();
+  if (token === "compliant") return "合规";
+  if (token === "review_needed") return "待复核";
+  if (token === "non_compliant") return "不合规";
+  return "未判定";
+}
+
+function affiliationStatusClass(value: string | null | undefined): string {
+  const token = (value ?? "").trim();
+  if (token === "compliant") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (token === "review_needed") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (token === "non_compliant") return "border-red-200 bg-red-50 text-red-700";
+  return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function candidateStatusLabel(value: string): string {
+  if (value === "pending_review") return "待审核";
+  if (value === "rejected") return "已拒绝";
+  if (value === "confirmed") return "已确认";
+  return value || "未标记";
 }
 
 function csvToList(value: string): string[] {
   return value
     .split(",")
-    .map((x) => x.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
 }
 
 function toInputDatetime(value: string | null | undefined): string {
   if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().slice(0, 16);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 16);
 }
 
 function fromInputDatetime(value: string): string | null {
   if (!value.trim()) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
 }
 
-function normalizePaper(paper: StudentPaperRecord): StudentPaperRecord {
-  const year = paper.year ?? parseYear(paper.publication_date ?? undefined) ?? "";
-  const venue = paper.venue ?? paper.source ?? "";
-  const complianceStatus =
-    paper.compliance_status ??
-    (paper.affiliation_status === "compliant"
-      ? "已通过"
-      : paper.affiliation_status === "review_needed"
-        ? "待补材料"
-        : paper.affiliation_status === "non_compliant"
-          ? "高风险"
-          : "未标记");
-
+function toEditablePaperForm(
+  record: Pick<
+    StudentPaperRecord | StudentPublicationCandidateRecord,
+    "title" | "doi" | "arxiv_id" | "publication_date" | "source" | "authors" | "affiliations" | "abstract"
+  >,
+): EditablePaperForm {
   return {
-    ...paper,
-    venue,
-    year,
-    compliance_status: complianceStatus,
-    compliance_note: paper.compliance_note ?? paper.compliance_reason ?? "",
+    title: record.title ?? "",
+    doi: record.doi ?? "",
+    arxiv_id: record.arxiv_id ?? "",
+    publication_date: toInputDatetime(record.publication_date),
+    source: record.source ?? "manual",
+    authors_csv: (record.authors ?? []).join(", "),
+    affiliations_csv: (record.affiliations ?? []).join(", "),
+    abstract: record.abstract ?? "",
   };
+}
+
+function extractReviewNote(candidate: StudentPublicationCandidateRecord): string {
+  const reviewDecision = candidate.review_decision ?? {};
+  const note =
+    (typeof reviewDecision.note === "string" ? reviewDecision.note : "") ||
+    candidate.compliance_reason ||
+    "";
+  return note.trim();
+}
+
+function summarizeSource(candidate: StudentPublicationCandidateRecord): string {
+  const providers = Array.isArray(candidate.source_details?.source_providers)
+    ? (candidate.source_details?.source_providers as string[])
+    : [];
+  const providerText = providers.filter(Boolean).join(" / ");
+  const source = (candidate.source ?? "").trim();
+  if (providerText && source) return `${source} · ${providerText}`;
+  return source || providerText || sourceTypeLabel(candidate.source_type);
 }
 
 function Panel({
@@ -213,24 +258,43 @@ function StatChip({
 }: {
   label: string;
   value: number;
-  tone: "emerald" | "amber" | "red" | "slate";
+  tone: "emerald" | "amber" | "red";
 }) {
   const styleMap = {
     emerald: "border-emerald-200 bg-emerald-50/80 text-emerald-700",
     amber: "border-amber-200 bg-amber-50/80 text-amber-700",
     red: "border-red-200 bg-red-50/80 text-red-700",
-    slate: "border-slate-200 bg-slate-50/90 text-slate-600",
   } as const;
   return (
     <div
       className={cn(
-        "min-w-[96px] rounded-xl border px-3 py-2 text-xs",
+        "min-w-[112px] rounded-xl border px-3 py-2 text-xs",
         styleMap[tone],
       )}
     >
       <p>{label}</p>
       <p className="mt-1 text-base font-semibold leading-none">{value}</p>
     </div>
+  );
+}
+
+function MetaTag({
+  label,
+  tone = "slate",
+}: {
+  label: string;
+  tone?: "slate" | "emerald" | "amber" | "red";
+}) {
+  const styles = {
+    slate: "border-slate-200 bg-slate-50 text-slate-600",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    red: "border-red-200 bg-red-50 text-red-700",
+  } as const;
+  return (
+    <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px]", styles[tone])}>
+      {label}
+    </span>
   );
 }
 
@@ -248,7 +312,7 @@ function Modal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl rounded-xl bg-white border border-gray-100 shadow-xl">
+      <div className="w-full max-w-3xl rounded-xl bg-white border border-gray-100 shadow-xl">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
           <button
@@ -265,6 +329,219 @@ function Modal({
   );
 }
 
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-400">
+      {text}
+    </div>
+  );
+}
+
+function PublicationCard({
+  paper,
+  onEdit,
+  onDelete,
+}: {
+  paper: StudentPaperRecord;
+  onEdit: (paper: StudentPaperRecord) => void;
+  onDelete: (paper: StudentPaperRecord) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold text-slate-900 break-words">{safeText(paper.title)}</h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <MetaTag label={paper.source?.trim() || "已确认成果"} tone="emerald" />
+            <MetaTag label={paper.doi?.trim() ? `DOI ${paper.doi}` : paper.arxiv_id?.trim() ? `arXiv ${paper.arxiv_id}` : "无标准标识"} />
+            <MetaTag label={formatDate(paper.publication_date)} />
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => onEdit(paper)}
+            className="h-8 w-8 rounded-lg border border-slate-200 text-slate-700 inline-flex items-center justify-center"
+            title="编辑真实成果"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void onDelete(paper)}
+            className="h-8 w-8 rounded-lg border border-red-200 text-red-700 inline-flex items-center justify-center"
+            title="删除真实成果"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div>
+          <p className="text-[11px] text-slate-400">作者</p>
+          <p className="mt-1 text-sm text-slate-600 break-words leading-6">
+            {paper.authors?.length ? paper.authors.join("，") : "-"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-slate-400">机构</p>
+          <p className="mt-1 text-sm text-slate-600 break-words leading-6">
+            {paper.affiliations?.length ? paper.affiliations.join("；") : "-"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <p className="text-[11px] text-slate-400">摘要</p>
+        <p className="mt-1 text-sm text-slate-600 break-words leading-6">
+          {safeText(paper.abstract)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CandidateCard({
+  candidate,
+  variant,
+  onEdit,
+  onConfirm,
+  onReject,
+  onReopen,
+}: {
+  candidate: StudentPublicationCandidateRecord;
+  variant: "pending" | "rejected";
+  onEdit: (candidate: StudentPublicationCandidateRecord) => void;
+  onConfirm: (candidate: StudentPublicationCandidateRecord) => void;
+  onReject: (candidate: StudentPublicationCandidateRecord) => void;
+  onReopen: (candidate: StudentPublicationCandidateRecord) => void;
+}) {
+  const reviewNote = extractReviewNote(candidate);
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold text-slate-900 break-words">{safeText(candidate.title)}</h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <MetaTag label={candidateStatusLabel(candidate.review_status)} tone={variant === "rejected" ? "red" : "amber"} />
+            <MetaTag label={affiliationStatusLabel(candidate.affiliation_status)} tone={candidate.affiliation_status === "non_compliant" ? "red" : candidate.affiliation_status === "compliant" ? "emerald" : "amber"} />
+            <MetaTag label={sourceTypeLabel(candidate.source_type)} />
+            <MetaTag label={summarizeSource(candidate)} />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => onEdit(candidate)}
+            className="h-8 px-3 rounded-lg border border-slate-200 text-slate-700 text-xs inline-flex items-center gap-1"
+          >
+            <Pencil className="w-3.5 h-3.5" /> 编辑候选
+          </button>
+          {variant === "pending" ? (
+            <>
+              <button
+                type="button"
+                onClick={() => onConfirm(candidate)}
+                className="h-8 px-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs inline-flex items-center gap-1"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" /> Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => onReject(candidate)}
+                className="h-8 px-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs inline-flex items-center gap-1"
+              >
+                <XCircle className="w-3.5 h-3.5" /> No
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => onReopen(candidate)}
+                className="h-8 px-3 rounded-lg border border-slate-200 text-slate-700 text-xs inline-flex items-center gap-1"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> 恢复待审核
+              </button>
+              <button
+                type="button"
+                onClick={() => onConfirm(candidate)}
+                className="h-8 px-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs inline-flex items-center gap-1"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" /> 直接确认 Yes
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div>
+          <p className="text-[11px] text-slate-400">标准标识</p>
+          <p className="mt-1 text-sm text-slate-600 break-all">
+            {candidate.doi?.trim() ? `DOI ${candidate.doi}` : candidate.arxiv_id?.trim() ? `arXiv ${candidate.arxiv_id}` : candidate.canonical_uid}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-slate-400">发布时间 / 最近发现</p>
+          <p className="mt-1 text-sm text-slate-600">
+            {formatDate(candidate.publication_date)} / {formatDateTime(candidate.last_seen_at)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div>
+          <p className="text-[11px] text-slate-400">作者</p>
+          <p className="mt-1 text-sm text-slate-600 break-words leading-6">
+            {candidate.authors?.length ? candidate.authors.join("，") : "-"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-slate-400">机构</p>
+          <p className="mt-1 text-sm text-slate-600 break-words leading-6">
+            {candidate.affiliations?.length ? candidate.affiliations.join("；") : "-"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <p className="text-[11px] text-slate-400">审核说明</p>
+        <p className="mt-1 text-sm text-slate-600 break-words leading-6">{safeText(reviewNote)}</p>
+      </div>
+
+      <div className="mt-3">
+        <p className="text-[11px] text-slate-400">摘要</p>
+        <p className="mt-1 text-sm text-slate-600 break-words leading-6">{safeText(candidate.abstract)}</p>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px]", affiliationStatusClass(candidate.affiliation_status))}>
+          {affiliationStatusLabel(candidate.affiliation_status)}
+        </span>
+        {candidate.matched_tokens?.length ? (
+          <MetaTag label={`匹配词：${candidate.matched_tokens.join("，")}`} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function workspaceFallback(): StudentPublicationWorkspaceResponse {
+  return {
+    counts: {
+      confirmed: 0,
+      pending_review: 0,
+      rejected: 0,
+    },
+    confirmed_publications: [],
+    pending_candidates: [],
+    rejected_candidates: [],
+  };
+}
+
 export default function StudentDetailPage() {
   const { studentId } = useParams<{ studentId: string }>();
   const location = useLocation();
@@ -277,11 +554,9 @@ export default function StudentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [papers, setPapers] = useState<StudentPaperRecord[]>([]);
-  const [papersLoading, setPapersLoading] = useState(false);
-  const [papersError, setPapersError] = useState<string | null>(null);
-  const [targetKey, setTargetKey] = useState<string | null>(null);
-  const [targetHint, setTargetHint] = useState<string | null>(null);
+  const [workspace, setWorkspace] = useState<StudentPublicationWorkspaceResponse>(workspaceFallback());
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
 
   const [studentEditorOpen, setStudentEditorOpen] = useState(false);
   const [studentSaving, setStudentSaving] = useState(false);
@@ -292,10 +567,16 @@ export default function StudentDetailPage() {
   const [paperForm, setPaperForm] = useState<EditablePaperForm>(EMPTY_PAPER_FORM);
   const [paperSaving, setPaperSaving] = useState(false);
 
-  const [complianceModalOpen, setComplianceModalOpen] = useState(false);
-  const [compliancePaper, setCompliancePaper] = useState<StudentPaperRecord | null>(null);
-  const [complianceForm, setComplianceForm] = useState<ComplianceForm>(EMPTY_COMPLIANCE_FORM);
-  const [complianceSaving, setComplianceSaving] = useState(false);
+  const [candidateModalOpen, setCandidateModalOpen] = useState(false);
+  const [editingCandidate, setEditingCandidate] = useState<StudentPublicationCandidateRecord | null>(null);
+  const [candidateForm, setCandidateForm] = useState<EditablePaperForm>(EMPTY_PAPER_FORM);
+  const [candidateSaving, setCandidateSaving] = useState(false);
+
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewCandidate, setReviewCandidate] = useState<StudentPublicationCandidateRecord | null>(null);
+  const [reviewAction, setReviewAction] = useState<CandidateAction>("confirm");
+  const [reviewForm, setReviewForm] = useState<CandidateReviewForm>(EMPTY_REVIEW_FORM);
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   const backLink = useMemo(() => {
     const prevLocation = locationState?.from;
@@ -305,32 +586,21 @@ export default function StudentDetailPage() {
     return window.sessionStorage.getItem("student_list_return_to") ?? "/?tab=students";
   }, [locationState]);
 
-  const refreshPapers = async (studentRecord: StudentRecord) => {
-    setPapersLoading(true);
-    setPapersError(null);
-    setTargetHint(null);
+  const confirmedPublications = workspace.confirmed_publications ?? [];
+  const pendingCandidates = workspace.pending_candidates ?? [];
+  const rejectedCandidates = workspace.rejected_candidates ?? [];
 
+  const refreshWorkspace = async (currentStudentId: string) => {
+    setWorkspaceLoading(true);
+    setWorkspaceError(null);
     try {
-      const resolvedTargetKey = studentRecord.id?.trim() || null;
-      setTargetKey(resolvedTargetKey);
-      if (!resolvedTargetKey) {
-        setPapers([]);
-        setPapersError("未找到可用的学生标识，无法加载论文与合规数据。");
-        setTargetHint("请检查学生数据是否完整（缺少学生ID）");
-        return;
-      }
-
-      const paperResp = await fetchAcademicStudentPapers(resolvedTargetKey);
-      const normalized = (paperResp.items ?? []).map(normalizePaper);
-      setPapers(normalized);
-      setTargetHint(`后端服务目标：${resolvedTargetKey}`);
-    } catch {
-      setPapers([]);
-      setPapersError("后端服务接口不可用，无法加载论文与合规数据。");
-      setTargetHint(null);
-      setTargetKey(null);
+      const nextWorkspace = await fetchStudentPublicationWorkspace(currentStudentId);
+      setWorkspace(nextWorkspace);
+    } catch (err) {
+      setWorkspace(workspaceFallback());
+      setWorkspaceError(err instanceof Error ? err.message : "学生成果工作台加载失败");
     } finally {
-      setPapersLoading(false);
+      setWorkspaceLoading(false);
     }
   };
 
@@ -392,9 +662,9 @@ export default function StudentDetailPage() {
   }, [snapshot, studentId]);
 
   useEffect(() => {
-    if (!student) return;
-    void refreshPapers(student);
-  }, [student]);
+    if (!student?.id) return;
+    void refreshWorkspace(student.id);
+  }, [student?.id]);
 
   useEffect(() => {
     if (!student) return;
@@ -416,16 +686,6 @@ export default function StudentDetailPage() {
     });
   }, [student]);
 
-  const complianceStats = useMemo(() => {
-    const initial = { pass: 0, pending: 0, risk: 0, other: 0 };
-    papers.forEach((paper) => {
-      const status = (paper.compliance_status ?? "").trim() || "未标记";
-      const key = classifyCompliance(status);
-      initial[key] += 1;
-    });
-    return initial;
-  }, [papers]);
-
   const openCreatePaper = () => {
     setEditingPaper(null);
     setPaperForm(EMPTY_PAPER_FORM);
@@ -434,42 +694,30 @@ export default function StudentDetailPage() {
 
   const openEditPaper = (paper: StudentPaperRecord) => {
     setEditingPaper(paper);
-    setPaperForm({
-      title: paper.title ?? "",
-      doi: paper.doi ?? "",
-      arxiv_id: paper.arxiv_id ?? "",
-      publication_date: toInputDatetime(paper.publication_date),
-      source: paper.source ?? "manual",
-      authors_csv: (paper.authors ?? []).join(", "),
-      affiliations_csv: (paper.affiliations ?? []).join(", "),
-      abstract: paper.abstract ?? "",
-    });
+    setPaperForm(toEditablePaperForm(paper));
     setPaperModalOpen(true);
   };
 
-  const openComplianceEditor = (paper: StudentPaperRecord) => {
-    setCompliancePaper(paper);
-    setComplianceForm({
-      affiliation_status: paper.affiliation_status ?? "unknown",
-      compliance_reason: paper.compliance_reason ?? "",
-      matched_tokens_csv: (paper.matched_tokens ?? []).join(", "),
-    });
-    setComplianceModalOpen(true);
+  const openCandidateEditor = (candidate: StudentPublicationCandidateRecord) => {
+    setEditingCandidate(candidate);
+    setCandidateForm(toEditablePaperForm(candidate));
+    setCandidateModalOpen(true);
   };
 
-  const handleSaveStudent = async () => {
-    if (!student) return;
-    setStudentSaving(true);
-    setSaveError(null);
-    try {
-      const updated = await patchStudent(student.id, studentForm);
-      setStudent(updated);
-      setStudentEditorOpen(false);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "学生信息保存失败");
-    } finally {
-      setStudentSaving(false);
-    }
+  const openCandidateReview = (
+    candidate: StudentPublicationCandidateRecord,
+    action: CandidateAction,
+  ) => {
+    setReviewCandidate(candidate);
+    setReviewAction(action);
+    setReviewForm({
+      affiliation_status: candidate.affiliation_status ?? "unknown",
+      compliance_reason: candidate.compliance_reason ?? "",
+      matched_tokens_csv: (candidate.matched_tokens ?? []).join(", "),
+      checked_affiliations_csv: (candidate.checked_affiliations ?? []).join(", "),
+      note: extractReviewNote(candidate),
+    });
+    setReviewModalOpen(true);
   };
 
   const openStudentEditor = () => {
@@ -493,20 +741,35 @@ export default function StudentDetailPage() {
     setStudentEditorOpen(true);
   };
 
+  const handleSaveStudent = async () => {
+    if (!student) return;
+    setStudentSaving(true);
+    setSaveError(null);
+    try {
+      const updated = await patchStudent(student.id, studentForm);
+      setStudent(updated);
+      setStudentEditorOpen(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "学生信息保存失败");
+    } finally {
+      setStudentSaving(false);
+    }
+  };
+
   const handleSavePaper = async () => {
-    if (!targetKey) {
-      setSaveError("缺少学生标识，无法保存论文");
+    if (!student?.id) {
+      setSaveError("缺少学生标识，无法保存成果");
       return;
     }
     if (!paperForm.title.trim()) {
-      setSaveError("论文标题不能为空");
+      setSaveError("成果标题不能为空");
       return;
     }
 
     setPaperSaving(true);
     setSaveError(null);
     try {
-      const payload: AcademicPaperUpsertPayload = {
+      const payload = {
         title: paperForm.title.trim(),
         doi: paperForm.doi.trim() || null,
         arxiv_id: paperForm.arxiv_id.trim() || null,
@@ -516,64 +779,108 @@ export default function StudentDetailPage() {
         authors: csvToList(paperForm.authors_csv),
         affiliations: csvToList(paperForm.affiliations_csv),
       };
-
       if (editingPaper?.paper_uid) {
-        await updateAcademicPaper(targetKey, editingPaper.paper_uid, payload);
+        await updateAcademicPaper(student.id, editingPaper.paper_uid, payload);
       } else {
-        await createAcademicPaper(targetKey, payload);
+        await createAcademicPaper(student.id, payload);
       }
       setPaperModalOpen(false);
       setEditingPaper(null);
-      if (student) await refreshPapers(student);
+      await refreshWorkspace(student.id);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "论文保存失败");
+      setSaveError(err instanceof Error ? err.message : "真实成果保存失败");
     } finally {
       setPaperSaving(false);
     }
   };
 
-  const handleSaveCompliance = async () => {
-    if (!targetKey || !compliancePaper?.paper_uid) {
-      setSaveError("缺少论文标识，无法保存合规结果");
+  const handleDeletePaper = async (paper: StudentPaperRecord) => {
+    if (!student?.id || !paper.paper_uid) {
+      setSaveError("缺少成果标识，无法删除");
       return;
     }
-    setComplianceSaving(true);
+    if (!window.confirm("确认删除这条已确认成果？")) return;
+
     setSaveError(null);
     try {
-      const payload: AcademicPaperCompliancePayload = {
-        affiliation_status: complianceForm.affiliation_status || null,
-        compliance_reason: complianceForm.compliance_reason.trim() || null,
-        matched_tokens: csvToList(complianceForm.matched_tokens_csv),
-        assessed_at: new Date().toISOString(),
-      };
-      await updateAcademicPaperCompliance(
-        targetKey,
-        compliancePaper.paper_uid,
-        payload,
-      );
-      setComplianceModalOpen(false);
-      setCompliancePaper(null);
-      if (student) await refreshPapers(student);
+      await deleteAcademicPaper(student.id, paper.paper_uid);
+      await refreshWorkspace(student.id);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "合规保存失败");
-    } finally {
-      setComplianceSaving(false);
+      setSaveError(err instanceof Error ? err.message : "删除真实成果失败");
     }
   };
 
-  const handleDeletePaper = async (paper: StudentPaperRecord) => {
-    if (!targetKey || !paper.paper_uid) {
-      setSaveError("缺少论文标识，无法删除");
+  const handleSaveCandidate = async () => {
+    if (!student?.id || !editingCandidate?.candidate_id) {
+      setSaveError("缺少候选成果标识，无法保存");
       return;
     }
-    if (!window.confirm("确认删除该论文？")) return;
+    if (!candidateForm.title.trim()) {
+      setSaveError("候选成果标题不能为空");
+      return;
+    }
 
+    setCandidateSaving(true);
     setSaveError(null);
     try {
-      await deleteAcademicPaper(targetKey, paper.paper_uid);
-      if (student) await refreshPapers(student);
+      const payload: StudentPublicationCandidatePatchPayload = {
+        title: candidateForm.title.trim(),
+        doi: candidateForm.doi.trim() || null,
+        arxiv_id: candidateForm.arxiv_id.trim() || null,
+        abstract: candidateForm.abstract.trim() || null,
+        publication_date: fromInputDatetime(candidateForm.publication_date),
+        source: candidateForm.source.trim() || null,
+        authors: csvToList(candidateForm.authors_csv),
+        affiliations: csvToList(candidateForm.affiliations_csv),
+      };
+      await updateStudentPublicationCandidate(student.id, editingCandidate.candidate_id, payload);
+      setCandidateModalOpen(false);
+      setEditingCandidate(null);
+      await refreshWorkspace(student.id);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "删除论文失败");
+      setSaveError(err instanceof Error ? err.message : "候选成果保存失败");
+    } finally {
+      setCandidateSaving(false);
+    }
+  };
+
+  const handleSubmitCandidateAction = async () => {
+    if (!student?.id || !reviewCandidate?.candidate_id) {
+      setSaveError("缺少候选成果标识，无法执行审核");
+      return;
+    }
+    setReviewSaving(true);
+    setSaveError(null);
+    try {
+      const payload: StudentPublicationCandidateDecisionPayload = {
+        reviewed_by: "scholars-system",
+        note: reviewForm.note.trim() || null,
+        affiliation_status: reviewForm.affiliation_status || null,
+        compliance_reason: reviewForm.compliance_reason.trim() || null,
+        matched_tokens: csvToList(reviewForm.matched_tokens_csv),
+        checked_affiliations: csvToList(reviewForm.checked_affiliations_csv),
+        compliance_details: {
+          affiliation_status: reviewForm.affiliation_status || null,
+          compliance_reason: reviewForm.compliance_reason.trim() || null,
+          matched_tokens: csvToList(reviewForm.matched_tokens_csv),
+          checked_affiliations: csvToList(reviewForm.checked_affiliations_csv),
+        },
+      };
+
+      if (reviewAction === "confirm") {
+        await confirmStudentPublicationCandidate(student.id, reviewCandidate.candidate_id, payload);
+      } else if (reviewAction === "reject") {
+        await rejectStudentPublicationCandidate(student.id, reviewCandidate.candidate_id, payload);
+      } else {
+        await reopenStudentPublicationCandidate(student.id, reviewCandidate.candidate_id, payload);
+      }
+      setReviewModalOpen(false);
+      setReviewCandidate(null);
+      await refreshWorkspace(student.id);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "候选成果审核失败");
+    } finally {
+      setReviewSaving(false);
     }
   };
 
@@ -708,139 +1015,107 @@ export default function StudentDetailPage() {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
-            className="order-1 xl:order-2"
+            className="order-1 xl:order-2 space-y-3"
           >
             <section className="rounded-2xl border border-slate-200/80 bg-white/95 shadow-[0_1px_2px_rgba(15,23,42,0.06)] overflow-hidden">
               <div className="px-4 py-3.5 border-b border-slate-100 flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h2 className="text-base font-semibold text-slate-900">论文与合规工作台</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">论文列表、合规标记与维护操作集中在中间区域</p>
-                  {targetHint && <p className="text-[11px] text-slate-500 mt-1.5 break-all">{targetHint}</p>}
+                  <h2 className="text-base font-semibold text-slate-900">学生成果审核工作台</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    已确认成果与候选审核分层管理；Yes 会沉淀到真实成果表，No 会留在候选层并参与后续排除。
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {targetKey && (
-                    <button
-                      type="button"
-                      onClick={openCreatePaper}
-                      className="h-8 px-3 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 text-xs inline-flex items-center gap-1.5 whitespace-nowrap"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> 新增论文
-                    </button>
-                  )}
-                  <span
-                    className="text-[11px] px-2.5 py-1 rounded-full border border-emerald-200 bg-emerald-50/80 text-emerald-700 whitespace-nowrap"
-                  >
-                    后端统一服务
-                  </span>
-                </div>
+                <span className="text-[11px] px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 whitespace-nowrap">
+                  student_publications + publication_candidates
+                </span>
               </div>
 
               <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap gap-2.5">
-                <StatChip label="已通过" value={complianceStats.pass} tone="emerald" />
-                <StatChip label="待补材料" value={complianceStats.pending} tone="amber" />
-                <StatChip label="高风险" value={complianceStats.risk} tone="red" />
-                <StatChip label="未标记" value={complianceStats.other} tone="slate" />
+                <StatChip label="已确认成果" value={workspace.counts.confirmed} tone="emerald" />
+                <StatChip label="待审核候选" value={workspace.counts.pending_review} tone="amber" />
+                <StatChip label="已拒绝候选" value={workspace.counts.rejected} tone="red" />
               </div>
+            </section>
 
-              {papersLoading ? (
-                <div className="h-52 flex items-center justify-center text-sm text-slate-400">
-                  论文与合规信息加载中...
-                </div>
-              ) : papersError ? (
-                <div className="h-52 flex items-center justify-center text-sm text-red-500 px-4 text-center">
-                  {papersError}
-                </div>
-              ) : papers.length === 0 ? (
-                <div className="h-52 flex items-center justify-center text-sm text-slate-400">
-                  该学生暂无论文与合规数据
-                </div>
+            {workspaceError ? (
+              <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {workspaceError}
+              </div>
+            ) : null}
+
+            <Panel
+              title="已确认成果"
+              actions={
+                <button
+                  type="button"
+                  onClick={openCreatePaper}
+                  className="h-8 px-3 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 text-xs inline-flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <Plus className="w-3.5 h-3.5" /> 新增真实成果
+                </button>
+              }
+            >
+              {workspaceLoading ? (
+                <EmptyState text="学生成果工作台加载中..." />
+              ) : confirmedPublications.length === 0 ? (
+                <EmptyState text="当前没有已确认成果，先在候选区审核 Yes，或直接手动新增。" />
               ) : (
-                <div className="overflow-auto max-h-[69vh]">
-                  <table className="w-full text-left min-w-[980px] table-fixed">
-                    <colgroup>
-                      <col className="w-[46%]" />
-                      <col className="w-[12%]" />
-                      <col className="w-[8%]" />
-                      <col className="w-[12%]" />
-                      <col className="w-[16%]" />
-                      <col className="w-[6%]" />
-                    </colgroup>
-                    <thead className="sticky top-0 bg-slate-50/95 z-10 backdrop-blur">
-                      <tr className="border-b border-slate-100">
-                        <th className="px-4 py-3 text-[11px] font-semibold text-slate-500">论文标题</th>
-                        <th className="px-3 py-3 text-[11px] font-semibold text-slate-500">来源</th>
-                        <th className="px-3 py-3 text-[11px] font-semibold text-slate-500">年份</th>
-                        <th className="px-3 py-3 text-[11px] font-semibold text-slate-500">合规状态</th>
-                        <th className="px-3 py-3 text-[11px] font-semibold text-slate-500">合规说明</th>
-                        <th className="px-3 py-3 text-[11px] font-semibold text-slate-500 text-right">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-sm">
-                      {papers.map((paper, idx) => {
-                        const compliance = (paper.compliance_status ?? "").trim() || "未标记";
-                        return (
-                          <tr
-                            key={paper.paper_uid ?? paper.id ?? `${paper.title}-${idx}`}
-                            className={cn(
-                              "border-b border-slate-100 last:border-b-0",
-                              idx % 2 === 0 ? "bg-white" : "bg-slate-50/30",
-                            )}
-                          >
-                            <td className="px-4 py-3 text-slate-800 font-medium leading-6 break-words">
-                              {safeText(paper.title)}
-                            </td>
-                            <td className="px-3 py-3 text-slate-600 truncate">{safeText(paper.venue)}</td>
-                            <td className="px-3 py-3 text-slate-600">{safeText(String(paper.year ?? ""))}</td>
-                            <td className="px-3 py-3">
-                              <span
-                                className={cn(
-                                  "inline-flex text-[11px] px-2 py-0.5 rounded-full border whitespace-nowrap",
-                                  complianceClass(compliance),
-                                )}
-                              >
-                                {compliance}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-slate-600 leading-6 break-words">{safeText(paper.compliance_note)}</td>
-                            <td className="px-3 py-3 sticky right-0 bg-inherit">
-                              <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={() => openEditPaper(paper)}
-                                  disabled={!targetKey}
-                                  title="编辑论文"
-                                  className="h-7 w-7 rounded-md border border-slate-200 text-slate-700 inline-flex items-center justify-center disabled:opacity-50"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openComplianceEditor(paper)}
-                                  disabled={!targetKey || !paper.paper_uid}
-                                  title="编辑合规"
-                                  className="h-7 w-7 rounded-md border border-blue-200 text-blue-700 inline-flex items-center justify-center disabled:opacity-50"
-                                >
-                                  <ShieldCheck className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDeletePaper(paper)}
-                                  disabled={!targetKey || !paper.paper_uid}
-                                  title="删除论文"
-                                  className="h-7 w-7 rounded-md border border-red-200 text-red-700 inline-flex items-center justify-center disabled:opacity-50"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="space-y-3">
+                  {confirmedPublications.map((paper, index) => (
+                    <PublicationCard
+                      key={paper.paper_uid ?? `${paper.title}-${index}`}
+                      paper={paper}
+                      onEdit={openEditPaper}
+                      onDelete={handleDeletePaper}
+                    />
+                  ))}
                 </div>
               )}
-            </section>
+            </Panel>
+
+            <Panel title="待审核候选">
+              {workspaceLoading ? (
+                <EmptyState text="候选成果加载中..." />
+              ) : pendingCandidates.length === 0 ? (
+                <EmptyState text="当前没有待审核候选。" />
+              ) : (
+                <div className="space-y-3">
+                  {pendingCandidates.map((candidate) => (
+                    <CandidateCard
+                      key={candidate.candidate_id}
+                      candidate={candidate}
+                      variant="pending"
+                      onEdit={openCandidateEditor}
+                      onConfirm={(item) => openCandidateReview(item, "confirm")}
+                      onReject={(item) => openCandidateReview(item, "reject")}
+                      onReopen={(item) => openCandidateReview(item, "reopen")}
+                    />
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            <Panel title="已拒绝候选">
+              {workspaceLoading ? (
+                <EmptyState text="已拒绝候选加载中..." />
+              ) : rejectedCandidates.length === 0 ? (
+                <EmptyState text="当前没有已拒绝候选。" />
+              ) : (
+                <div className="space-y-3">
+                  {rejectedCandidates.map((candidate) => (
+                    <CandidateCard
+                      key={candidate.candidate_id}
+                      candidate={candidate}
+                      variant="rejected"
+                      onEdit={openCandidateEditor}
+                      onConfirm={(item) => openCandidateReview(item, "confirm")}
+                      onReject={(item) => openCandidateReview(item, "reject")}
+                      onReopen={(item) => openCandidateReview(item, "reopen")}
+                    />
+                  ))}
+                </div>
+              )}
+            </Panel>
           </motion.main>
 
           <motion.aside
@@ -874,8 +1149,8 @@ export default function StudentDetailPage() {
                       ? "border-gray-200 text-gray-700 hover:bg-gray-50"
                       : "border-gray-100 text-gray-300 cursor-not-allowed",
                   )}
-                  onClick={(e) => {
-                    if (!student.email) e.preventDefault();
+                  onClick={(event) => {
+                    if (!student.email) event.preventDefault();
                   }}
                 >
                   <Mail className="w-3.5 h-3.5" /> 发送邮件
@@ -888,8 +1163,8 @@ export default function StudentDetailPage() {
                       ? "border-gray-200 text-gray-700 hover:bg-gray-50"
                       : "border-gray-100 text-gray-300 cursor-not-allowed",
                   )}
-                  onClick={(e) => {
-                    if (!student.phone) e.preventDefault();
+                  onClick={(event) => {
+                    if (!student.phone) event.preventDefault();
                   }}
                 >
                   <Phone className="w-3.5 h-3.5" /> 拨打电话
@@ -924,10 +1199,10 @@ export default function StudentDetailPage() {
               {label}
               <input
                 value={String((studentForm as Record<string, unknown>)[key] ?? "")}
-                onChange={(e) =>
+                onChange={(event) =>
                   setStudentForm((prev) => ({
                     ...prev,
-                    [key]: e.target.value,
+                    [key]: event.target.value,
                   }))
                 }
                 className="mt-1 w-full h-9 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
@@ -938,8 +1213,8 @@ export default function StudentDetailPage() {
             备注
             <textarea
               value={studentForm.notes ?? ""}
-              onChange={(e) =>
-                setStudentForm((prev) => ({ ...prev, notes: e.target.value }))
+              onChange={(event) =>
+                setStudentForm((prev) => ({ ...prev, notes: event.target.value }))
               }
               rows={3}
               className="mt-1 w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700"
@@ -968,15 +1243,15 @@ export default function StudentDetailPage() {
 
       <Modal
         open={paperModalOpen}
-        title={editingPaper ? "编辑论文" : "新增论文"}
+        title={editingPaper ? "编辑已确认成果" : "新增真实成果"}
         onClose={() => setPaperModalOpen(false)}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label className="text-xs text-gray-500 md:col-span-2">
-            论文标题
+            成果标题
             <input
               value={paperForm.title}
-              onChange={(e) => setPaperForm((s) => ({ ...s, title: e.target.value }))}
+              onChange={(event) => setPaperForm((prev) => ({ ...prev, title: event.target.value }))}
               className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
             />
           </label>
@@ -984,7 +1259,7 @@ export default function StudentDetailPage() {
             DOI
             <input
               value={paperForm.doi}
-              onChange={(e) => setPaperForm((s) => ({ ...s, doi: e.target.value }))}
+              onChange={(event) => setPaperForm((prev) => ({ ...prev, doi: event.target.value }))}
               className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
             />
           </label>
@@ -992,7 +1267,7 @@ export default function StudentDetailPage() {
             arXiv ID
             <input
               value={paperForm.arxiv_id}
-              onChange={(e) => setPaperForm((s) => ({ ...s, arxiv_id: e.target.value }))}
+              onChange={(event) => setPaperForm((prev) => ({ ...prev, arxiv_id: event.target.value }))}
               className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
             />
           </label>
@@ -1001,8 +1276,8 @@ export default function StudentDetailPage() {
             <input
               type="datetime-local"
               value={paperForm.publication_date}
-              onChange={(e) =>
-                setPaperForm((s) => ({ ...s, publication_date: e.target.value }))
+              onChange={(event) =>
+                setPaperForm((prev) => ({ ...prev, publication_date: event.target.value }))
               }
               className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
             />
@@ -1011,38 +1286,38 @@ export default function StudentDetailPage() {
             来源
             <input
               value={paperForm.source}
-              onChange={(e) => setPaperForm((s) => ({ ...s, source: e.target.value }))}
+              onChange={(event) => setPaperForm((prev) => ({ ...prev, source: event.target.value }))}
               className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
             />
           </label>
-          <label className="text-xs text-gray-500 md:col-span-2">
-            作者（逗号分隔）
+          <label className="text-xs text-gray-500">
+            作者
             <input
               value={paperForm.authors_csv}
-              onChange={(e) =>
-                setPaperForm((s) => ({ ...s, authors_csv: e.target.value }))
+              onChange={(event) =>
+                setPaperForm((prev) => ({ ...prev, authors_csv: event.target.value }))
               }
               className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+              placeholder="用英文逗号分隔"
             />
           </label>
-          <label className="text-xs text-gray-500 md:col-span-2">
-            单位（逗号分隔）
+          <label className="text-xs text-gray-500">
+            机构
             <input
               value={paperForm.affiliations_csv}
-              onChange={(e) =>
-                setPaperForm((s) => ({ ...s, affiliations_csv: e.target.value }))
+              onChange={(event) =>
+                setPaperForm((prev) => ({ ...prev, affiliations_csv: event.target.value }))
               }
               className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+              placeholder="用英文逗号分隔"
             />
           </label>
           <label className="text-xs text-gray-500 md:col-span-2">
             摘要
             <textarea
-              rows={3}
               value={paperForm.abstract}
-              onChange={(e) =>
-                setPaperForm((s) => ({ ...s, abstract: e.target.value }))
-              }
+              onChange={(event) => setPaperForm((prev) => ({ ...prev, abstract: event.target.value }))}
+              rows={4}
               className="mt-1 w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700"
             />
           </label>
@@ -1059,52 +1334,93 @@ export default function StudentDetailPage() {
             type="button"
             disabled={paperSaving}
             onClick={() => void handleSavePaper()}
-            className="h-8 px-3 rounded-md bg-primary-600 text-white text-xs disabled:opacity-60"
+            className="h-8 px-3 rounded-md bg-primary-600 text-white text-xs inline-flex items-center gap-1.5 disabled:opacity-60"
           >
+            <Save className="w-3.5 h-3.5" />
             {paperSaving ? "保存中..." : "保存"}
           </button>
         </div>
       </Modal>
 
       <Modal
-        open={complianceModalOpen}
-        title="编辑合规状态"
-        onClose={() => setComplianceModalOpen(false)}
+        open={candidateModalOpen}
+        title="编辑候选成果"
+        onClose={() => setCandidateModalOpen(false)}
       >
-        <div className="grid grid-cols-1 gap-3">
-          <label className="text-xs text-gray-500">
-            合规状态
-            <select
-              value={complianceForm.affiliation_status}
-              onChange={(e) =>
-                setComplianceForm((s) => ({ ...s, affiliation_status: e.target.value }))
-              }
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs text-gray-500 md:col-span-2">
+            候选标题
+            <input
+              value={candidateForm.title}
+              onChange={(event) => setCandidateForm((prev) => ({ ...prev, title: event.target.value }))}
               className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
-            >
-              <option value="unknown">unknown</option>
-              <option value="compliant">compliant</option>
-              <option value="review_needed">review_needed</option>
-              <option value="non_compliant">non_compliant</option>
-            </select>
+            />
           </label>
           <label className="text-xs text-gray-500">
-            匹配 token（逗号分隔）
+            DOI
             <input
-              value={complianceForm.matched_tokens_csv}
-              onChange={(e) =>
-                setComplianceForm((s) => ({ ...s, matched_tokens_csv: e.target.value }))
+              value={candidateForm.doi}
+              onChange={(event) => setCandidateForm((prev) => ({ ...prev, doi: event.target.value }))}
+              className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+            />
+          </label>
+          <label className="text-xs text-gray-500">
+            arXiv ID
+            <input
+              value={candidateForm.arxiv_id}
+              onChange={(event) => setCandidateForm((prev) => ({ ...prev, arxiv_id: event.target.value }))}
+              className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+            />
+          </label>
+          <label className="text-xs text-gray-500">
+            发表时间
+            <input
+              type="datetime-local"
+              value={candidateForm.publication_date}
+              onChange={(event) =>
+                setCandidateForm((prev) => ({ ...prev, publication_date: event.target.value }))
               }
               className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
             />
           </label>
           <label className="text-xs text-gray-500">
-            合规说明
-            <textarea
-              rows={4}
-              value={complianceForm.compliance_reason}
-              onChange={(e) =>
-                setComplianceForm((s) => ({ ...s, compliance_reason: e.target.value }))
+            来源
+            <input
+              value={candidateForm.source}
+              onChange={(event) => setCandidateForm((prev) => ({ ...prev, source: event.target.value }))}
+              className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+            />
+          </label>
+          <label className="text-xs text-gray-500">
+            作者
+            <input
+              value={candidateForm.authors_csv}
+              onChange={(event) =>
+                setCandidateForm((prev) => ({ ...prev, authors_csv: event.target.value }))
               }
+              className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+              placeholder="用英文逗号分隔"
+            />
+          </label>
+          <label className="text-xs text-gray-500">
+            机构
+            <input
+              value={candidateForm.affiliations_csv}
+              onChange={(event) =>
+                setCandidateForm((prev) => ({ ...prev, affiliations_csv: event.target.value }))
+              }
+              className="mt-1 w-full h-8 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+              placeholder="用英文逗号分隔"
+            />
+          </label>
+          <label className="text-xs text-gray-500 md:col-span-2">
+            摘要
+            <textarea
+              value={candidateForm.abstract}
+              onChange={(event) =>
+                setCandidateForm((prev) => ({ ...prev, abstract: event.target.value }))
+              }
+              rows={4}
               className="mt-1 w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700"
             />
           </label>
@@ -1112,18 +1428,130 @@ export default function StudentDetailPage() {
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => setComplianceModalOpen(false)}
+            onClick={() => setCandidateModalOpen(false)}
             className="h-8 px-3 rounded-md border border-gray-200 text-xs text-gray-700"
           >
             取消
           </button>
           <button
             type="button"
-            disabled={complianceSaving}
-            onClick={() => void handleSaveCompliance()}
-            className="h-8 px-3 rounded-md bg-primary-600 text-white text-xs disabled:opacity-60"
+            disabled={candidateSaving}
+            onClick={() => void handleSaveCandidate()}
+            className="h-8 px-3 rounded-md bg-primary-600 text-white text-xs inline-flex items-center gap-1.5 disabled:opacity-60"
           >
-            {complianceSaving ? "保存中..." : "保存"}
+            <Save className="w-3.5 h-3.5" />
+            {candidateSaving ? "保存中..." : "保存"}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={reviewModalOpen}
+        title={
+          reviewAction === "confirm"
+            ? "确认候选成果"
+            : reviewAction === "reject"
+              ? "拒绝候选成果"
+              : "恢复候选到待审核"
+        }
+        onClose={() => setReviewModalOpen(false)}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs text-gray-500">
+            合规状态
+            <select
+              value={reviewForm.affiliation_status}
+              onChange={(event) =>
+                setReviewForm((prev) => ({ ...prev, affiliation_status: event.target.value }))
+              }
+              className="mt-1 w-full h-9 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+            >
+              <option value="unknown">未判定</option>
+              <option value="compliant">合规</option>
+              <option value="review_needed">待复核</option>
+              <option value="non_compliant">不合规</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-500">
+            匹配词
+            <input
+              value={reviewForm.matched_tokens_csv}
+              onChange={(event) =>
+                setReviewForm((prev) => ({ ...prev, matched_tokens_csv: event.target.value }))
+              }
+              className="mt-1 w-full h-9 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+              placeholder="用英文逗号分隔"
+            />
+          </label>
+          <label className="text-xs text-gray-500 md:col-span-2">
+            已检查机构
+            <input
+              value={reviewForm.checked_affiliations_csv}
+              onChange={(event) =>
+                setReviewForm((prev) => ({ ...prev, checked_affiliations_csv: event.target.value }))
+              }
+              className="mt-1 w-full h-9 rounded-md border border-gray-200 px-2 text-sm text-gray-700"
+              placeholder="用英文逗号分隔"
+            />
+          </label>
+          <label className="text-xs text-gray-500 md:col-span-2">
+            合规说明
+            <textarea
+              value={reviewForm.compliance_reason}
+              onChange={(event) =>
+                setReviewForm((prev) => ({ ...prev, compliance_reason: event.target.value }))
+              }
+              rows={3}
+              className="mt-1 w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700"
+            />
+          </label>
+          <label className="text-xs text-gray-500 md:col-span-2">
+            审核备注
+            <textarea
+              value={reviewForm.note}
+              onChange={(event) =>
+                setReviewForm((prev) => ({ ...prev, note: event.target.value }))
+              }
+              rows={3}
+              className="mt-1 w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700"
+            />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setReviewModalOpen(false)}
+            className="h-8 px-3 rounded-md border border-gray-200 text-xs text-gray-700"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            disabled={reviewSaving}
+            onClick={() => void handleSubmitCandidateAction()}
+            className={cn(
+              "h-8 px-3 rounded-md text-xs inline-flex items-center gap-1.5 disabled:opacity-60",
+              reviewAction === "confirm"
+                ? "bg-emerald-600 text-white"
+                : reviewAction === "reject"
+                  ? "bg-red-600 text-white"
+                  : "bg-slate-700 text-white",
+            )}
+          >
+            {reviewAction === "confirm" ? (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            ) : reviewAction === "reject" ? (
+              <XCircle className="w-3.5 h-3.5" />
+            ) : (
+              <RotateCcw className="w-3.5 h-3.5" />
+            )}
+            {reviewSaving
+              ? "提交中..."
+              : reviewAction === "confirm"
+                ? "确认 Yes"
+                : reviewAction === "reject"
+                  ? "确认 No"
+                  : "恢复待审核"}
           </button>
         </div>
       </Modal>

@@ -19,12 +19,11 @@ import { Pagination } from "@/components/common/Pagination";
 import {
   createStudent,
   deleteStudent,
-  fetchAcademicStudentPapers,
   fetchStudentList,
   fetchStudentListAll,
   fetchStudentOptions,
+  fetchStudentPublicationWorkspace,
   type StudentCreatePayload,
-  type StudentPaperRecord,
   type StudentRecord,
 } from "@/services/studentApi";
 import { BatchStudentImportModal } from "@/components/student/BatchStudentImportModal";
@@ -373,22 +372,19 @@ export default function StudentListPage() {
         let failedCount = 0;
         const concurrency = 8;
 
-        const hasProblemPaper = (papers: StudentPaperRecord[]): boolean =>
-          papers.some((paper) => {
-            const affiliation = String(paper.affiliation_status ?? "").trim();
-            const compliance = String(paper.compliance_status ?? "").trim();
-            return (
-              affiliation === "non_compliant" ||
-              compliance === "高风险" ||
-              compliance === "不通过"
-            );
+        const hasProblemPaper = (workspace: Awaited<ReturnType<typeof fetchStudentPublicationWorkspace>>): boolean => {
+          if ((workspace.rejected_candidates ?? []).length > 0) return true;
+          return (workspace.pending_candidates ?? []).some((candidate) => {
+            const affiliation = String(candidate.affiliation_status ?? "").trim();
+            return affiliation === "non_compliant";
           });
+        };
 
         for (let idx = 0; idx < allItems.length; idx += concurrency) {
           if (controller.signal.aborted) return;
           const chunk = allItems.slice(idx, idx + concurrency);
           const results = await Promise.allSettled(
-            chunk.map((student) => fetchAcademicStudentPapers(student.id, controller.signal)),
+            chunk.map((student) => fetchStudentPublicationWorkspace(student.id, controller.signal)),
           );
 
           results.forEach((result, offset) => {
@@ -398,7 +394,7 @@ export default function StudentListPage() {
               failedCount += 1;
               return;
             }
-            if (!hasProblemPaper(result.value.items ?? [])) return;
+            if (!hasProblemPaper(result.value)) return;
 
             const studentId = (student.id ?? "").trim();
             const studentName = (student.name ?? "").trim();

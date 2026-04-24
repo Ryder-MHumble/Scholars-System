@@ -100,6 +100,48 @@ export interface StudentPaperRecord {
   compliance_reason?: string | null;
 }
 
+export interface StudentPublicationCandidateRecord {
+  candidate_id: string;
+  target_key?: string | null;
+  owner_type: string;
+  owner_id: string;
+  canonical_uid: string;
+  paper_uid?: string | null;
+  title: string;
+  doi?: string | null;
+  arxiv_id?: string | null;
+  abstract?: string | null;
+  publication_date?: string | null;
+  source?: string | null;
+  source_type?: string | null;
+  source_details?: Record<string, unknown>;
+  authors?: string[];
+  affiliations?: string[];
+  review_status: string;
+  review_decision?: Record<string, unknown>;
+  compliance_details?: Record<string, unknown>;
+  affiliation_status?: string | null;
+  compliance_reason?: string | null;
+  matched_tokens?: string[];
+  checked_affiliations?: string[];
+  assessed_at?: string | null;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface StudentPublicationWorkspaceResponse {
+  counts: {
+    confirmed: number;
+    pending_review: number;
+    rejected: number;
+  };
+  confirmed_publications: StudentPaperRecord[];
+  pending_candidates: StudentPublicationCandidateRecord[];
+  rejected_candidates: StudentPublicationCandidateRecord[];
+}
+
 export interface AcademicStudentSummary {
   target_key: string;
   name: string;
@@ -138,6 +180,27 @@ export interface AcademicPaperCompliancePayload {
   compliance_reason?: string | null;
   matched_tokens?: string[];
   assessed_at?: string | null;
+}
+
+export interface StudentPublicationCandidatePatchPayload {
+  title?: string;
+  doi?: string | null;
+  arxiv_id?: string | null;
+  abstract?: string | null;
+  publication_date?: string | null;
+  source?: string | null;
+  authors?: string[];
+  affiliations?: string[];
+}
+
+export interface StudentPublicationCandidateDecisionPayload {
+  reviewed_by?: string | null;
+  note?: string | null;
+  affiliation_status?: string | null;
+  compliance_reason?: string | null;
+  matched_tokens?: string[];
+  checked_affiliations?: string[];
+  compliance_details?: Record<string, unknown>;
 }
 
 export interface AcademicStudentPapersResponse {
@@ -248,6 +311,95 @@ export async function fetchStudentPapers(
   }
 
   return [];
+}
+
+export async function fetchStudentPublicationWorkspace(
+  studentId: string,
+  signal?: AbortSignal,
+): Promise<StudentPublicationWorkspaceResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/students/${studentId}/publication-workspace`, {
+    signal,
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch student publication workspace: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function updateStudentPublicationCandidate(
+  studentId: string,
+  candidateId: string,
+  payload: StudentPublicationCandidatePatchPayload,
+): Promise<StudentPublicationCandidateRecord> {
+  const res = await fetch(
+    `${BASE_URL}/api/v1/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to update student publication candidate: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function confirmStudentPublicationCandidate(
+  studentId: string,
+  candidateId: string,
+  payload: StudentPublicationCandidateDecisionPayload,
+): Promise<{ status: string; candidate_id: string; paper_uid?: string | null }> {
+  const res = await fetch(
+    `${BASE_URL}/api/v1/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}/confirm`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to confirm student publication candidate: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function rejectStudentPublicationCandidate(
+  studentId: string,
+  candidateId: string,
+  payload: StudentPublicationCandidateDecisionPayload,
+): Promise<{ status: string; candidate_id: string; paper_uid?: string | null }> {
+  const res = await fetch(
+    `${BASE_URL}/api/v1/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}/reject`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to reject student publication candidate: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function reopenStudentPublicationCandidate(
+  studentId: string,
+  candidateId: string,
+  payload: StudentPublicationCandidateDecisionPayload,
+): Promise<{ status: string; candidate_id: string; paper_uid?: string | null }> {
+  const res = await fetch(
+    `${BASE_URL}/api/v1/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}/reopen`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to reopen student publication candidate: ${res.status}`);
+  }
+  return res.json();
 }
 
 export async function createStudent(
