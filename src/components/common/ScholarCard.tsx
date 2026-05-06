@@ -7,6 +7,11 @@ import { motion } from "framer-motion";
 import { Building2, Award, Trash2 } from "lucide-react";
 import { type ScholarListItem } from "@/services/scholarApi";
 import { getAvatarColor, getInitial } from "@/utils/avatar";
+import {
+  extractAchievementTags,
+  getAchievementTagKind,
+  type AchievementTag,
+} from "@/utils/scholarAchievementTags";
 
 interface ScholarCardProps {
   scholar: ScholarListItem;
@@ -16,6 +21,12 @@ interface ScholarCardProps {
   isDeleting?: boolean;
 }
 
+function getAchievementTagClassName(tag: AchievementTag): string {
+  return getAchievementTagKind(tag) === "competition"
+    ? "bg-amber-50 text-amber-700 border-amber-200"
+    : "bg-violet-50 text-violet-700 border-violet-100";
+}
+
 export function ScholarCard({
   scholar: s,
   index = 0,
@@ -23,6 +34,8 @@ export function ScholarCard({
   onDelete,
   isDeleting = false,
 }: ScholarCardProps) {
+  const achievementTags = extractAchievementTags(s);
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.97 }}
@@ -106,6 +119,24 @@ export function ScholarCard({
               </span>
             )}
           </div>
+
+          {achievementTags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1">
+              {achievementTags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag}
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${getAchievementTagClassName(tag)}`}
+                >
+                  {tag}
+                </span>
+              ))}
+              {achievementTags.length > 3 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                  +{achievementTags.length - 3}
+                </span>
+              )}
+            </div>
+          )}
         </Link>
 
         {onDelete && (

@@ -8,6 +8,11 @@ import type {
   EducationRecord,
 } from "@/services/scholarApi";
 import {
+  buildLegacyProfileLinkFields,
+  resolveProfileLinks,
+  type ProfileLinks,
+} from "@/services/scholarApi";
+import {
   ensureDepartmentExists,
   ensureOrganizationExists,
 } from "@/services/institutionApi";
@@ -65,6 +70,7 @@ export function EditProfileModal({
   const [editedManagementRoles, setEditedManagementRoles] = useState<string[]>(
     scholar.joint_management_roles ?? [],
   );
+  const initialProfileLinks = resolveProfileLinks(scholar);
 
   const [form, setForm] = useState({
     name: scholar.name || "",
@@ -76,11 +82,14 @@ export function EditProfileModal({
     email: scholar.email || "",
     phone: scholar.phone || "",
     office: scholar.office || "",
-    profile_url: scholar.profile_url || "",
-    google_scholar_url: scholar.google_scholar_url || "",
-    dblp_url: scholar.dblp_url || "",
-    lab_url: scholar.lab_url || "",
-    orcid: scholar.orcid || "",
+    profile_url: initialProfileLinks.homepage,
+    google_scholar_url: initialProfileLinks.google_scholar,
+    dblp_url: initialProfileLinks.dblp,
+    lab_url: initialProfileLinks.lab,
+    orcid: initialProfileLinks.orcid,
+    github_url: initialProfileLinks.github,
+    linkedin_url: initialProfileLinks.linkedin,
+    other_profile_links: initialProfileLinks.other.join("\n"),
     bio: scholar.bio || "",
     bio_en: scholar.bio_en || "",
     research_areas: (scholar.research_areas ?? []).join(", "),
@@ -165,15 +174,23 @@ export function EditProfileModal({
     check("email", form.email, scholar.email);
     check("phone", form.phone, scholar.phone);
     check("office", form.office, scholar.office);
-    check("profile_url", form.profile_url, scholar.profile_url);
-    check(
-      "google_scholar_url",
-      form.google_scholar_url,
-      scholar.google_scholar_url,
-    );
-    check("dblp_url", form.dblp_url, scholar.dblp_url);
-    check("lab_url", form.lab_url, scholar.lab_url);
-    check("orcid", form.orcid, scholar.orcid);
+    const nextProfileLinks: ProfileLinks = {
+      homepage: form.profile_url.trim(),
+      lab: form.lab_url.trim(),
+      github: form.github_url.trim(),
+      linkedin: form.linkedin_url.trim(),
+      google_scholar: form.google_scholar_url.trim(),
+      orcid: form.orcid.trim(),
+      dblp: form.dblp_url.trim(),
+      other: form.other_profile_links
+        .split(/\n|,/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    };
+    if (JSON.stringify(nextProfileLinks) !== JSON.stringify(initialProfileLinks)) {
+      patch.profile_links = nextProfileLinks;
+      Object.assign(patch, buildLegacyProfileLinkFields(nextProfileLinks));
+    }
     check("bio", form.bio, scholar.bio);
     check("bio_en", form.bio_en, scholar.bio_en);
 
@@ -412,13 +429,41 @@ export function EditProfileModal({
           )}
 
           {activeTab === "links" && (
-            <Section title="学术链接">
+            <Section title="主页链接">
               <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="个人主页"
+                  value={form.profile_url}
+                  onChange={(v) => set("profile_url", v)}
+                  placeholder="https://..."
+                />
+                <Field
+                  label="GitHub"
+                  value={form.github_url}
+                  onChange={(v) => set("github_url", v)}
+                  placeholder="https://..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="LinkedIn"
+                  value={form.linkedin_url}
+                  onChange={(v) => set("linkedin_url", v)}
+                  placeholder="https://..."
+                />
                 <Field
                   label="Google Scholar"
                   value={form.google_scholar_url}
                   onChange={(v) => set("google_scholar_url", v)}
                   placeholder="https://..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="ORCID"
+                  value={form.orcid}
+                  onChange={(v) => set("orcid", v)}
+                  placeholder="0000-0000-0000-0000"
                 />
                 <Field
                   label="DBLP"
@@ -434,11 +479,12 @@ export function EditProfileModal({
                   onChange={(v) => set("lab_url", v)}
                   placeholder="https://..."
                 />
-                <Field
-                  label="ORCID"
-                  value={form.orcid}
-                  onChange={(v) => set("orcid", v)}
-                  placeholder="0000-0000-0000-0000"
+                <TextareaField
+                  label="其他链接"
+                  value={form.other_profile_links}
+                  onChange={(v) => set("other_profile_links", v)}
+                  rows={3}
+                  placeholder="每行一个链接"
                 />
               </div>
             </Section>
@@ -715,11 +761,13 @@ function TextareaField({
   value,
   onChange,
   rows = 3,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   rows?: number;
+  placeholder?: string;
 }) {
   return (
     <div>
@@ -730,6 +778,7 @@ function TextareaField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={rows}
+        placeholder={placeholder}
         className={TEXTAREA_CLASS}
       />
     </div>

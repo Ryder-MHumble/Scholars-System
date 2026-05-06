@@ -2,7 +2,7 @@ import { API_BASE_URL } from "@/services/apiBase";
 
 const BASE_URL = API_BASE_URL;
 
-// List item (from GET /api/v1/events/)
+// List item (from GET /api/events/)
 export interface ActivityEvent {
   id: string;
   category: string;
@@ -22,7 +22,7 @@ export interface ActivityEvent {
   updated_at?: string;
 }
 
-// Full detail (from GET /api/v1/events/{id})
+// Full detail (from GET /api/events/{id})
 export interface ActivityEventDetail {
   id: string;
   category: string;
@@ -49,7 +49,7 @@ export interface ActivityListResponse {
   items: ActivityEvent[];
 }
 
-// Actual stats shape from GET /api/v1/events/stats
+// Actual stats shape from GET /api/events/stats
 export interface ActivityStats {
   total: number;
   by_category: Array<{ category: string; count: number }>;
@@ -268,7 +268,7 @@ export async function fetchActivities(
   if (series) params.set("series", series);
   if (scholarId) params.set("scholar_id", scholarId);
 
-  const res = await fetch(`${BASE_URL}/api/v1/events/?${params}`);
+  const res = await fetch(`${BASE_URL}/api/events/?${params}`);
   if (!res.ok) throw new Error(`Failed to fetch activities: ${res.status}`);
   const raw: BackendActivityListResponse = await res.json();
   return {
@@ -278,7 +278,7 @@ export async function fetchActivities(
 }
 
 export async function fetchActivityStats(): Promise<ActivityStats> {
-  const res = await fetch(`${BASE_URL}/api/v1/events/stats`);
+  const res = await fetch(`${BASE_URL}/api/events/stats`);
   if (!res.ok) throw new Error(`Failed to fetch activity stats: ${res.status}`);
   return res.json();
 }
@@ -286,7 +286,7 @@ export async function fetchActivityStats(): Promise<ActivityStats> {
 export async function fetchActivityDetail(
   eventId: string,
 ): Promise<ActivityEventDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/events/${eventId}`);
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}`);
   if (!res.ok)
     throw new Error(`Failed to fetch activity detail: ${res.status}`);
   const raw: BackendActivityEventDetail = await res.json();
@@ -297,7 +297,7 @@ export async function createActivity(
   data: ActivityCreateRequest,
 ): Promise<ActivityEventDetail> {
   const payload = toBackendPayload(data);
-  const res = await fetch(`${BASE_URL}/api/v1/events/`, {
+  const res = await fetch(`${BASE_URL}/api/events/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -312,7 +312,7 @@ export async function updateActivity(
   data: ActivityUpdateRequest,
 ): Promise<ActivityEventDetail> {
   const payload = toBackendPayload(data);
-  const res = await fetch(`${BASE_URL}/api/v1/events/${eventId}`, {
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -323,7 +323,7 @@ export async function updateActivity(
 }
 
 export async function deleteActivity(eventId: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/v1/events/${eventId}`, {
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`Failed to delete activity: ${res.status}`);
@@ -431,7 +431,7 @@ async function fetchActivityScholarsViaScholarList(
   eventId: string,
 ): Promise<ActivityScholarDetail[]> {
   const firstRes = await fetch(
-    `${BASE_URL}/api/v1/scholars?page=1&page_size=200&participated_event_id=${encodeURIComponent(eventId)}`,
+    `${BASE_URL}/api/scholars?page=1&page_size=200&participated_event_id=${encodeURIComponent(eventId)}`,
   );
   if (!firstRes.ok) {
     throw new Error(`Failed to fetch activity scholars from scholar list: ${firstRes.status}`);
@@ -446,7 +446,7 @@ async function fetchActivityScholarsViaScholarList(
     for (let page = 2; page <= totalPages; page += 1) {
       pageRequests.push(
         fetch(
-          `${BASE_URL}/api/v1/scholars?page=${page}&page_size=200&participated_event_id=${encodeURIComponent(eventId)}`,
+          `${BASE_URL}/api/scholars?page=${page}&page_size=200&participated_event_id=${encodeURIComponent(eventId)}`,
         ).then(async (res) => {
           if (!res.ok) {
             throw new Error(
@@ -495,7 +495,7 @@ export async function fetchActivityScholars(
     // Fallback to /events/{id}/scholars for compatibility with older backends.
   }
 
-  const res = await fetch(`${BASE_URL}/api/v1/events/${eventId}/scholars`);
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}/scholars`);
   if (!res.ok) {
     throw new Error(`Failed to fetch activity scholars: ${res.status}`);
   }
@@ -512,7 +512,7 @@ export async function addActivityScholar(
   eventId: string,
   scholarId: string,
 ): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/v1/events/${eventId}/scholars`, {
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}/scholars`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scholar_id: scholarId }),
@@ -526,7 +526,7 @@ export async function removeActivityScholar(
   scholarId: string,
 ): Promise<void> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/events/${eventId}/scholars/${scholarId}`,
+    `${BASE_URL}/api/events/${eventId}/scholars/${scholarId}`,
     { method: "DELETE" },
   );
   if (!res.ok)
@@ -597,7 +597,7 @@ async function eventContainsScholar(
   targetScholarKey: string,
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/api/v1/events/${eventId}/scholars`);
+    const res = await fetch(`${BASE_URL}/api/events/${eventId}/scholars`);
     if (!res.ok) return false;
     const raw = await res.json();
     if (!Array.isArray(raw)) return false;
@@ -756,7 +756,7 @@ export interface TaxonomyUpdateRequest {
 }
 
 export async function fetchTaxonomyTree(): Promise<TaxonomyTree> {
-  const res = await fetch(`${BASE_URL}/api/v1/events/taxonomy`);
+  const res = await fetch(`${BASE_URL}/api/events/taxonomy`);
   if (!res.ok) throw new Error(`Failed to fetch taxonomy tree: ${res.status}`);
   return res.json();
 }
@@ -764,7 +764,7 @@ export async function fetchTaxonomyTree(): Promise<TaxonomyTree> {
 export async function createTaxonomyNode(
   data: TaxonomyCreateRequest,
 ): Promise<TaxonomyNode> {
-  const res = await fetch(`${BASE_URL}/api/v1/events/taxonomy`, {
+  const res = await fetch(`${BASE_URL}/api/events/taxonomy`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),

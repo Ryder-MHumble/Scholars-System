@@ -10,9 +10,11 @@ import type {
   ScholarProjectTag,
 } from "@/services/scholarApi";
 import {
+  buildLegacyProfileLinkFields,
   createScholar,
   patchScholarAchievements,
   patchScholarRelation,
+  resolveProfileLinks,
 } from "@/services/scholarApi";
 import type { ScholarDetailPatch } from "@/services/scholarApi";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
@@ -35,6 +37,16 @@ const emptyScholar: ScholarDetail = {
   is_academician: false,
   research_areas: [],
   email: "",
+  profile_links: {
+    homepage: "",
+    lab: "",
+    github: "",
+    linkedin: "",
+    google_scholar: "",
+    orcid: "",
+    dblp: "",
+    other: [],
+  },
   profile_url: "",
   joint_research_projects: [],
   is_potential_recruit: false,
@@ -106,7 +118,25 @@ export default function AddScholarDetailPage() {
   // Basic field save handler
   const handleFieldSave = async (patch: ScholarDetailPatch) => {
     try {
-      setScholar((prev) => ({ ...prev, ...patch }));
+      setScholar((prev) => {
+        const next = { ...prev, ...patch };
+        const touchedLinks = Boolean(
+          patch.profile_links ||
+            "profile_url" in patch ||
+            "lab_url" in patch ||
+            "google_scholar_url" in patch ||
+            "dblp_url" in patch ||
+            "orcid" in patch,
+        );
+        if (!touchedLinks) return next;
+
+        const profileLinks = resolveProfileLinks(next);
+        return {
+          ...next,
+          profile_links: profileLinks,
+          ...buildLegacyProfileLinkFields(profileLinks),
+        };
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败");
@@ -168,6 +198,8 @@ export default function AddScholarDetailPage() {
     setError(null);
 
     try {
+      const profileLinks = resolveProfileLinks(scholar);
+      const legacyProfileFields = buildLegacyProfileLinkFields(profileLinks);
       // Prepare data for API
       const submitData = {
         name: scholar.name,
@@ -178,9 +210,8 @@ export default function AddScholarDetailPage() {
         department: scholar.department || undefined,
         email: scholar.email || undefined,
         phone: scholar.phone || undefined,
-        profile_url: scholar.profile_url || undefined,
-        google_scholar_url: scholar.google_scholar_url || undefined,
-        dblp_url: scholar.dblp_url || undefined,
+        profile_links: profileLinks,
+        ...legacyProfileFields,
         research_areas: scholar.research_areas || [],
         academic_titles: scholar.academic_titles || [],
         education: scholar.education || [],

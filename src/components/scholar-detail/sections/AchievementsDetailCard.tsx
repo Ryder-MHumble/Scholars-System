@@ -4,6 +4,11 @@ import { BookOpen, Award, Trophy, ExternalLink, Edit3 } from "lucide-react";
 import type { ScholarDetail } from "@/services/scholarApi";
 import { cn } from "@/utils/cn";
 import { slideInUp } from "@/utils/animations";
+import {
+  extractAchievementTags,
+  getAchievementTagKind,
+  type AchievementTag,
+} from "@/utils/scholarAchievementTags";
 
 interface AchievementsDetailCardProps {
   scholar: ScholarDetail;
@@ -16,6 +21,13 @@ export function AchievementsDetailCard({
 }: AchievementsDetailCardProps) {
   const [activeTab, setActiveTab] = useState<"publications" | "patents" | "awards">(
     "publications",
+  );
+  const achievementTags = extractAchievementTags(scholar);
+  const venueTags = achievementTags.filter(
+    (tag) => getAchievementTagKind(tag) === "venue",
+  );
+  const competitionTags = achievementTags.filter(
+    (tag) => getAchievementTagKind(tag) === "competition",
   );
   const tabs = [
     {
@@ -56,6 +68,14 @@ export function AchievementsDetailCard({
         </button>
       </div>
 
+      {achievementTags.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2">
+          <span className="text-xs font-semibold text-gray-500">学术标识</span>
+          <AchievementTagGroup label="顶刊顶会" tags={venueTags} />
+          <AchievementTagGroup label="竞赛" tags={competitionTags} />
+        </div>
+      )}
+
       <div className="mb-4 border-b border-gray-100">
         <div className="flex items-center gap-2">
           {tabs.map((tab) => (
@@ -82,6 +102,35 @@ export function AchievementsDetailCard({
       {activeTab === "patents" && <PatentsSection scholar={scholar} />}
       {activeTab === "awards" && <AwardsSection scholar={scholar} />}
     </motion.div>
+  );
+}
+
+function AchievementTagGroup({
+  label,
+  tags,
+}: {
+  label: string;
+  tags: AchievementTag[];
+}) {
+  if (tags.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-[11px] text-gray-400">{label}</span>
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          className={cn(
+            "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+            getAchievementTagKind(tag) === "competition"
+              ? "border-amber-200 bg-amber-50 text-amber-700"
+              : "border-violet-100 bg-violet-50 text-violet-700",
+          )}
+        >
+          {tag}
+        </span>
+      ))}
+    </div>
   );
 }
 

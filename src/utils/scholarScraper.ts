@@ -109,7 +109,7 @@ ${content.substring(0, 8000)}
 
 只返回JSON，不要包含任何其他文字说明。`;
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const response = await fetch("https://openrouter.ai/api/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

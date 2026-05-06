@@ -30,7 +30,7 @@
 
 ## API 请求体（前端已按此发送）
 
-### POST /api/v1/events/
+### POST /api/events/
 ```json
 {
   "category": "research",
@@ -47,6 +47,6 @@
 }
 ```
 
-### PATCH /api/v1/events/{id}
+### PATCH /api/events/{id}
 同上字段，按需部分更新。
 

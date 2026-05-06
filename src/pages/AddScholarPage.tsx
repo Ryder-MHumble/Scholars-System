@@ -51,8 +51,13 @@ interface FormData {
   email: string;
   phone: string;
   homepage: string;
+  lab: string;
+  github: string;
+  linkedin: string;
   googleScholar: string;
+  orcid: string;
   dblp: string;
+  otherProfileLinks: string;
   researchFields: string[];
   honors: AcademicHonor[];
   bio: string;
@@ -73,8 +78,13 @@ const initialForm: FormData = {
   email: "",
   phone: "",
   homepage: "",
+  lab: "",
+  github: "",
+  linkedin: "",
   googleScholar: "",
+  orcid: "",
   dblp: "",
+  otherProfileLinks: "",
   researchFields: [],
   honors: [],
   bio: "",
@@ -163,9 +173,24 @@ export default function AddScholarPage() {
         department: form.departmentId || undefined,
         email: form.email || undefined,
         phone: form.phone || undefined,
-        profile_url: form.homepage || undefined,
-        dblp_url: form.dblp || undefined,
-        google_scholar_url: form.googleScholar || undefined,
+        profile_links: {
+          homepage: form.homepage,
+          lab: form.lab,
+          github: form.github,
+          linkedin: form.linkedin,
+          google_scholar: form.googleScholar,
+          orcid: form.orcid,
+          dblp: form.dblp,
+          other: form.otherProfileLinks
+            .split(/\n|,/)
+            .map((item) => item.trim())
+            .filter(Boolean),
+        },
+        profile_url: form.homepage,
+        lab_url: form.lab,
+        dblp_url: form.dblp,
+        google_scholar_url: form.googleScholar,
+        orcid: form.orcid,
         research_areas:
           form.researchFields.length > 0 ? form.researchFields : undefined,
         bio: form.bio || undefined,
@@ -493,6 +518,30 @@ export default function AddScholarPage() {
                     type="url"
                   />
                 </Field>
+                <Field label="实验室主页">
+                  <TextInput
+                    value={form.lab}
+                    onChange={(v) => set("lab", v)}
+                    placeholder="https://lab.example.edu/..."
+                    type="url"
+                  />
+                </Field>
+                <Field label="GitHub">
+                  <TextInput
+                    value={form.github}
+                    onChange={(v) => set("github", v)}
+                    placeholder="https://github.com/..."
+                    type="url"
+                  />
+                </Field>
+                <Field label="LinkedIn">
+                  <TextInput
+                    value={form.linkedin}
+                    onChange={(v) => set("linkedin", v)}
+                    placeholder="https://linkedin.com/in/..."
+                    type="url"
+                  />
+                </Field>
                 <Field label="Google Scholar">
                   <TextInput
                     value={form.googleScholar}
@@ -501,12 +550,27 @@ export default function AddScholarPage() {
                     type="url"
                   />
                 </Field>
+                <Field label="ORCID">
+                  <TextInput
+                    value={form.orcid}
+                    onChange={(v) => set("orcid", v)}
+                    placeholder="0000-0000-0000-0000"
+                  />
+                </Field>
                 <Field label="DBLP">
                   <TextInput
                     value={form.dblp}
                     onChange={(v) => set("dblp", v)}
                     placeholder="https://dblp.org/pid/..."
                     type="url"
+                  />
+                </Field>
+                <Field label="其它主页链接">
+                  <TextareaInput
+                    value={form.otherProfileLinks}
+                    onChange={(v) => set("otherProfileLinks", v)}
+                    placeholder="每行一个链接，或用逗号分隔"
+                    rows={3}
                   />
                 </Field>
               </div>

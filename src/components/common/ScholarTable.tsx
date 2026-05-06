@@ -3,6 +3,11 @@ import { motion } from "framer-motion";
 import { Eye, Trash2 } from "lucide-react";
 import type { ScholarListItem } from "@/services/scholarApi";
 import { getAvatarColor, getInitial } from "@/utils/avatar";
+import {
+  extractAchievementTags,
+  getAchievementTagKind,
+  type AchievementTag,
+} from "@/utils/scholarAchievementTags";
 
 const SUBCATEGORY_ALIAS_MAP: Record<string, string> = {
   科技育青委员会: "科技教育委员会",
@@ -32,6 +37,12 @@ function getMentorTypes(scholar: ScholarListItem): string[] {
   }
 
   return labels;
+}
+
+function getAchievementTagClassName(tag: AchievementTag): string {
+  return getAchievementTagKind(tag) === "competition"
+    ? "bg-amber-50 text-amber-700 border-amber-200"
+    : "bg-violet-50 text-violet-700 border-violet-100";
 }
 
 interface ScholarTableProps {
@@ -64,6 +75,9 @@ export function ScholarTable({
               </th>
               <th className="px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
                 职称
+              </th>
+              <th className="px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
+                学术标识
               </th>
               <th className="px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50/70">
                 共建导师类别
@@ -152,6 +166,33 @@ export function ScholarTable({
                   <span className="text-sm text-gray-600">
                     {s.position ? s.position.replace(/^职称[：:]\s*/, "") : "—"}
                   </span>
+                </td>
+
+                {/* 学术标识 */}
+                <td className="px-4 py-2.5">
+                  {(() => {
+                    const achievementTags = extractAchievementTags(s);
+                    if (!achievementTags.length) {
+                      return <span className="text-xs text-gray-300">—</span>;
+                    }
+                    return (
+                      <div className="flex flex-wrap gap-1 max-w-[180px]">
+                        {achievementTags.slice(0, 3).map((label) => (
+                          <span
+                            key={label}
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getAchievementTagClassName(label)}`}
+                          >
+                            {label}
+                          </span>
+                        ))}
+                        {achievementTags.length > 3 && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400 border border-gray-200">
+                            +{achievementTags.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </td>
 
                 {/* 共建导师类别 */}

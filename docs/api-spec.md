@@ -19,7 +19,7 @@
 
 | 项目 | 约定 |
 |------|------|
-| 基础路径 | `/api/v1` |
+| 基础路径 | `/api` |
 | 数据格式 | JSON（`Content-Type: application/json`） |
 | 字符编码 | UTF-8 |
 | 时间格式 | ISO 8601（`2025-12-01T10:30:00Z`） |
@@ -215,7 +215,7 @@
 
 ### 3.1 高校与院系
 
-#### `GET /api/v1/universities`
+#### `GET /api/universities`
 
 获取高校列表（含院系）。
 
@@ -245,11 +245,11 @@
 }
 ```
 
-#### `GET /api/v1/universities/:universityId`
+#### `GET /api/universities/:universityId`
 
 获取单个高校详情（含院系列表）。
 
-#### `GET /api/v1/universities/:universityId/departments/:departmentId`
+#### `GET /api/universities/:universityId/departments/:departmentId`
 
 获取单个院系详情及其下学者摘要列表。
 
@@ -257,7 +257,7 @@
 
 ### 3.2 学者
 
-#### `GET /api/v1/scholars`
+#### `GET /api/scholars`
 
 分页获取学者列表。
 
@@ -277,13 +277,13 @@
 
 **响应**: 分页包装，`items` 为 `ScholarWithInstitution[]`
 
-#### `GET /api/v1/scholars/:scholarId`
+#### `GET /api/scholars/:scholarId`
 
 获取学者详细信息。
 
 **响应**: 包含学者基本信息 + 关联的高校/院系名称。
 
-#### `POST /api/v1/scholars`
+#### `POST /api/scholars`
 
 新增学者。
 
@@ -291,7 +291,7 @@
 
 **响应**: 新建的 `Scholar` 对象
 
-#### `PUT /api/v1/scholars/:scholarId`
+#### `PUT /api/scholars/:scholarId`
 
 更新学者信息。
 
@@ -299,7 +299,7 @@
 
 **响应**: 更新后的 `Scholar` 对象
 
-#### `DELETE /api/v1/scholars/:scholarId`
+#### `DELETE /api/scholars/:scholarId`
 
 删除学者。
 
@@ -309,7 +309,7 @@
 
 ### 3.3 论文
 
-#### `GET /api/v1/scholars/:scholarId/papers`
+#### `GET /api/scholars/:scholarId/papers`
 
 获取某学者的论文列表。
 
@@ -324,15 +324,15 @@
 
 **响应**: 分页包装，`items` 为 `Paper[]`
 
-#### `POST /api/v1/scholars/:scholarId/papers`
+#### `POST /api/scholars/:scholarId/papers`
 
 为学者添加论文。
 
-#### `PUT /api/v1/papers/:paperId`
+#### `PUT /api/papers/:paperId`
 
 更新论文信息。
 
-#### `DELETE /api/v1/papers/:paperId`
+#### `DELETE /api/papers/:paperId`
 
 删除论文。
 
@@ -340,7 +340,7 @@
 
 ### 3.4 科研项目
 
-#### `GET /api/v1/scholars/:scholarId/projects`
+#### `GET /api/scholars/:scholarId/projects`
 
 获取某学者的科研项目列表。
 
@@ -348,15 +348,15 @@
 
 **响应**: 分页包装，`items` 为 `ResearchProject[]`
 
-#### `POST /api/v1/scholars/:scholarId/projects`
+#### `POST /api/scholars/:scholarId/projects`
 
 新增科研项目。
 
-#### `PUT /api/v1/projects/:projectId`
+#### `PUT /api/projects/:projectId`
 
 更新项目。
 
-#### `DELETE /api/v1/projects/:projectId`
+#### `DELETE /api/projects/:projectId`
 
 删除项目。
 
@@ -364,19 +364,19 @@
 
 ### 3.5 专利
 
-#### `GET /api/v1/scholars/:scholarId/patents`
+#### `GET /api/scholars/:scholarId/patents`
 
 获取某学者的专利列表。
 
-#### `POST /api/v1/scholars/:scholarId/patents`
+#### `POST /api/scholars/:scholarId/patents`
 
 新增专利。
 
-#### `PUT /api/v1/patents/:patentId`
+#### `PUT /api/patents/:patentId`
 
 更新专利。
 
-#### `DELETE /api/v1/patents/:patentId`
+#### `DELETE /api/patents/:patentId`
 
 删除专利。
 
@@ -384,19 +384,19 @@
 
 ### 3.6 学术交流
 
-#### `GET /api/v1/scholars/:scholarId/exchanges`
+#### `GET /api/scholars/:scholarId/exchanges`
 
 获取某学者的学术交流记录。
 
-#### `POST /api/v1/scholars/:scholarId/exchanges`
+#### `POST /api/scholars/:scholarId/exchanges`
 
 新增学术交流。
 
-#### `PUT /api/v1/exchanges/:exchangeId`
+#### `PUT /api/exchanges/:exchangeId`
 
 更新学术交流。
 
-#### `DELETE /api/v1/exchanges/:exchangeId`
+#### `DELETE /api/exchanges/:exchangeId`
 
 删除学术交流。
 
@@ -404,19 +404,19 @@
 
 ### 3.7 指导学生
 
-#### `GET /api/v1/scholars/:scholarId/students`
+#### `GET /api/scholars/:scholarId/students`
 
 获取某学者指导的学生列表。
 
-#### `POST /api/v1/scholars/:scholarId/students`
+#### `POST /api/scholars/:scholarId/students`
 
 新增指导学生。
 
-#### `PUT /api/v1/students/:studentId`
+#### `PUT /api/students/:studentId`
 
 更新学生信息。
 
-#### `DELETE /api/v1/students/:studentId`
+#### `DELETE /api/students/:studentId`
 
 删除学生记录。
 
@@ -424,7 +424,7 @@
 
 ### 3.8 学者关系
 
-#### `GET /api/v1/scholars/:scholarId/relationships`
+#### `GET /api/scholars/:scholarId/relationships`
 
 获取某学者的所有学术关系。
 
@@ -451,11 +451,11 @@
 }
 ```
 
-#### `POST /api/v1/scholars/:scholarId/relationships`
+#### `POST /api/scholars/:scholarId/relationships`
 
 新增学者关系。
 
-#### `DELETE /api/v1/relationships/:relationshipId`
+#### `DELETE /api/relationships/:relationshipId`
 
 删除学者关系。
 
@@ -463,7 +463,7 @@
 
 ### 3.9 变更记录
 
-#### `GET /api/v1/changelog`
+#### `GET /api/changelog`
 
 获取系统级变更记录。
 
@@ -480,7 +480,7 @@
 
 **响应**: 分页包装，`items` 为 `ChangeLogEntry[]`
 
-#### `GET /api/v1/scholars/:scholarId/changelog`
+#### `GET /api/scholars/:scholarId/changelog`
 
 获取某学者的变更历史。
 
@@ -488,7 +488,7 @@
 
 ### 3.10 全局搜索
 
-#### `GET /api/v1/search`
+#### `GET /api/search`
 
 全局搜索（学者 + 高校 + 论文）。
 
@@ -523,7 +523,7 @@
 
 ### 3.11 统计数据（Dashboard 用）
 
-#### `GET /api/v1/stats/overview`
+#### `GET /api/stats/overview`
 
 获取总览统计数据。
 
@@ -555,7 +555,7 @@
 
 ### 3.12 数据导出
 
-#### `GET /api/v1/export`
+#### `GET /api/export`
 
 导出数据。
 
@@ -666,25 +666,25 @@
 所有列表接口均支持分页：
 
 ```
-GET /api/v1/scholars?page=2&pageSize=20
+GET /api/scholars?page=2&pageSize=20
 ```
 
 ### 筛选示例
 
 ```
-GET /api/v1/scholars?universityId=tsinghua&title=教授&q=人工智能
+GET /api/scholars?universityId=tsinghua&title=教授&q=人工智能
 ```
 
 ### 排序示例
 
 ```
-GET /api/v1/scholars?sort=hIndex&order=desc
+GET /api/scholars?sort=hIndex&order=desc
 ```
 
 ### 组合使用
 
 ```
-GET /api/v1/scholars?universityId=tsinghua&title=教授&sort=hIndex&order=desc&page=1&pageSize=12
+GET /api/scholars?universityId=tsinghua&title=教授&sort=hIndex&order=desc&page=1&pageSize=12
 ```
 
 ---
@@ -723,11 +723,11 @@ GET /api/v1/scholars?universityId=tsinghua&title=教授&sort=hIndex&order=desc&p
 
 | 前端文件 | 对应 API |
 |----------|----------|
-| `src/data/universities.ts` | `GET /api/v1/universities` |
-| `src/data/scholars.ts` | `GET /api/v1/scholars` |
-| `src/data/papers.ts` | `GET /api/v1/scholars/:id/papers` |
-| `src/data/projects.ts` | `GET /api/v1/scholars/:id/projects` |
-| `src/data/relationships.ts` | `GET /api/v1/scholars/:id/relationships` |
-| `src/data/changelog.ts` | `GET /api/v1/changelog` |
+| `src/data/universities.ts` | `GET /api/universities` |
+| `src/data/scholars.ts` | `GET /api/scholars` |
+| `src/data/papers.ts` | `GET /api/scholars/:id/papers` |
+| `src/data/projects.ts` | `GET /api/scholars/:id/projects` |
+| `src/data/relationships.ts` | `GET /api/scholars/:id/relationships` |
+| `src/data/changelog.ts` | `GET /api/changelog` |
 
 建议后端接入时使用 `src/data/api.ts` 作为中间层，将所有 API 调用集中管理。

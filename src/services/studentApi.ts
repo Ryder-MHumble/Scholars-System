@@ -11,6 +11,8 @@ export interface StudentRecord {
   degree_type: string;
   enrollment_year: string;
   expected_graduation_year: string;
+  entry_date?: string;
+  paper_date_floor?: string;
   status: string;
   email: string;
   phone: string;
@@ -39,6 +41,8 @@ export interface StudentCreatePayload {
   degree_type?: string;
   enrollment_year?: string;
   expected_graduation_year?: string;
+  entry_date?: string;
+  paper_date_floor?: string;
   status?: string;
   email?: string;
   phone?: string;
@@ -56,6 +60,8 @@ export interface StudentUpdatePayload {
   degree_type?: string;
   enrollment_year?: string;
   expected_graduation_year?: string;
+  entry_date?: string;
+  paper_date_floor?: string;
   status?: string;
   email?: string;
   phone?: string;
@@ -208,7 +214,7 @@ export interface AcademicStudentPapersResponse {
   total: number;
 }
 
-const ACADEMIC_V1_BASE = `${BASE_URL}/api/v1`;
+const ACADEMIC_V1_BASE = `${BASE_URL}/api`;
 
 export async function fetchStudentList(
   filters: StudentListFilters = {},
@@ -224,7 +230,7 @@ export async function fetchStudentList(
   if (filters.mentor_name) params.set("mentor_name", filters.mentor_name);
   if (filters.keyword) params.set("keyword", filters.keyword);
 
-  const res = await fetch(`${BASE_URL}/api/v1/students?${params.toString()}`, {
+  const res = await fetch(`${BASE_URL}/api/students?${params.toString()}`, {
     signal,
   });
   if (!res.ok) throw new Error(`Failed to fetch students: ${res.status}`);
@@ -272,7 +278,7 @@ export async function fetchStudentOptions(
   if (enrollmentYear) params.set("enrollment_year", enrollmentYear);
   const query = params.toString();
   const res = await fetch(
-    `${BASE_URL}/api/v1/students/options${query ? `?${query}` : ""}`,
+    `${BASE_URL}/api/students/options${query ? `?${query}` : ""}`,
   );
   if (!res.ok)
     throw new Error(`Failed to fetch student options: ${res.status}`);
@@ -283,7 +289,7 @@ export async function fetchStudentDetail(
   studentId: string,
   signal?: AbortSignal,
 ): Promise<StudentRecord> {
-  const res = await fetch(`${BASE_URL}/api/v1/students/${studentId}`, {
+  const res = await fetch(`${BASE_URL}/api/students/${studentId}`, {
     signal,
   });
   if (!res.ok) throw new Error(`Failed to fetch student detail: ${res.status}`);
@@ -295,8 +301,8 @@ export async function fetchStudentPapers(
   signal?: AbortSignal,
 ): Promise<StudentPaperRecord[]> {
   const candidates = [
-    `${BASE_URL}/api/v1/students/${studentId}/papers`,
-    `${BASE_URL}/api/v1/students/${studentId}/publications`,
+    `${BASE_URL}/api/students/${studentId}/papers`,
+    `${BASE_URL}/api/students/${studentId}/publications`,
   ];
 
   for (const url of candidates) {
@@ -317,7 +323,7 @@ export async function fetchStudentPublicationWorkspace(
   studentId: string,
   signal?: AbortSignal,
 ): Promise<StudentPublicationWorkspaceResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/students/${studentId}/publication-workspace`, {
+  const res = await fetch(`${BASE_URL}/api/students/${studentId}/publication-workspace`, {
     signal,
   });
   if (!res.ok) {
@@ -332,7 +338,7 @@ export async function updateStudentPublicationCandidate(
   payload: StudentPublicationCandidatePatchPayload,
 ): Promise<StudentPublicationCandidateRecord> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}`,
+    `${BASE_URL}/api/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -351,7 +357,7 @@ export async function confirmStudentPublicationCandidate(
   payload: StudentPublicationCandidateDecisionPayload,
 ): Promise<{ status: string; candidate_id: string; paper_uid?: string | null }> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}/confirm`,
+    `${BASE_URL}/api/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}/confirm`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -370,7 +376,7 @@ export async function rejectStudentPublicationCandidate(
   payload: StudentPublicationCandidateDecisionPayload,
 ): Promise<{ status: string; candidate_id: string; paper_uid?: string | null }> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}/reject`,
+    `${BASE_URL}/api/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}/reject`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -389,7 +395,7 @@ export async function reopenStudentPublicationCandidate(
   payload: StudentPublicationCandidateDecisionPayload,
 ): Promise<{ status: string; candidate_id: string; paper_uid?: string | null }> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}/reopen`,
+    `${BASE_URL}/api/students/${studentId}/publication-candidates/${encodeURIComponent(candidateId)}/reopen`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -405,7 +411,7 @@ export async function reopenStudentPublicationCandidate(
 export async function createStudent(
   payload: StudentCreatePayload,
 ): Promise<StudentRecord> {
-  const res = await fetch(`${BASE_URL}/api/v1/students`, {
+  const res = await fetch(`${BASE_URL}/api/students`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -418,7 +424,7 @@ export async function patchStudent(
   studentId: string,
   payload: StudentUpdatePayload,
 ): Promise<StudentRecord> {
-  const res = await fetch(`${BASE_URL}/api/v1/students/${studentId}`, {
+  const res = await fetch(`${BASE_URL}/api/students/${studentId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -428,7 +434,7 @@ export async function patchStudent(
 }
 
 export async function deleteStudent(studentId: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/v1/students/${studentId}`, {
+  const res = await fetch(`${BASE_URL}/api/students/${studentId}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`Failed to delete student: ${res.status}`);

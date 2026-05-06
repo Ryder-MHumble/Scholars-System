@@ -1,46 +1,117 @@
 import * as XLSX from "xlsx";
-import type { ScholarListItem } from "@/services/scholarApi";
+import type {
+  AwardRecord,
+  PatentRecord,
+  PublicationRecord,
+  ScholarListItem,
+} from "@/services/scholarApi";
+import { extractAchievementTags } from "@/utils/scholarAchievementTags";
+import { readProfileFlag } from "@/utils/scholarIdentity";
 
-/**
- * Field mapping from API schema to Chinese column names
- */
-const FIELD_MAPPING: Record<keyof ScholarListItem | string, string> = {
-  name: "姓名",
-  name_en: "英文名",
-  university: "院校",
-  department: "院系",
-  position: "职称",
-  research_areas: "研究方向",
-  email: "邮箱",
-  profile_url: "主页链接",
-  is_potential_recruit: "是否潜在招募对象",
-  is_advisor_committee: "是否导师委员会成员",
-};
+function formatBoolean(value: boolean | null | undefined): string {
+  if (value === true) return "是";
+  if (value === false) return "否";
+  return "";
+}
 
-/**
- * Transform scholar data to Excel-friendly format with Chinese headers
- */
-function transformScholarForExport(
-  scholar: ScholarListItem,
-): Record<string, string> {
-  return {
-    [FIELD_MAPPING.name]: scholar.name || "",
-    [FIELD_MAPPING.name_en]: scholar.name_en || "",
-    [FIELD_MAPPING.university]: scholar.university || "",
-    [FIELD_MAPPING.department]: scholar.department || "",
-    [FIELD_MAPPING.position]: scholar.position || "",
-    [FIELD_MAPPING.research_areas]: Array.isArray(scholar.research_areas)
-      ? scholar.research_areas.join("; ")
-      : "",
-    [FIELD_MAPPING.email]: scholar.email || "",
-    [FIELD_MAPPING.profile_url]: scholar.profile_url || "",
-    [FIELD_MAPPING.is_potential_recruit]: scholar.is_potential_recruit
-      ? "是"
-      : "否",
-    [FIELD_MAPPING.is_advisor_committee]: scholar.is_advisor_committee
-      ? "是"
-      : "否",
+function formatList(value: unknown): string {
+  return Array.isArray(value)
+    ? value.map((item) => String(item ?? "").trim()).filter(Boolean).join("; ")
+    : "";
+}
+
+function compactParts(parts: Array<string | number | undefined>): string {
+  return parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function formatPublications(publications: PublicationRecord[] = []): string {
+  return publications
+    .map((publication) =>
+      compactParts([
+        publication.title,
+        publication.venue,
+        publication.year,
+        publication.authors,
+        publication.url,
+      ]),
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatPatents(patents: PatentRecord[] = []): string {
+  return patents
+    .map((patent) =>
+      compactParts([
+        patent.title,
+        patent.patent_no,
+        patent.year,
+        patent.inventors,
+        patent.patent_type,
+        patent.status,
+      ]),
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatAwards(awards: AwardRecord[] = []): string {
+  return awards
+    .map((award) =>
+      compactParts([
+        award.title,
+        award.year,
+        award.level,
+        award.grantor,
+        award.description,
+      ]),
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+function transformScholarForExport(scholar: ScholarListItem): Record<string, string> {
+  const row: Record<string, string> = {
+    学者ID: scholar.url_hash || "",
+    姓名: scholar.name || "",
+    英文名: scholar.name_en || "",
+    院校: scholar.university || "",
+    院系: scholar.department || "",
+    职称: scholar.position || "",
+    学术头衔: formatList(scholar.academic_titles),
+    是否院士: formatBoolean(scholar.is_academician),
+    研究方向: formatList(scholar.research_areas),
+    邮箱: scholar.email || "",
+    主页链接: scholar.profile_links?.homepage || scholar.profile_url || "",
+    实验室主页: scholar.profile_links?.lab || "",
+    GitHub: scholar.profile_links?.github || "",
+    LinkedIn: scholar.profile_links?.linkedin || "",
+    "Google Scholar": scholar.profile_links?.google_scholar || "",
+    ORCID: scholar.profile_links?.orcid || "",
+    DBLP: scholar.profile_links?.dblp || "",
+    其他链接: formatList(scholar.profile_links?.other),
+    是否为华人: formatBoolean(readProfileFlag(scholar.custom_fields, "is_chinese")),
+    是否为学生: formatBoolean(readProfileFlag(scholar.custom_fields, "is_student")),
   };
+
+  row.学术标签 = extractAchievementTags(scholar).join("; ");
+  row.学术成果 = formatPublications(scholar.representative_publications);
+  row.专利 = formatPatents(scholar.patents);
+  row.奖项 = formatAwards(scholar.awards);
+
+  return row;
+}
+
+function widthForHeader(header: string): number {
+  if (["学术成果", "专利", "奖项"].includes(header)) return 50;
+  if (["研究方向", "主页链接", "实验室主页", "Google Scholar", "其他链接"].includes(header)) {
+    return 30;
+  }
+  if (["学者ID", "邮箱"].includes(header)) return 28;
+  return 14;
 }
 
 /**
@@ -50,36 +121,20 @@ export function exportScholarsToExcel(
   scholars: ScholarListItem[],
   filename?: string,
 ): void {
-  // Transform data
   const exportData = scholars.map(transformScholarForExport);
-
-  // Create workbook and worksheet
   const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const headers = exportData.length > 0 ? Object.keys(exportData[0]) : [];
 
-  // Set column widths for better readability
-  worksheet["!cols"] = [
-    { wch: 12 }, // 姓名
-    { wch: 15 }, // 英文名
-    { wch: 20 }, // 院校
-    { wch: 15 }, // 院系
-    { wch: 12 }, // 职称
-    { wch: 30 }, // 研究方向
-    { wch: 20 }, // 邮箱
-    { wch: 30 }, // 主页链接
-    { wch: 15 }, // 是否潜在招募对象
-    { wch: 18 }, // 是否导师委员会成员
-  ];
+  worksheet["!cols"] = headers.map((header) => ({ wch: widthForHeader(header) }));
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "学者列表");
 
-  // Generate file
   const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
   const blob = new Blob([excelBuffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 
-  // Download file
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
   const defaultFilename = `学者列表_${timestamp}.xlsx`;
   const file = new File([blob], filename || defaultFilename, {

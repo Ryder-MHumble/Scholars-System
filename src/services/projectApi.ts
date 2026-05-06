@@ -390,7 +390,7 @@ export async function fetchProjectList(
     params.set("custom_field_key", "status");
     params.set("custom_field_value", status);
   }
-  const res = await fetch(`${BASE_URL}/api/v1/projects/?${params}`);
+  const res = await fetch(`${BASE_URL}/api/projects/?${params}`);
   if (!res.ok) throw new Error(`项目列表加载失败: ${res.status}`);
   const raw: BackendProjectListResponse = await res.json();
   return {
@@ -400,13 +400,13 @@ export async function fetchProjectList(
 }
 
 export async function fetchProjectTaxonomy(): Promise<ProjectTaxonomyTree> {
-  const res = await fetch(`${BASE_URL}/api/v1/projects/taxonomy`);
+  const res = await fetch(`${BASE_URL}/api/projects/taxonomy`);
   if (!res.ok) throw new Error(`项目所属导师加载失败: ${res.status}`);
   return res.json();
 }
 
 export async function fetchProjectDetail(id: string): Promise<Project> {
-  const res = await fetch(`${BASE_URL}/api/v1/projects/${id}`);
+  const res = await fetch(`${BASE_URL}/api/projects/${id}`);
   if (!res.ok) throw new Error(`项目详情加载失败: ${res.status}`);
   const raw: BackendProjectDetail = await res.json();
   return mapBackendDetail(raw);
@@ -416,7 +416,7 @@ export async function createProject(
   data: ProjectCreateRequest,
 ): Promise<Project> {
   const payload = toBackendCreatePayload(data);
-  const res = await fetch(`${BASE_URL}/api/v1/projects/`, {
+  const res = await fetch(`${BASE_URL}/api/projects/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -431,7 +431,7 @@ export async function patchProject(
   data: ProjectPatchRequest,
 ): Promise<Project> {
   const payload = toBackendPatchPayload(data);
-  const res = await fetch(`${BASE_URL}/api/v1/projects/${id}`, {
+  const res = await fetch(`${BASE_URL}/api/projects/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -442,7 +442,7 @@ export async function patchProject(
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/v1/projects/${id}`, {
+  const res = await fetch(`${BASE_URL}/api/projects/${id}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`删除项目失败: ${res.status}`);

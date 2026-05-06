@@ -75,7 +75,7 @@ export interface InstitutionTaxonomy {
 }
 
 export async function fetchInstitutionTaxonomy(): Promise<InstitutionTaxonomy> {
-  const res = await fetch(`${BASE_URL}/api/v1/institutions/taxonomy`);
+  const res = await fetch(`${BASE_URL}/api/institutions/taxonomy`);
   if (!res.ok) throw new Error(`分类体系加载失败: ${res.status}`);
   return res.json();
 }
@@ -114,7 +114,7 @@ export async function fetchInstitutionList(
     params.set("sub_classification", filters.sub_classification);
   if (filters?.keyword) params.set("keyword", filters.keyword);
 
-  const res = await fetch(`${BASE_URL}/api/v1/institutions?${params}`);
+  const res = await fetch(`${BASE_URL}/api/institutions?${params}`);
   if (!res.ok) throw new Error(`机构列表加载失败: ${res.status}`);
   return res.json();
 }
@@ -160,7 +160,7 @@ export async function fetchInstitutionHierarchy(filters?: {
     params.set("sub_classification", filters.sub_classification);
   if (filters?.keyword) params.set("keyword", filters.keyword);
 
-  const res = await fetch(`${BASE_URL}/api/v1/institutions?${params.toString()}`);
+  const res = await fetch(`${BASE_URL}/api/institutions?${params.toString()}`);
   if (!res.ok) throw new Error(`机构层级数据加载失败: ${res.status}`);
   const data = await res.json();
   if (!Array.isArray(data.organizations)) return [];
@@ -168,7 +168,7 @@ export async function fetchInstitutionHierarchy(filters?: {
 }
 
 export async function fetchInstitutionTree(): Promise<InstitutionTreeResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/institutions/scholars/tree`);
+  const res = await fetch(`${BASE_URL}/api/institutions/scholars/tree`);
   if (!res.ok) throw new Error(`机构分类树加载失败: ${res.status}`);
   return res.json();
 }
@@ -186,7 +186,7 @@ export async function fetchAllInstitutions() {
 export async function fetchInstitutionDetail(
   id: string,
 ): Promise<InstitutionDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/institutions/${id}`);
+  const res = await fetch(`${BASE_URL}/api/institutions/${id}`);
   if (!res.ok) throw new Error(`机构详情加载失败: ${res.status}`);
   return res.json();
 }
@@ -194,7 +194,7 @@ export async function fetchInstitutionDetail(
 export async function fetchInstitutionLeadership(
   institutionId: string,
 ): Promise<LeadershipDetailResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/leadership/${institutionId}`);
+  const res = await fetch(`${BASE_URL}/api/leadership/${institutionId}`);
   if (!res.ok) throw new Error(`领导信息加载失败: ${res.status}`);
   return res.json();
 }
@@ -203,7 +203,7 @@ export async function patchInstitution(
   id: string,
   data: InstitutionPatchRequest,
 ): Promise<InstitutionDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/institutions/${id}`, {
+  const res = await fetch(`${BASE_URL}/api/institutions/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -229,7 +229,7 @@ export async function patchInstitution(
 export async function createInstitution(
   data: InstitutionCreateRequest,
 ): Promise<InstitutionDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/institutions/`, {
+  const res = await fetch(`${BASE_URL}/api/institutions/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -255,7 +255,7 @@ export async function createInstitution(
 }
 
 export async function deleteInstitution(id: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/v1/institutions/${id}`, {
+  const res = await fetch(`${BASE_URL}/api/institutions/${id}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`机构删除失败: ${res.status}`);
@@ -312,7 +312,7 @@ export async function searchInstitutions(
   });
 
   const response = await fetch(
-    `${BASE_URL}/api/v1/institutions/search?${params.toString()}`,
+    `${BASE_URL}/api/institutions/search?${params.toString()}`,
   );
 
   if (!response.ok) {
@@ -338,7 +338,7 @@ export async function suggestInstitution(
   });
 
   const response = await fetch(
-    `${BASE_URL}/api/v1/institutions/suggest?${params.toString()}`,
+    `${BASE_URL}/api/institutions/suggest?${params.toString()}`,
   );
 
   if (!response.ok) {
@@ -395,7 +395,7 @@ export async function getDepartmentsForUniversity(
   if (!university) return [];
 
   const firstRes = await fetch(
-    `${BASE_URL}/api/v1/institutions?entity_type=department&page=1&page_size=200`,
+    `${BASE_URL}/api/institutions?entity_type=department&page=1&page_size=200`,
   );
   if (!firstRes.ok) return [];
   const firstData = await firstRes.json();
@@ -415,7 +415,7 @@ export async function getDepartmentsForUniversity(
   const totalPages = Number(firstData.total_pages ?? 1);
   for (let page = 2; page <= totalPages; page++) {
     const res = await fetch(
-      `${BASE_URL}/api/v1/institutions?entity_type=department&page=${page}&page_size=200`,
+      `${BASE_URL}/api/institutions?entity_type=department&page=${page}&page_size=200`,
     );
     if (!res.ok) break;
     const data = await res.json();

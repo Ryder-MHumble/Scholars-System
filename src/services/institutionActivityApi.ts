@@ -54,7 +54,7 @@ interface ArticleListResponse {
 }
 
 export async function fetchUniversitySourcesWithData(): Promise<UniversitySourceItem[]> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/intel/university/sources`);
+  const res = await fetch(`${API_BASE_URL}/api/intel/university/sources`);
   if (!res.ok) throw new Error(`加载高校生态信源失败: ${res.status}`);
   const data: UniversitySourcesResponse = await res.json();
   return (data.items || []).filter(
@@ -72,7 +72,7 @@ export async function fetchUniversityFeedBySourceIds(
     page: "1",
     page_size: String(pageSize),
   });
-  const res = await fetch(`${API_BASE_URL}/api/v1/intel/university/feed?${params.toString()}`);
+  const res = await fetch(`${API_BASE_URL}/api/intel/university/feed?${params.toString()}`);
   if (!res.ok) throw new Error(`加载高校生态动态失败: ${res.status}`);
   const data: UniversityFeedResponse = await res.json();
   return data.items || [];
@@ -83,7 +83,7 @@ export async function fetchEnabledTechnologySources(): Promise<SourceConfigItem[
     dimension: "technology",
     is_enabled: "true",
   });
-  const res = await fetch(`${API_BASE_URL}/api/v1/sources?${params.toString()}`);
+  const res = await fetch(`${API_BASE_URL}/api/sources?${params.toString()}`);
   if (!res.ok) throw new Error(`加载技术信源失败: ${res.status}`);
   const items = (await res.json()) as SourceConfigItem[];
   return (items || []).filter(
@@ -107,7 +107,7 @@ export async function fetchTechnologyArticlesBySourceIds(
     sort_by: "published_at",
     order: "desc",
   });
-  const res = await fetch(`${API_BASE_URL}/api/v1/articles?${params.toString()}`);
+  const res = await fetch(`${API_BASE_URL}/api/articles?${params.toString()}`);
   if (!res.ok) throw new Error(`加载公司动态失败: ${res.status}`);
   const data: ArticleListResponse = await res.json();
   return data.items || [];

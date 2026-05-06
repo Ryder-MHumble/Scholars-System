@@ -26,6 +26,17 @@ export interface ScholarEventTag {
   event_title?: string;
 }
 
+export interface ProfileLinks {
+  homepage: string;
+  lab: string;
+  github: string;
+  linkedin: string;
+  google_scholar: string;
+  orcid: string;
+  dblp: string;
+  other: string[];
+}
+
 export interface ScholarListItem {
   url_hash: string;
   name: string;
@@ -38,6 +49,7 @@ export interface ScholarListItem {
   is_academician: boolean;
   research_areas: string[];
   email: string;
+  profile_links: ProfileLinks;
   profile_url: string;
   is_potential_recruit: boolean;
   is_advisor_committee: boolean;
@@ -46,6 +58,11 @@ export interface ScholarListItem {
   event_tags: ScholarEventTag[];
   participated_event_ids: string[];
   is_cobuild_scholar: boolean;
+  custom_fields?: Record<string, unknown>;
+  achievement_tags?: string[];
+  representative_publications?: PublicationRecord[];
+  patents?: PatentRecord[];
+  awards?: AwardRecord[];
   // Legacy convenience fields for existing UI components
   project_category: string;
   project_subcategory: string;
@@ -84,6 +101,7 @@ export interface ScholarDetail extends ScholarListItem {
   representative_publications: PublicationRecord[];
   patents: PatentRecord[];
   awards: AwardRecord[];
+  custom_fields?: Record<string, unknown>;
 }
 
 export interface EducationRecord {
@@ -181,7 +199,13 @@ export interface ScholarListFilters {
   department?: string;
   search?: string;
   participated_event_id?: string;
+  is_chinese?: boolean;
+  is_current_student?: boolean;
+  chinese_identity?: "unknown";
+  achievement_tag?: string;
+  achievement_tags?: string[];
   is_adjunct_supervisor?: boolean;
+  is_cobuild_scholar?: boolean;
   institution_group?: string;
   institution_category?: string;
   region?: string;
@@ -234,6 +258,7 @@ export interface ScholarDetailPatch {
   email?: string;
   phone?: string;
   office?: string;
+  profile_links?: ProfileLinks;
   profile_url?: string;
   lab_url?: string;
   google_scholar_url?: string;
@@ -334,7 +359,15 @@ const scholarUniversityCache = new Map<
   string,
   { expiresAt: number; data: ScholarUniversityItem[] }
 >();
-const scholarUniversityInFlight = new Map<string, Promise<ScholarUniversityItem[]>>();
+const scholarUniversityInFlight = new Map<
+  string,
+  Promise<ScholarUniversityItem[]>
+>();
+
+export function invalidateScholarUniversityCache(): void {
+  scholarUniversityCache.clear();
+  scholarUniversityInFlight.clear();
+}
 
 function buildUniversityCacheKey(filters?: {
   region?: string;
@@ -358,8 +391,26 @@ function appendScholarFilterParams(
   if (filters?.participated_event_id) {
     params.set("participated_event_id", filters.participated_event_id);
   }
+  if (filters?.is_chinese !== undefined) {
+    params.set("is_chinese", String(filters.is_chinese));
+  }
+  if (filters?.is_current_student !== undefined) {
+    params.set("is_current_student", String(filters.is_current_student));
+  }
+  if (filters?.chinese_identity) {
+    params.set("chinese_identity", filters.chinese_identity);
+  }
+  if (filters?.achievement_tag) {
+    params.set("achievement_tag", filters.achievement_tag);
+  }
+  if (filters?.achievement_tags?.length) {
+    params.set("achievement_tags", filters.achievement_tags.join(","));
+  }
   if (filters?.is_adjunct_supervisor) {
     params.set("is_adjunct_supervisor", "true");
+  }
+  if (filters?.is_cobuild_scholar !== undefined) {
+    params.set("is_cobuild_scholar", String(filters.is_cobuild_scholar));
   }
   if (filters?.institution_group) {
     params.set("institution_group", filters.institution_group);
@@ -381,7 +432,10 @@ function appendScholarFilterParams(
     params.set("project_categories", filters.project_categories.join(","));
   }
   if (filters?.project_subcategories?.length) {
-    params.set("project_subcategories", filters.project_subcategories.join(","));
+    params.set(
+      "project_subcategories",
+      filters.project_subcategories.join(","),
+    );
   }
   if (filters?.event_types?.length) {
     params.set("event_types", filters.event_types.join(","));
@@ -454,6 +508,99 @@ interface ScholarProjectFields {
   is_cobuild_scholar?: boolean;
   project_category?: string;
   project_subcategory?: string;
+  profile_links?: unknown;
+  profile_url?: unknown;
+  lab_url?: unknown;
+  google_scholar_url?: unknown;
+  dblp_url?: unknown;
+  orcid?: unknown;
+}
+
+function normalizeStringArray(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => String(item ?? "").trim()).filter(Boolean);
+}
+
+export function normalizeProfileLinks(raw: unknown): ProfileLinks {
+  if (!raw || typeof raw !== "object") {
+    return {
+      homepage: "",
+      lab: "",
+      github: "",
+      linkedin: "",
+      google_scholar: "",
+      orcid: "",
+      dblp: "",
+      other: [],
+    };
+  }
+
+  const links = raw as Record<string, unknown>;
+  return {
+    homepage: String(links.homepage ?? "").trim(),
+    lab: String(links.lab ?? "").trim(),
+    github: String(links.github ?? "").trim(),
+    linkedin: String(links.linkedin ?? "").trim(),
+    google_scholar: String(links.google_scholar ?? "").trim(),
+    orcid: String(links.orcid ?? "").trim(),
+    dblp: String(links.dblp ?? "").trim(),
+    other: normalizeStringArray(links.other),
+  };
+}
+
+export function resolveProfileLinks(
+  scholar: Pick<
+    ScholarProjectFields,
+    | "profile_links"
+    | "profile_url"
+    | "lab_url"
+    | "google_scholar_url"
+    | "dblp_url"
+    | "orcid"
+  >,
+): ProfileLinks {
+  const profileLinks = normalizeProfileLinks(scholar.profile_links);
+  return {
+    homepage: profileLinks.homepage || String(scholar.profile_url ?? "").trim(),
+    lab: profileLinks.lab || String(scholar.lab_url ?? "").trim(),
+    github: profileLinks.github,
+    linkedin: profileLinks.linkedin,
+    google_scholar:
+      profileLinks.google_scholar ||
+      String(scholar.google_scholar_url ?? "").trim(),
+    orcid: profileLinks.orcid || String(scholar.orcid ?? "").trim(),
+    dblp: profileLinks.dblp || String(scholar.dblp_url ?? "").trim(),
+    other: profileLinks.other,
+  };
+}
+
+export function buildLegacyProfileLinkFields(profileLinks: ProfileLinks): {
+  profile_url: string;
+  lab_url: string;
+  google_scholar_url: string;
+  dblp_url: string;
+  orcid: string;
+} {
+  return {
+    profile_url: profileLinks.homepage,
+    lab_url: profileLinks.lab,
+    google_scholar_url: profileLinks.google_scholar,
+    dblp_url: profileLinks.dblp,
+    orcid: profileLinks.orcid,
+  };
+}
+
+export function hasProfileLinks(profileLinks: ProfileLinks): boolean {
+  return Boolean(
+    profileLinks.homepage ||
+    profileLinks.lab ||
+    profileLinks.github ||
+    profileLinks.linkedin ||
+    profileLinks.google_scholar ||
+    profileLinks.orcid ||
+    profileLinks.dblp ||
+    profileLinks.other.length > 0,
+  );
 }
 
 function normalizeScholarProjectFields<T extends ScholarProjectFields>(
@@ -465,6 +612,12 @@ function normalizeScholarProjectFields<T extends ScholarProjectFields>(
   is_cobuild_scholar: boolean;
   project_category: string;
   project_subcategory: string;
+  profile_links: ProfileLinks;
+  profile_url: string;
+  lab_url: string;
+  google_scholar_url: string;
+  dblp_url: string;
+  orcid: string;
 } {
   const projectTags = normalizeProjectTags(scholar.project_tags);
   const eventTags = normalizeEventTags(scholar.event_tags);
@@ -472,6 +625,7 @@ function normalizeScholarProjectFields<T extends ScholarProjectFields>(
   const legacySubcategory = normalizeProjectSubcategoryLabel(
     String(scholar.project_subcategory ?? "").trim(),
   );
+  const profileLinks = resolveProfileLinks(scholar);
   const mergedTags =
     projectTags.length > 0
       ? projectTags
@@ -490,6 +644,35 @@ function normalizeScholarProjectFields<T extends ScholarProjectFields>(
     is_cobuild_scholar: mergedTags.length > 0,
     project_category: first.category,
     project_subcategory: first.subcategory,
+    profile_links: profileLinks,
+    profile_url: profileLinks.homepage,
+    lab_url: profileLinks.lab,
+    google_scholar_url: profileLinks.google_scholar,
+    dblp_url: profileLinks.dblp,
+    orcid: profileLinks.orcid,
+  };
+}
+
+function buildScholarPayload<
+  T extends {
+    profile_links?: ProfileLinks;
+    profile_url?: string;
+    lab_url?: string;
+    google_scholar_url?: string;
+    dblp_url?: string;
+    orcid?: string;
+  },
+>(data: T): T {
+  const payload = { ...data };
+  const nextLinks = resolveProfileLinks(payload);
+
+  if (hasProfileLinks(nextLinks)) {
+    payload.profile_links = nextLinks;
+  }
+
+  return {
+    ...payload,
+    ...buildLegacyProfileLinkFields(nextLinks),
   };
 }
 
@@ -515,7 +698,8 @@ function buildRelationPayload(data: RelationPatch): Record<string, unknown> {
   }
 
   if (payload.is_cobuild_scholar === undefined) {
-    const hasProjectTags = Array.isArray(payload.project_tags) && payload.project_tags.length > 0;
+    const hasProjectTags =
+      Array.isArray(payload.project_tags) && payload.project_tags.length > 0;
     payload.is_cobuild_scholar = hasProjectTags;
   }
 
@@ -551,7 +735,7 @@ export async function fetchScholarUniversities(filters?: {
   const query = params.toString();
   const reqPromise = (async () => {
     const res = await fetch(
-      `${BASE_URL}/api/v1/institutions${query ? `?${query}` : ""}`,
+      `${BASE_URL}/api/institutions${query ? `?${query}` : ""}`,
     );
     if (!res.ok)
       throw new Error(`Failed to fetch scholar universities: ${res.status}`);
@@ -594,7 +778,7 @@ export async function fetchScholarList(
 ): Promise<ScholarListResponse> {
   const params = buildScholarListParams(page, pageSize, filters);
 
-  const res = await fetch(`${BASE_URL}/api/v1/scholars?${params}`, { signal });
+  const res = await fetch(`${BASE_URL}/api/scholars?${params}`, { signal });
   if (!res.ok) throw new Error(`Failed to fetch scholar list: ${res.status}`);
   const data: ScholarListResponse = await res.json();
   return {
@@ -611,7 +795,7 @@ export async function fetchAllScholars(
   const firstPageParams = buildScholarListParams(1, 100, filters);
 
   const firstRes = await fetch(
-    `${BASE_URL}/api/v1/scholars?${firstPageParams}`,
+    `${BASE_URL}/api/scholars?${firstPageParams}`,
     { signal },
   );
   if (!firstRes.ok)
@@ -619,7 +803,9 @@ export async function fetchAllScholars(
   const firstDataRaw: ScholarListResponse = await firstRes.json();
   const firstData: ScholarListResponse = {
     ...firstDataRaw,
-    items: firstDataRaw.items.map((item) => normalizeScholarProjectFields(item)),
+    items: firstDataRaw.items.map((item) =>
+      normalizeScholarProjectFields(item),
+    ),
   };
 
   // If all data fits in first page, return it
@@ -637,7 +823,7 @@ export async function fetchAllScholars(
     const params = buildScholarListParams(page, 100, filters);
 
     pagePromises.push(
-      fetch(`${BASE_URL}/api/v1/scholars?${params}`, { signal }).then((res) => {
+      fetch(`${BASE_URL}/api/scholars?${params}`, { signal }).then((res) => {
         if (!res.ok)
           throw new Error(`Failed to fetch page ${page}: ${res.status}`);
         return res.json() as Promise<ScholarListResponse>;
@@ -658,7 +844,7 @@ export async function fetchAllScholars(
 export async function fetchScholarDetail(
   urlHash: string,
 ): Promise<ScholarDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}`);
+  const res = await fetch(`${BASE_URL}/api/scholars/${urlHash}`);
   if (!res.ok) throw new Error(`Failed to fetch scholar detail: ${res.status}`);
   const data: ScholarDetail = await res.json();
   return normalizeScholarProjectFields(data);
@@ -669,7 +855,7 @@ export async function patchScholarRelation(
   data: RelationPatch,
 ): Promise<ScholarDetail> {
   const payload = buildRelationPayload(data);
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/relation`, {
+  const res = await fetch(`${BASE_URL}/api/scholars/${urlHash}/relation`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -683,10 +869,11 @@ export async function patchScholarDetail(
   urlHash: string,
   data: ScholarDetailPatch,
 ): Promise<ScholarDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/basic`, {
+  const payload = buildScholarPayload(data);
+  const res = await fetch(`${BASE_URL}/api/scholars/${urlHash}/basic`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
   if (!res.ok)
     throw new Error(`Failed to update scholar detail: ${res.status}`);
@@ -698,7 +885,7 @@ export async function postScholarUpdate(
   urlHash: string,
   data: NewScholarUpdate,
 ): Promise<ScholarDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/updates`, {
+  const res = await fetch(`${BASE_URL}/api/scholars/${urlHash}/updates`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -713,7 +900,7 @@ export async function deleteScholarUpdate(
   updateIdx: number,
 ): Promise<ScholarDetail> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/scholars/${urlHash}/updates/${updateIdx}`,
+    `${BASE_URL}/api/scholars/${urlHash}/updates/${updateIdx}`,
     {
       method: "DELETE",
     },
@@ -728,7 +915,7 @@ export async function patchScholarAchievements(
   data: AchievementsPatch,
 ): Promise<ScholarDetail> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/scholars/${urlHash}/achievements`,
+    `${BASE_URL}/api/scholars/${urlHash}/achievements`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -743,7 +930,7 @@ export async function patchScholarAchievements(
 export async function fetchStudents(
   urlHash: string,
 ): Promise<StudentListResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/students`);
+  const res = await fetch(`${BASE_URL}/api/scholars/${urlHash}/students`);
   if (!res.ok) throw new Error(`Failed to fetch students: ${res.status}`);
   return res.json();
 }
@@ -752,7 +939,7 @@ export async function createStudent(
   urlHash: string,
   data: StudentCreate,
 ): Promise<StudentRecord> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}/students`, {
+  const res = await fetch(`${BASE_URL}/api/scholars/${urlHash}/students`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -767,7 +954,7 @@ export async function patchStudent(
   data: StudentPatch,
 ): Promise<StudentRecord> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/scholars/${urlHash}/students/${studentId}`,
+    `${BASE_URL}/api/scholars/${urlHash}/students/${studentId}`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -783,7 +970,7 @@ export async function deleteStudent(
   studentId: string,
 ): Promise<void> {
   const res = await fetch(
-    `${BASE_URL}/api/v1/scholars/${urlHash}/students/${studentId}`,
+    `${BASE_URL}/api/scholars/${urlHash}/students/${studentId}`,
     {
       method: "DELETE",
     },
@@ -792,7 +979,7 @@ export async function deleteStudent(
 }
 
 export async function deleteScholar(urlHash: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/${urlHash}`, {
+  const res = await fetch(`${BASE_URL}/api/scholars/${urlHash}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`Failed to delete scholar: ${res.status}`);
@@ -816,6 +1003,7 @@ export interface ScholarCreate {
   email?: string;
   phone?: string;
   office?: string;
+  profile_links?: ProfileLinks;
   profile_url?: string;
   lab_url?: string;
   google_scholar_url?: string;
@@ -853,12 +1041,13 @@ export interface BatchScholarCreateResponse {
 export async function createScholar(
   data: ScholarCreate,
 ): Promise<ScholarDetail> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars`, {
+  const payload = buildScholarPayload(data);
+  const res = await fetch(`${BASE_URL}/api/scholars`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     let detail = "";
@@ -881,7 +1070,7 @@ export async function createScholar(
 export async function batchCreateScholars(
   scholars: BatchScholarCreate[],
 ): Promise<BatchScholarCreateResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/batch`, {
+  const res = await fetch(`${BASE_URL}/api/scholars/batch`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -909,7 +1098,7 @@ export interface ScholarStatsResponse {
 }
 
 export async function fetchScholarStats(): Promise<ScholarStatsResponse> {
-  const res = await fetch(`${BASE_URL}/api/v1/scholars/stats`);
+  const res = await fetch(`${BASE_URL}/api/scholars/stats`);
   if (!res.ok) throw new Error(`Failed to fetch scholar stats: ${res.status}`);
   return res.json();
 }

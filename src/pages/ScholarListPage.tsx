@@ -8,7 +8,6 @@ import {
   LayoutGrid,
   FileSpreadsheet,
   Download,
-  Info,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -18,8 +17,8 @@ import { ScholarCard } from "@/components/common/ScholarCard";
 import { ScholarTable } from "@/components/common/ScholarTable";
 import { BatchScholarImportModal } from "@/components/scholar/BatchScholarImportModal";
 import { InstitutionFilterPanel } from "@/components/scholar/InstitutionFilterPanel";
+import { ScholarAdvancedFilters } from "@/components/scholar/ScholarAdvancedFilters";
 import { useScholarList } from "@/hooks/useScholarList";
-import { GroupedComboboxInput } from "@/components/ui/GroupedComboboxInput";
 
 type ViewMode = "list" | "grid";
 
@@ -41,9 +40,15 @@ export default function ScholarListPage() {
     filterChips,
     hasAnyFilter,
     clearAll,
-    mentorType,
-    mentorTypeGroups,
-    handleChangeMentorType,
+    studentIdentity,
+    chineseIdentity,
+    achievementTags,
+    advancedFilterCount,
+    handleChangeStudentIdentity,
+    handleChangeChineseIdentity,
+    handleChangeAchievementTags,
+    applyAdvancedFilters,
+    resetAdvancedFilters,
     items,
     page,
     setPage,
@@ -56,7 +61,7 @@ export default function ScholarListPage() {
     handleDeleteScholar,
     handleExportToExcel,
     isExporting,
-  } = useScholarList();
+  } = useScholarList({ enableMentorFilter: false });
 
   const filteredTotalCount = useMemo(
     () => filteredUniNodes.reduce((sum, u) => sum + u.count, 0),
@@ -116,8 +121,8 @@ export default function ScholarListPage() {
             </div>
 
             <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(300px,1fr)_260px_auto] gap-4 items-end">
-                <div>
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(420px,1fr)_auto] gap-4 items-end">
+                <div className="min-w-0">
                   <p className="text-xs font-semibold text-gray-500 mb-2">
                     搜索
                   </p>
@@ -138,21 +143,19 @@ export default function ScholarListPage() {
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-2">
-                    共建导师类别
-                  </p>
-                  <GroupedComboboxInput
-                    value={mentorType}
-                    onChange={handleChangeMentorType}
-                    groups={mentorTypeGroups}
-                    placeholder="选择项目分类"
-                    showAllOnFocus
-                    clearable
-                  />
-                </div>
-
                 <div className="flex items-center gap-2 flex-wrap xl:justify-end">
+                  <ScholarAdvancedFilters
+                    studentIdentity={studentIdentity}
+                    onChangeStudentIdentity={handleChangeStudentIdentity}
+                    chineseIdentity={chineseIdentity}
+                    onChangeChineseIdentity={handleChangeChineseIdentity}
+                    achievementTags={achievementTags}
+                    onChangeAchievementTags={handleChangeAchievementTags}
+                    onApplyQuickFilters={applyAdvancedFilters}
+                    activeCount={advancedFilterCount}
+                    onReset={resetAdvancedFilters}
+                  />
+
                   <div className="flex items-center h-10 bg-white border border-gray-200 rounded-lg overflow-hidden">
                     {(["list", "grid"] as ViewMode[]).map((mode) => (
                       <button
@@ -216,22 +219,12 @@ export default function ScholarListPage() {
                 </div>
               </div>
 
-              <div className="mt-3 flex items-start gap-2 text-xs text-gray-500">
-                <Info className="w-3.5 h-3.5 mt-0.5 text-gray-400 shrink-0" />
-                <p>
-                  使用步骤：先选左侧机构，再选“共建导师类别”，最后输入关键词并回车搜索。
-                  当前支持按姓名、研究方向、职称搜索。
-                  视图按钮可在列表/卡片间切换。
-                </p>
-              </div>
+              {filterChips.length > 0 && (
+                <div className="mt-3 border-t border-gray-100 pt-3">
+                  <FilterChips chips={filterChips} onClearAll={clearAll} />
+                </div>
+              )}
             </div>
-
-            {/* Filter Chips */}
-            {filterChips.length > 0 && (
-              <div className="mt-3">
-                <FilterChips chips={filterChips} onClearAll={clearAll} />
-              </div>
-            )}
           </div>
 
           {/* Content */}
@@ -241,7 +234,10 @@ export default function ScholarListPage() {
             <div className="bg-white rounded-xl border border-red-100 flex flex-col items-center justify-center py-16 text-red-400">
               <p className="text-sm">{error}</p>
               <button
-                onClick={() => setPage(1)}
+                onClick={() => {
+                  setPage(1);
+                  refreshList();
+                }}
                 className="mt-3 text-xs text-primary-600 hover:underline"
               >
                 重试

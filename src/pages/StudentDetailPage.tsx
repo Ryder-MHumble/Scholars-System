@@ -209,6 +209,66 @@ function summarizeSource(candidate: StudentPublicationCandidateRecord): string {
   return source || providerText || sourceTypeLabel(candidate.source_type);
 }
 
+function truncateText(value: string | null | undefined, maxLength = 320): string {
+  const text = (value ?? "").trim();
+  if (!text) return "-";
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trim()}...`;
+}
+
+function normalizeDoiUrl(value: string | null | undefined): string | null {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  return `https://doi.org/${raw.replace(/^doi:/i, "").trim()}`;
+}
+
+function normalizeArxivUrl(value: string | null | undefined): string | null {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  const cleaned = raw.replace(/^arxiv:/i, "").replace(/^abs\//i, "").trim();
+  return cleaned ? `https://arxiv.org/abs/${cleaned}` : null;
+}
+
+function candidatePaperUrl(candidate: StudentPublicationCandidateRecord): string | null {
+  const doiUrl = normalizeDoiUrl(candidate.doi);
+  if (doiUrl) return doiUrl;
+
+  const details = candidate.source_details ?? {};
+  const landingPageUrl = typeof details.landing_page_url === "string" ? details.landing_page_url.trim() : "";
+  if (landingPageUrl) return landingPageUrl;
+
+  const openalexUrl = typeof details.openalex === "string" ? details.openalex.trim() : "";
+  if (openalexUrl.startsWith("http://") || openalexUrl.startsWith("https://")) return openalexUrl;
+
+  const recordId = typeof details.record_id === "string" ? details.record_id.trim() : "";
+  if (recordId.startsWith("openalex:")) {
+    const openalexId = recordId.slice("openalex:".length).trim();
+    if (openalexId.startsWith("http://") || openalexId.startsWith("https://")) return openalexId;
+  }
+
+  const arxivUrl = normalizeArxivUrl(candidate.arxiv_id);
+  if (arxivUrl) return arxivUrl;
+
+  if (recordId.startsWith("arxiv:")) {
+    return normalizeArxivUrl(recordId.slice("arxiv:".length));
+  }
+  return null;
+}
+
+function candidateInstitutionText(candidate: StudentPublicationCandidateRecord): string {
+  const affiliations = (candidate.affiliations ?? []).filter(Boolean);
+  if (affiliations.length > 0) return affiliations.join("；");
+  const checkedAffiliations = (candidate.checked_affiliations ?? []).filter(Boolean);
+  if (checkedAffiliations.length > 0) return checkedAffiliations.join("；");
+  return "-";
+}
+
+function candidateDisplayDate(candidate: StudentPublicationCandidateRecord): string {
+  return formatDate(candidate.publication_date || candidate.last_seen_at);
+}
+
 function Panel({
   title,
   children,
@@ -417,12 +477,25 @@ function CandidateCard({
   onReject: (candidate: StudentPublicationCandidateRecord) => void;
   onReopen: (candidate: StudentPublicationCandidateRecord) => void;
 }) {
-  const reviewNote = extractReviewNote(candidate);
+  const paperUrl = candidatePaperUrl(candidate);
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-slate-900 break-words">{safeText(candidate.title)}</h3>
+          <h3 className="text-sm font-semibold break-words">
+            {paperUrl ? (
+              <a
+                href={paperUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-slate-900 hover:text-primary-600 hover:underline underline-offset-2 transition-colors"
+              >
+                {safeText(candidate.title)}
+              </a>
+            ) : (
+              <span className="text-slate-900">{safeText(candidate.title)}</span>
+            )}
+          </h3>
           <div className="mt-2 flex flex-wrap gap-2">
             <MetaTag label={candidateStatusLabel(candidate.review_status)} tone={variant === "rejected" ? "red" : "amber"} />
             <MetaTag label={affiliationStatusLabel(candidate.affiliation_status)} tone={candidate.affiliation_status === "non_compliant" ? "red" : candidate.affiliation_status === "compliant" ? "emerald" : "amber"} />
@@ -485,10 +558,8 @@ function CandidateCard({
           </p>
         </div>
         <div>
-          <p className="text-[11px] text-slate-400">发布时间 / 最近发现</p>
-          <p className="mt-1 text-sm text-slate-600">
-            {formatDate(candidate.publication_date)} / {formatDateTime(candidate.last_seen_at)}
-          </p>
+          <p className="text-[11px] text-slate-400">发布时间</p>
+          <p className="mt-1 text-sm text-slate-600">{candidateDisplayDate(candidate)}</p>
         </div>
       </div>
 
@@ -502,19 +573,16 @@ function CandidateCard({
         <div>
           <p className="text-[11px] text-slate-400">机构</p>
           <p className="mt-1 text-sm text-slate-600 break-words leading-6">
-            {candidate.affiliations?.length ? candidate.affiliations.join("；") : "-"}
+            {candidateInstitutionText(candidate)}
           </p>
         </div>
       </div>
 
       <div className="mt-3">
-        <p className="text-[11px] text-slate-400">审核说明</p>
-        <p className="mt-1 text-sm text-slate-600 break-words leading-6">{safeText(reviewNote)}</p>
-      </div>
-
-      <div className="mt-3">
         <p className="text-[11px] text-slate-400">摘要</p>
-        <p className="mt-1 text-sm text-slate-600 break-words leading-6">{safeText(candidate.abstract)}</p>
+        <p className="mt-1 text-sm text-slate-600 break-words leading-6">
+          {truncateText(candidate.abstract, 360)}
+        </p>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -678,6 +746,8 @@ export default function StudentDetailPage() {
       degree_type: student.degree_type || "",
       enrollment_year: parseYear(student.enrollment_year) || "",
       expected_graduation_year: parseYear(student.expected_graduation_year) || "",
+      entry_date: student.entry_date || "",
+      paper_date_floor: student.paper_date_floor || "",
       status: student.status || "在读",
       email: student.email || "",
       phone: student.phone || "",
@@ -732,6 +802,8 @@ export default function StudentDetailPage() {
       degree_type: student.degree_type || "",
       enrollment_year: parseYear(student.enrollment_year) || "",
       expected_graduation_year: parseYear(student.expected_graduation_year) || "",
+      entry_date: student.entry_date || "",
+      paper_date_floor: student.paper_date_floor || "",
       status: student.status || "在读",
       email: student.email || "",
       phone: student.phone || "",
@@ -986,6 +1058,7 @@ export default function StudentDetailPage() {
                 <LabelValue label="共建高校" value={safeText(student.home_university)} />
                 <LabelValue label="年级" value={formatEnrollmentYear(student.enrollment_year)} />
                 <LabelValue label="学号" value={safeText(student.student_no)} />
+                <LabelValue label="入项时间" value={formatDate(student.entry_date)} />
                 <LabelValue label="预计毕业" value={safeText(graduationYear)} />
               </div>
             </Panel>
@@ -1002,6 +1075,14 @@ export default function StudentDetailPage() {
                 <div className="inline-flex items-start gap-2 text-sm text-gray-700">
                   <GraduationCap className="w-4 h-4 text-gray-400 mt-0.5" />
                   入学：{safeText(enrollmentYear)}
+                </div>
+                <div className="inline-flex items-start gap-2 text-sm text-gray-700">
+                  <CalendarClock className="w-4 h-4 text-gray-400 mt-0.5" />
+                  入项：{formatDate(student.entry_date)}
+                </div>
+                <div className="inline-flex items-start gap-2 text-sm text-gray-700">
+                  <CalendarClock className="w-4 h-4 text-gray-400 mt-0.5" />
+                  论文时间下限：{formatDate(student.paper_date_floor)}
                 </div>
                 <div className="inline-flex items-start gap-2 text-sm text-gray-700">
                   <CalendarClock className="w-4 h-4 text-gray-400 mt-0.5" />
@@ -1191,6 +1272,8 @@ export default function StudentDetailPage() {
             ["培养类型", "degree_type"],
             ["入学年份", "enrollment_year"],
             ["预计毕业年份", "expected_graduation_year"],
+            ["入项时间", "entry_date"],
+            ["论文时间下限", "paper_date_floor"],
             ["状态", "status"],
             ["邮箱", "email"],
             ["电话", "phone"],

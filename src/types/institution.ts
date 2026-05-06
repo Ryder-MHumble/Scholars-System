@@ -5,7 +5,7 @@ export interface InstitutionDepartmentListItem {
 }
 
 // ---------------------------------------------------------------------------
-// Institution Tree types (for /api/v1/institutions/scholars/tree)
+// Institution Tree types (for /api/institutions/scholars/tree)
 // ---------------------------------------------------------------------------
 
 export interface InstitutionTreeDepartment {
