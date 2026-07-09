@@ -67,6 +67,10 @@ export default function ScholarListPage() {
     () => filteredUniNodes.reduce((sum, u) => sum + u.count, 0),
     [filteredUniNodes],
   );
+  const displayError =
+    error?.includes("timeout") || error?.includes("超时")
+      ? "数据加载超时，请稍后重试"
+      : error;
 
   useEffect(() => {
     const returnTo = `${location.pathname}${location.search || "?tab=scholars"}`;
@@ -232,7 +236,7 @@ export default function ScholarListPage() {
             <LoadingSpinner />
           ) : error ? (
             <div className="bg-white rounded-xl border border-red-100 flex flex-col items-center justify-center py-16 text-red-400">
-              <p className="text-sm">{error}</p>
+              <p className="text-sm">{displayError}</p>
               <button
                 onClick={() => {
                   setPage(1);

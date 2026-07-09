@@ -4,6 +4,7 @@ import {
   fetchScholarList,
   fetchAllScholars,
   deleteScholar,
+  invalidateScholarListCache,
   invalidateScholarUniversityCache,
   type ScholarListFilters,
   type ScholarListResponse,
@@ -40,6 +41,16 @@ function isAbortError(err: unknown): boolean {
   return (
     String((err as { name?: unknown }).name) === "AbortError"
   );
+}
+
+function getListErrorMessage(err: unknown): string {
+  if (
+    err instanceof Error &&
+    err.message.includes("Request timeout after")
+  ) {
+    return "数据加载超时，请稍后重试";
+  }
+  return err instanceof Error ? err.message : "加载失败";
 }
 
 const PROJECT_SUBTAB_FILTER: Record<
@@ -357,29 +368,35 @@ export function useScholarList(options: UseScholarListOptions = {}) {
     setIsLoading(true);
     setError(null);
 
-    fetchScholarList(page, PAGE_SIZE, apiListFilters, controller.signal)
-      .then((res) => {
-        if (controller.signal.aborted || requestSeq !== listRequestSeqRef.current) {
-          return;
-        }
-        setApiData(res);
-        if (res.page !== page) {
-          setPage(res.page);
-        }
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        if (
-          controller.signal.aborted ||
-          requestSeq !== listRequestSeqRef.current ||
-          isAbortError(err)
-        ) {
-          return;
-        }
-        setError(err instanceof Error ? err.message : "加载失败");
-        setIsLoading(false);
-      });
-    return () => controller.abort();
+    const timer = setTimeout(() => {
+      fetchScholarList(page, PAGE_SIZE, apiListFilters, controller.signal)
+        .then((res) => {
+          if (controller.signal.aborted || requestSeq !== listRequestSeqRef.current) {
+            return;
+          }
+          setApiData(res);
+          if (res.page !== page) {
+            setPage(res.page);
+          }
+          setIsLoading(false);
+        })
+        .catch((err) => {
+          if (
+            controller.signal.aborted ||
+            requestSeq !== listRequestSeqRef.current ||
+            isAbortError(err)
+          ) {
+            return;
+          }
+          setError(getListErrorMessage(err));
+          setIsLoading(false);
+        });
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [
     page,
     reloadSeed,
@@ -604,6 +621,7 @@ export function useScholarList(options: UseScholarListOptions = {}) {
   };
 
   const refreshList = () => {
+    invalidateScholarListCache();
     invalidateScholarUniversityCache();
     setUniversityReloadSeed((prev) => prev + 1);
     setReloadSeed((prev) => prev + 1);

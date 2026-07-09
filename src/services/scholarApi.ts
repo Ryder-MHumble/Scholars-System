@@ -1,7 +1,16 @@
 import { normalizeProjectSubcategoryLabel } from "@/constants/projectCategories";
 import { API_BASE_URL } from "@/services/apiBase";
+import {
+  cachedFetch,
+  fetchWithTimeout,
+  invalidateCache,
+} from "@/services/requestUtils";
 
 export const BASE_URL = API_BASE_URL;
+const SCHOLAR_REQUEST_TIMEOUT_MS = 15_000;
+const SCHOLAR_LIST_CACHE_TTL_MS = 60_000;
+const SCHOLAR_LIST_FETCH_CONCURRENCY = 2;
+const SCHOLAR_LIST_MAX_PAGES = 500;
 
 export interface AdjunctSupervisorInfo {
   status: string;
@@ -369,6 +378,10 @@ export function invalidateScholarUniversityCache(): void {
   scholarUniversityInFlight.clear();
 }
 
+export function invalidateScholarListCache(): void {
+  invalidateCache("/api/scholars");
+}
+
 function buildUniversityCacheKey(filters?: {
   region?: string;
   affiliation_type?: string;
@@ -453,6 +466,28 @@ function buildScholarListParams(
   });
   appendScholarFilterParams(params, filters);
   return params;
+}
+
+function isRequestTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof Error && error.message.includes("Request timeout after")
+  );
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function createScholarListError(error: unknown, fallback: string): Error {
+  if (isAbortError(error)) {
+    const abortError = new Error("The operation was aborted.");
+    abortError.name = "AbortError";
+    return abortError;
+  }
+  if (isRequestTimeoutError(error)) {
+    return new Error("数据加载超时，请稍后重试");
+  }
+  return error instanceof Error ? error : new Error(fallback);
 }
 
 function normalizeProjectTags(raw: unknown): ScholarProjectTag[] {
@@ -777,14 +812,21 @@ export async function fetchScholarList(
   signal?: AbortSignal,
 ): Promise<ScholarListResponse> {
   const params = buildScholarListParams(page, pageSize, filters);
+  const url = `${BASE_URL}/api/scholars?${params}`;
 
-  const res = await fetch(`${BASE_URL}/api/scholars?${params}`, { signal });
-  if (!res.ok) throw new Error(`Failed to fetch scholar list: ${res.status}`);
-  const data: ScholarListResponse = await res.json();
-  return {
-    ...data,
-    items: data.items.map((item) => normalizeScholarProjectFields(item)),
-  };
+  try {
+    const data = await cachedFetch<ScholarListResponse>(url, {
+      signal,
+      ttl: SCHOLAR_LIST_CACHE_TTL_MS,
+      timeoutMs: SCHOLAR_REQUEST_TIMEOUT_MS,
+    });
+    return {
+      ...data,
+      items: data.items.map((item) => normalizeScholarProjectFields(item)),
+    };
+  } catch (error) {
+    throw createScholarListError(error, "Failed to fetch scholar list");
+  }
 }
 
 export async function fetchAllScholars(
@@ -794,12 +836,11 @@ export async function fetchAllScholars(
   // First, get the first page to know the total count
   const firstPageParams = buildScholarListParams(1, 100, filters);
 
-  const firstRes = await fetch(
+  const firstRes = await fetchWithTimeout(
     `${BASE_URL}/api/scholars?${firstPageParams}`,
     { signal },
+    SCHOLAR_REQUEST_TIMEOUT_MS,
   );
-  if (!firstRes.ok)
-    throw new Error(`Failed to fetch all scholars: ${firstRes.status}`);
   const firstDataRaw: ScholarListResponse = await firstRes.json();
   const firstData: ScholarListResponse = {
     ...firstDataRaw,
@@ -815,27 +856,35 @@ export async function fetchAllScholars(
 
   // Otherwise, fetch all pages
   const allScholars: ScholarListItem[] = [...firstData.items];
-  const totalPages = firstData.total_pages;
+  const totalPages = Math.min(firstData.total_pages, SCHOLAR_LIST_MAX_PAGES);
+  const remainingPageResults: ScholarListItem[][] = [];
 
-  // Fetch remaining pages in parallel
-  const pagePromises: Promise<ScholarListResponse>[] = [];
-  for (let page = 2; page <= totalPages; page++) {
-    const params = buildScholarListParams(page, 100, filters);
+  let nextPage = 2;
+  async function fetchNextPage(): Promise<void> {
+    while (nextPage <= totalPages) {
+      const page = nextPage;
+      nextPage += 1;
+      const params = buildScholarListParams(page, 100, filters);
 
-    pagePromises.push(
-      fetch(`${BASE_URL}/api/scholars?${params}`, { signal }).then((res) => {
-        if (!res.ok)
-          throw new Error(`Failed to fetch page ${page}: ${res.status}`);
-        return res.json() as Promise<ScholarListResponse>;
-      }),
-    );
+      const res = await fetchWithTimeout(
+        `${BASE_URL}/api/scholars?${params}`,
+        { signal },
+        SCHOLAR_REQUEST_TIMEOUT_MS,
+      );
+      const pageData = (await res.json()) as ScholarListResponse;
+      remainingPageResults[page - 2] = pageData.items.map((item) =>
+        normalizeScholarProjectFields(item),
+      );
+    }
   }
 
-  const pageResults = await Promise.all(pagePromises);
-  pageResults.forEach((pageData) => {
-    allScholars.push(
-      ...pageData.items.map((item) => normalizeScholarProjectFields(item)),
-    );
+  const workerCount = Math.min(
+    SCHOLAR_LIST_FETCH_CONCURRENCY,
+    Math.max(0, totalPages - 1),
+  );
+  await Promise.all(Array.from({ length: workerCount }, () => fetchNextPage()));
+  remainingPageResults.forEach((items) => {
+    allScholars.push(...items);
   });
 
   return allScholars;
@@ -862,6 +911,7 @@ export async function patchScholarRelation(
   });
   if (!res.ok) throw new Error(`Failed to update relation: ${res.status}`);
   const updated: ScholarDetail = await res.json();
+  invalidateScholarListCache();
   return normalizeScholarProjectFields(updated);
 }
 
@@ -878,6 +928,7 @@ export async function patchScholarDetail(
   if (!res.ok)
     throw new Error(`Failed to update scholar detail: ${res.status}`);
   const updated: ScholarDetail = await res.json();
+  invalidateScholarListCache();
   return normalizeScholarProjectFields(updated);
 }
 
@@ -892,6 +943,7 @@ export async function postScholarUpdate(
   });
   if (!res.ok) throw new Error(`Failed to post update: ${res.status}`);
   const updated: ScholarDetail = await res.json();
+  invalidateScholarListCache();
   return normalizeScholarProjectFields(updated);
 }
 
@@ -907,6 +959,7 @@ export async function deleteScholarUpdate(
   );
   if (!res.ok) throw new Error(`Failed to delete update: ${res.status}`);
   const updated: ScholarDetail = await res.json();
+  invalidateScholarListCache();
   return normalizeScholarProjectFields(updated);
 }
 
@@ -924,6 +977,7 @@ export async function patchScholarAchievements(
   );
   if (!res.ok) throw new Error(`Failed to update achievements: ${res.status}`);
   const updated: ScholarDetail = await res.json();
+  invalidateScholarListCache();
   return normalizeScholarProjectFields(updated);
 }
 
@@ -945,6 +999,7 @@ export async function createStudent(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`Failed to create student: ${res.status}`);
+  invalidateScholarListCache();
   return res.json();
 }
 
@@ -962,6 +1017,7 @@ export async function patchStudent(
     },
   );
   if (!res.ok) throw new Error(`Failed to update student: ${res.status}`);
+  invalidateScholarListCache();
   return res.json();
 }
 
@@ -976,6 +1032,7 @@ export async function deleteStudent(
     },
   );
   if (!res.ok) throw new Error(`Failed to delete student: ${res.status}`);
+  invalidateScholarListCache();
 }
 
 export async function deleteScholar(urlHash: string): Promise<void> {
@@ -983,6 +1040,7 @@ export async function deleteScholar(urlHash: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`Failed to delete scholar: ${res.status}`);
+  invalidateScholarListCache();
 }
 
 export interface ScholarCreate {
@@ -1064,6 +1122,7 @@ export async function createScholar(
     );
   }
   const created: ScholarDetail = await res.json();
+  invalidateScholarListCache();
   return normalizeScholarProjectFields(created);
 }
 
@@ -1079,6 +1138,7 @@ export async function batchCreateScholars(
   });
   if (!res.ok)
     throw new Error(`Failed to batch create scholars: ${res.status}`);
+  invalidateScholarListCache();
   return res.json();
 }
 
@@ -1098,9 +1158,10 @@ export interface ScholarStatsResponse {
 }
 
 export async function fetchScholarStats(): Promise<ScholarStatsResponse> {
-  const res = await fetch(`${BASE_URL}/api/scholars/stats`);
-  if (!res.ok) throw new Error(`Failed to fetch scholar stats: ${res.status}`);
-  return res.json();
+  return cachedFetch<ScholarStatsResponse>(`${BASE_URL}/api/scholars/stats`, {
+    ttl: SCHOLAR_LIST_CACHE_TTL_MS,
+    timeoutMs: SCHOLAR_REQUEST_TIMEOUT_MS,
+  });
 }
 
 export interface UniversityOption {
