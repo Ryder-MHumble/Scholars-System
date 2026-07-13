@@ -26,7 +26,7 @@ export function useScholarDetail(scholarId: string | undefined) {
     awards: AwardRecord[];
   } | null>(null);
 
-  const loadScholar = useCallback(async () => {
+  const loadScholar = useCallback(async (signal?: AbortSignal) => {
     if (!scholarId) {
       setScholar(null);
       setEditableAchievements(null);
@@ -38,7 +38,7 @@ export function useScholarDetail(scholarId: string | undefined) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchScholarDetail(scholarId);
+      const data = await fetchScholarDetail(scholarId, signal);
       setScholar(data);
       setEditableAchievements({
         publications: data.representative_publications ?? [],
@@ -46,14 +46,22 @@ export function useScholarDetail(scholarId: string | undefined) {
         awards: data.awards ?? [],
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载失败");
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        setError(err instanceof Error ? err.message : "加载失败");
+      }
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [scholarId]);
 
   useEffect(() => {
-    void loadScholar();
+    const controller = new AbortController();
+    void loadScholar(controller.signal);
+    return () => {
+      controller.abort();
+    };
   }, [loadScholar]);
 
   const withScholar = useCallback(

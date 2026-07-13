@@ -2,6 +2,7 @@
  * 学者卡片组件（网格视图）
  * 从 ScholarListPage 的网格视图代码提取（第 747-834 行）
  */
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Building2, Award, Trash2 } from "lucide-react";
@@ -35,6 +36,8 @@ export function ScholarCard({
   isDeleting = false,
 }: ScholarCardProps) {
   const achievementTags = extractAchievementTags(s);
+  const [imageFailed, setImageFailed] = useState(false);
+  const showPhoto = Boolean(s.photo_url) && !imageFailed;
 
   return (
     <motion.div
@@ -49,10 +52,13 @@ export function ScholarCard({
           className="block bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md hover:border-primary-100 transition-all"
         >
           <div className="flex items-start gap-3 mb-3">
-            {s.photo_url ? (
+            {showPhoto ? (
               <img
                 src={s.photo_url}
                 alt={s.name}
+                loading="lazy"
+                decoding="async"
+                onError={() => setImageFailed(true)}
                 className="w-11 h-11 rounded-lg object-cover shrink-0"
               />
             ) : (

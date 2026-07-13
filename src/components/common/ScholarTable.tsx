@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Eye, Trash2 } from "lucide-react";
@@ -50,6 +51,32 @@ interface ScholarTableProps {
   locationState: unknown;
   deletingHash: string | null;
   onDelete: (urlHash: string, name: string) => void;
+}
+
+function ScholarPhotoCell({ scholar }: { scholar: ScholarListItem }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  if (scholar.photo_url && !imageFailed) {
+    return (
+      <img
+        src={scholar.photo_url}
+        alt={scholar.name}
+        loading="lazy"
+        decoding="async"
+        onError={() => setImageFailed(true)}
+        className="w-14 h-14 rounded-lg object-cover shrink-0 ring-2 ring-transparent group-hover:ring-primary-200 transition-all duration-150"
+      />
+    );
+  }
+
+  return (
+    <div
+      className="w-14 h-14 rounded-lg flex items-center justify-center text-white font-bold text-lg shrink-0 ring-2 ring-transparent group-hover:ring-primary-200 transition-all duration-150"
+      style={{ backgroundColor: getAvatarColor(scholar.name) }}
+    >
+      {getInitial(scholar.name)}
+    </div>
+  );
 }
 
 export function ScholarTable({
@@ -107,20 +134,7 @@ export function ScholarTable({
                     state={locationState}
                     className="flex items-center gap-3"
                   >
-                    {s.photo_url ? (
-                      <img
-                        src={s.photo_url}
-                        alt={s.name}
-                        className="w-14 h-14 rounded-lg object-cover shrink-0 ring-2 ring-transparent group-hover:ring-primary-200 transition-all duration-150"
-                      />
-                    ) : (
-                      <div
-                        className="w-14 h-14 rounded-lg flex items-center justify-center text-white font-bold text-lg shrink-0 ring-2 ring-transparent group-hover:ring-primary-200 transition-all duration-150"
-                        style={{ backgroundColor: getAvatarColor(s.name) }}
-                      >
-                        {getInitial(s.name)}
-                      </div>
-                    )}
+                    <ScholarPhotoCell scholar={s} />
                     <span className="text-sm font-semibold text-gray-800 group-hover:text-primary-600 transition-colors duration-150 whitespace-nowrap">
                       {s.name}
                     </span>

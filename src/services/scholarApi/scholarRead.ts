@@ -18,6 +18,7 @@ import {
 } from "./helpers";
 import type {
   BackendInstitutionHierarchyResponse,
+  FetchAllScholarsOptions,
   ScholarDetail,
   ScholarListItem,
   ScholarListResponse,
@@ -119,8 +120,9 @@ export async function fetchScholarList(
 
 export async function fetchAllScholars(
   filters?: ScholarListFilters,
-  signal?: AbortSignal,
+  options: FetchAllScholarsOptions = {},
 ): Promise<ScholarListItem[]> {
+  const { signal, maxRecords } = options;
   // First, get the first page to know the total count
   const firstPageParams = buildScholarListParams(1, 50, filters);
 
@@ -136,6 +138,10 @@ export async function fetchAllScholars(
       normalizeScholarProjectFields(item),
     ),
   };
+
+  if (typeof maxRecords === "number" && maxRecords > 0 && firstData.total > maxRecords) {
+    throw new Error(`导出范围过大，当前共有 ${firstData.total} 条记录，超过上限 ${maxRecords} 条，请先筛选后再导出。`);
+  }
 
   // If all data fits in first page, return it
   if (firstData.total <= 50) {

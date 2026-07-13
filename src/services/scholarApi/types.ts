@@ -192,6 +192,11 @@ export interface ScholarListResponse {
   items: ScholarListItem[];
 }
 
+export interface FetchAllScholarsOptions {
+  signal?: AbortSignal;
+  maxRecords?: number;
+}
+
 export interface ScholarListFilters {
   university?: string;
   department?: string;

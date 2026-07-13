@@ -28,6 +28,7 @@ import {
 } from "@/utils/scholarAchievementTags";
 
 const PAGE_SIZE = 20;
+const EXPORT_MAX_RECORDS = 2000;
 
 function parsePageParam(value: string | null): number {
   const parsed = value ? Number.parseInt(value, 10) : 1;
@@ -630,7 +631,9 @@ export function useScholarList(options: UseScholarListOptions = {}) {
   const handleExportToExcel = async () => {
     setIsExporting(true);
     try {
-      const allScholars = await fetchAllScholars(apiListFilters);
+      const allScholars = await fetchAllScholars(apiListFilters, {
+        maxRecords: EXPORT_MAX_RECORDS,
+      });
       exportScholarsToExcel(allScholars);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "导出失败";
