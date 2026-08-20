@@ -19,6 +19,9 @@ import {
   Database,
   FlaskConical,
   Link2,
+  Twitter,
+  FileText,
+  UserSearch,
 } from "lucide-react";
 import { resolveProfileLinks, type ScholarDetail } from "@/services/scholarApi";
 import { SideLabel } from "@/components/scholar-detail/shared/SideLabel";
@@ -275,7 +278,7 @@ export function DetailLeftSidebar({
               {scholar.joint_management_roles.map((role, i) => (
                 <div key={i} className="relative pl-5">
                   <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
-                  <p className="text-sm text-gray-700">{role}</p>
+                  <p className="text-sm text-gray-700">{role.role}</p>
                 </div>
               ))}
             </div>
@@ -391,6 +394,27 @@ function ProfileLinkIcons({
       Icon: Database,
       className:
         "hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200",
+    },
+    {
+      label: "X (Twitter)",
+      value: profileLinks.x,
+      Icon: Twitter,
+      className:
+        "hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300",
+    },
+    {
+      label: "OpenReview",
+      value: profileLinks.openreview,
+      Icon: FileText,
+      className:
+        "hover:text-orange-600 hover:bg-orange-50 hover:border-orange-200",
+    },
+    {
+      label: "AMiner",
+      value: profileLinks.aminer,
+      Icon: UserSearch,
+      className:
+        "hover:text-purple-600 hover:bg-purple-50 hover:border-purple-200",
     },
     {
       label: "实验室网站",

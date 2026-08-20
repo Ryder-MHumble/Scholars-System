@@ -32,7 +32,24 @@ export interface ProfileLinks {
   google_scholar: string;
   orcid: string;
   dblp: string;
+  x: string;
+  openreview: string;
+  aminer: string;
   other: string[];
+}
+
+export interface CoauthorInfo {
+  aminer_id: string;
+  name: string;
+  name_zh: string;
+  h_index: number | null;
+  n_citation: number | null;
+  n_pubs: number | null;
+  avatar: string;
+  position: string;
+  affiliation: string;
+  affiliation_zh: string;
+  weight: number;
 }
 
 export interface ScholarListItem {
@@ -61,6 +78,7 @@ export interface ScholarListItem {
   representative_publications?: PublicationRecord[];
   patents?: PatentRecord[];
   awards?: AwardRecord[];
+  coauthors?: CoauthorInfo[];
   // Legacy convenience fields for existing UI components
   project_category: string;
   project_subcategory: string;
@@ -80,6 +98,11 @@ export interface ScholarDetail extends ScholarListItem {
   google_scholar_url: string;
   dblp_url: string;
   orcid: string;
+  linkedin_url: string;
+  github_url: string;
+  x_url: string;
+  openreview_url: string;
+  aminer_url: string;
   phd_institution: string;
   phd_year: string;
   education: EducationRecord[];
@@ -90,8 +113,8 @@ export interface ScholarDetail extends ScholarListItem {
   supervised_students: string[];
   supervised_students_count: number;
   joint_research_projects: JointProject[];
-  joint_management_roles: string[];
-  academic_exchange_records: string[];
+  joint_management_roles: ManagementRole[];
+  academic_exchange_records: ExchangeRecord[];
   institute_relation_notes: string;
   relation_updated_by: string;
   relation_updated_at: string;
@@ -99,6 +122,7 @@ export interface ScholarDetail extends ScholarListItem {
   representative_publications: PublicationRecord[];
   patents: PatentRecord[];
   awards: AwardRecord[];
+  coauthors?: CoauthorInfo[];
   custom_fields?: Record<string, unknown>;
 }
 
@@ -235,9 +259,9 @@ export interface RelationPatch {
   is_potential_recruit?: boolean;
   institute_relation_notes?: string;
   supervised_students?: string[];
-  joint_research_projects?: string[];
-  joint_management_roles?: string[];
-  academic_exchange_records?: string[];
+  joint_research_projects?: JointProject[];
+  joint_management_roles?: ManagementRole[];
+  academic_exchange_records?: ExchangeRecord[];
   project_tags?: ScholarProjectTag[];
   event_tags?: ScholarEventTag[];
   participated_event_ids?: string[];
@@ -267,6 +291,11 @@ export interface ScholarDetailPatch {
   google_scholar_url?: string;
   dblp_url?: string;
   orcid?: string;
+  linkedin_url?: string;
+  github_url?: string;
+  x_url?: string;
+  openreview_url?: string;
+  aminer_url?: string;
   phd_institution?: string;
   phd_year?: string;
   research_areas?: string[];
@@ -278,6 +307,9 @@ export interface AchievementsPatch {
   representative_publications?: PublicationRecord[];
   patents?: PatentRecord[];
   awards?: AwardRecord[];
+  h_index?: number;
+  citations_count?: number;
+  publications_count?: number;
   updated_by?: string;
 }
 
@@ -370,6 +402,12 @@ export interface ScholarProjectFields {
   google_scholar_url?: unknown;
   dblp_url?: unknown;
   orcid?: unknown;
+  linkedin_url?: unknown;
+  github_url?: unknown;
+  x_url?: unknown;
+  openreview_url?: unknown;
+  aminer_url?: unknown;
+  coauthors?: unknown;
 }
 
 export interface ScholarCreate {

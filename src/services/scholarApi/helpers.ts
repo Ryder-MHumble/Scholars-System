@@ -1,6 +1,7 @@
 import { normalizeProjectSubcategoryLabel } from "@/constants/projectCategories";
 import { invalidateCache } from "@/services/requestUtils";
 import type {
+  CoauthorInfo,
   ProfileLinks,
   RelationPatch,
   ScholarEventTag,
@@ -185,6 +186,49 @@ function normalizeEventTags(raw: unknown): ScholarEventTag[] {
   return tags;
 }
 
+function normalizeNullableNumber(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function normalizeCoauthors(raw: unknown): CoauthorInfo[] {
+  let value = raw;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(value)) return [];
+
+  const coauthors: CoauthorInfo[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const coauthor = item as Record<string, unknown>;
+    const aminerId = String(coauthor.aminer_id ?? "").trim();
+    const name = String(coauthor.name ?? "").trim();
+    const nameZh = String(coauthor.name_zh ?? "").trim();
+    if (!aminerId && !name && !nameZh) continue;
+
+    coauthors.push({
+      aminer_id: aminerId,
+      name,
+      name_zh: nameZh,
+      h_index: normalizeNullableNumber(coauthor.h_index),
+      n_citation: normalizeNullableNumber(coauthor.n_citation),
+      n_pubs: normalizeNullableNumber(coauthor.n_pubs),
+      avatar: String(coauthor.avatar ?? "").trim(),
+      position: String(coauthor.position ?? "").trim(),
+      affiliation: String(coauthor.affiliation ?? "").trim(),
+      affiliation_zh: String(coauthor.affiliation_zh ?? "").trim(),
+      weight: normalizeNullableNumber(coauthor.weight) ?? 0,
+    });
+  }
+  return coauthors;
+}
+
 
 function normalizeStringArray(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -201,6 +245,9 @@ export function normalizeProfileLinks(raw: unknown): ProfileLinks {
       google_scholar: "",
       orcid: "",
       dblp: "",
+      x: "",
+      openreview: "",
+      aminer: "",
       other: [],
     };
   }
@@ -214,6 +261,9 @@ export function normalizeProfileLinks(raw: unknown): ProfileLinks {
     google_scholar: String(links.google_scholar ?? "").trim(),
     orcid: String(links.orcid ?? "").trim(),
     dblp: String(links.dblp ?? "").trim(),
+    x: String(links.x ?? "").trim(),
+    openreview: String(links.openreview ?? "").trim(),
+    aminer: String(links.aminer ?? "").trim(),
     other: normalizeStringArray(links.other),
   };
 }
@@ -227,19 +277,27 @@ export function resolveProfileLinks(
     | "google_scholar_url"
     | "dblp_url"
     | "orcid"
+    | "linkedin_url"
+    | "github_url"
+    | "x_url"
+    | "openreview_url"
+    | "aminer_url"
   >,
 ): ProfileLinks {
   const profileLinks = normalizeProfileLinks(scholar.profile_links);
   return {
     homepage: profileLinks.homepage || String(scholar.profile_url ?? "").trim(),
     lab: profileLinks.lab || String(scholar.lab_url ?? "").trim(),
-    github: profileLinks.github,
-    linkedin: profileLinks.linkedin,
+    github: profileLinks.github || String(scholar.github_url ?? "").trim(),
+    linkedin: profileLinks.linkedin || String(scholar.linkedin_url ?? "").trim(),
     google_scholar:
       profileLinks.google_scholar ||
       String(scholar.google_scholar_url ?? "").trim(),
     orcid: profileLinks.orcid || String(scholar.orcid ?? "").trim(),
     dblp: profileLinks.dblp || String(scholar.dblp_url ?? "").trim(),
+    x: profileLinks.x || String(scholar.x_url ?? "").trim(),
+    openreview: profileLinks.openreview || String(scholar.openreview_url ?? "").trim(),
+    aminer: profileLinks.aminer || String(scholar.aminer_url ?? "").trim(),
     other: profileLinks.other,
   };
 }
@@ -250,6 +308,11 @@ export function buildLegacyProfileLinkFields(profileLinks: ProfileLinks): {
   google_scholar_url: string;
   dblp_url: string;
   orcid: string;
+  linkedin_url: string;
+  github_url: string;
+  x_url: string;
+  openreview_url: string;
+  aminer_url: string;
 } {
   return {
     profile_url: profileLinks.homepage,
@@ -257,6 +320,11 @@ export function buildLegacyProfileLinkFields(profileLinks: ProfileLinks): {
     google_scholar_url: profileLinks.google_scholar,
     dblp_url: profileLinks.dblp,
     orcid: profileLinks.orcid,
+    linkedin_url: profileLinks.linkedin,
+    github_url: profileLinks.github,
+    x_url: profileLinks.x,
+    openreview_url: profileLinks.openreview,
+    aminer_url: profileLinks.aminer,
   };
 }
 
@@ -269,6 +337,9 @@ export function hasProfileLinks(profileLinks: ProfileLinks): boolean {
     profileLinks.google_scholar ||
     profileLinks.orcid ||
     profileLinks.dblp ||
+    profileLinks.x ||
+    profileLinks.openreview ||
+    profileLinks.aminer ||
     profileLinks.other.length > 0,
   );
 }
@@ -288,6 +359,12 @@ export function normalizeScholarProjectFields<T extends ScholarProjectFields>(
   google_scholar_url: string;
   dblp_url: string;
   orcid: string;
+  linkedin_url: string;
+  github_url: string;
+  x_url: string;
+  openreview_url: string;
+  aminer_url: string;
+  coauthors: CoauthorInfo[];
 } {
   const projectTags = normalizeProjectTags(scholar.project_tags);
   const eventTags = normalizeEventTags(scholar.event_tags);
@@ -320,6 +397,12 @@ export function normalizeScholarProjectFields<T extends ScholarProjectFields>(
     google_scholar_url: profileLinks.google_scholar,
     dblp_url: profileLinks.dblp,
     orcid: profileLinks.orcid,
+    linkedin_url: profileLinks.linkedin,
+    github_url: profileLinks.github,
+    x_url: profileLinks.x,
+    openreview_url: profileLinks.openreview,
+    aminer_url: profileLinks.aminer,
+    coauthors: normalizeCoauthors(scholar.coauthors),
   };
 }
 
@@ -331,6 +414,11 @@ export function buildScholarPayload<
     google_scholar_url?: string;
     dblp_url?: string;
     orcid?: string;
+    linkedin_url?: string;
+    github_url?: string;
+    x_url?: string;
+    openreview_url?: string;
+    aminer_url?: string;
   },
 >(data: T): T {
   const payload = { ...data };

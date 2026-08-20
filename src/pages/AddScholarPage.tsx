@@ -57,6 +57,9 @@ interface FormData {
   googleScholar: string;
   orcid: string;
   dblp: string;
+  xUrl: string;
+  openreviewUrl: string;
+  aminerUrl: string;
   otherProfileLinks: string;
   researchFields: string[];
   honors: AcademicHonor[];
@@ -84,6 +87,9 @@ const initialForm: FormData = {
   googleScholar: "",
   orcid: "",
   dblp: "",
+  xUrl: "",
+  openreviewUrl: "",
+  aminerUrl: "",
   otherProfileLinks: "",
   researchFields: [],
   honors: [],
@@ -181,6 +187,9 @@ export default function AddScholarPage() {
           google_scholar: form.googleScholar,
           orcid: form.orcid,
           dblp: form.dblp,
+          x: form.xUrl,
+          openreview: form.openreviewUrl,
+          aminer: form.aminerUrl,
           other: form.otherProfileLinks
             .split(/\n|,/)
             .map((item) => item.trim())

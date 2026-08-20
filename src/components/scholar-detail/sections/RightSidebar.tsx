@@ -11,6 +11,7 @@ import {
   Loader2,
   ClipboardList,
   ArrowUpRight,
+  Users,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import {
@@ -84,9 +85,15 @@ export function RightSidebar({ scholar }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [scholarActivities, setScholarActivities] = useState<ActivityEvent[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"coauthors" | "activities">(
+    "coauthors",
+  );
 
   // Check if scholar is adjunct supervisor
   const isAdjunctSupervisor = Boolean(scholar.adjunct_supervisor?.status);
+  const coauthors = [...(scholar.coauthors ?? [])].sort(
+    (a, b) => b.weight - a.weight,
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -205,12 +212,122 @@ export function RightSidebar({ scholar }: Props) {
           <ClipboardList className="w-4 h-4 text-primary-600" />
           <h3 className="text-sm font-semibold text-gray-900">学者活动</h3>
           <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-            {scholarActivities.length} 条
+            {activeTab === "coauthors"
+              ? `${coauthors.length} 人`
+              : `${scholarActivities.length} 条`}
           </span>
         </div>
 
-        <div className="px-5 py-3 max-h-[400px] overflow-y-auto custom-scrollbar">
-          {isActivityLoading ? (
+        <div className="px-5 pt-2 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("coauthors")}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-lg border-b-2 transition-colors",
+                activeTab === "coauthors"
+                  ? "text-primary-700 border-primary-600 bg-primary-50/40"
+                  : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
+              )}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>合作学者</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("activities")}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-lg border-b-2 transition-colors",
+                activeTab === "activities"
+                  ? "text-primary-700 border-primary-600 bg-primary-50/40"
+                  : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
+              )}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>学者活动</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="px-5 py-3 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar">
+          {activeTab === "coauthors" ? (
+            coauthors.length > 0 ? (
+              <div className="space-y-3">
+                {coauthors.map((coauthor) => (
+                  <a
+                    key={coauthor.aminer_id || `${coauthor.name}-${coauthor.name_zh}`}
+                    href={`https://www.aminer.cn/profile/${coauthor.aminer_id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block p-3 border border-gray-100 hover:border-primary-200 rounded-lg transition-all duration-200 hover:bg-primary-50/30"
+                  >
+                    <div className="flex items-start gap-3">
+                      {coauthor.avatar ? (
+                        <img
+                          src={coauthor.avatar}
+                          alt={coauthor.name_zh || coauthor.name}
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                          className="w-10 h-10 rounded-full object-cover bg-gray-100 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-semibold shrink-0">
+                          {(coauthor.name_zh || coauthor.name).charAt(0) || "?"}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {coauthor.name_zh || coauthor.name || "未知学者"}
+                            </p>
+                            {coauthor.name_zh && coauthor.name && (
+                              <p className="text-xs text-gray-500 truncate">
+                                {coauthor.name}
+                              </p>
+                            )}
+                          </div>
+                          <ArrowUpRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        </div>
+                        {coauthor.position && (
+                          <p className="mt-1 text-xs text-gray-600 truncate">
+                            {coauthor.position}
+                          </p>
+                        )}
+                        {(coauthor.affiliation_zh || coauthor.affiliation) && (
+                          <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-2">
+                            {coauthor.affiliation_zh || coauthor.affiliation}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
+                      {[
+                        ["H-index", coauthor.h_index],
+                        ["论文", coauthor.n_pubs],
+                        ["引用", coauthor.n_citation],
+                        ["权重", coauthor.weight],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded bg-gray-50 px-1 py-1.5">
+                          <p className="text-[10px] text-gray-400">{label}</p>
+                          <p className="mt-0.5 text-xs font-medium text-gray-700 truncate">
+                            {typeof value === "number"
+                              ? value.toLocaleString("zh-CN")
+                              : "-"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-8">
+                <Users className="w-8 h-8 text-gray-200" />
+                <p className="text-sm text-gray-400">暂无合作学者</p>
+              </div>
+            )
+          ) : isActivityLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
             </div>

@@ -9,7 +9,7 @@ import {
   Plus,
   FileText,
 } from "lucide-react";
-import type { ScholarDetail } from "@/services/scholarApi";
+import type { ScholarDetail, ExchangeRecord } from "@/services/scholarApi";
 import { ClickToEditField } from "@/components/scholar-detail/shared/ClickToEditField";
 import { ExchangeRecordFormModal } from "@/components/scholar-detail/modals/ExchangeRecordFormModal";
 import { cn } from "@/utils/cn";
@@ -38,7 +38,7 @@ interface RelationCardProps {
     field: "is_advisor_committee" | "is_potential_recruit",
   ) => Promise<void>;
   onRelationNotesSave: (val: string) => Promise<void>;
-  onSaveExchangeRecords: (records: string[]) => Promise<void>;
+  onSaveExchangeRecords: (records: ExchangeRecord[]) => Promise<void>;
 }
 
 const RELATION_BADGES = [
@@ -59,7 +59,7 @@ export function RelationCard({
 }: RelationCardProps) {
   // Exchange records editing state
   const [isExchangeEditMode, setIsExchangeEditMode] = useState(false);
-  const [editedExchangeRecords, setEditedExchangeRecords] = useState<string[]>(
+  const [editedExchangeRecords, setEditedExchangeRecords] = useState<ExchangeRecord[]>(
     [],
   );
   const [showExchangeRecordForm, setShowExchangeRecordForm] = useState(false);
@@ -87,7 +87,7 @@ export function RelationCard({
     setEditingExchangeIdx(null);
   };
 
-  const handleExchangeRecordSubmit = (record: string) => {
+  const handleExchangeRecordSubmit = (record: ExchangeRecord) => {
     if (editingExchangeIdx !== null) {
       setEditedExchangeRecords((prev) => {
         const updated = [...prev];
@@ -367,7 +367,7 @@ export function RelationCard({
                   className="p-3 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all duration-200"
                 >
                   <p className="text-sm text-gray-700 leading-relaxed">
-                    {record}
+                    {record.title || record.description || record.type || JSON.stringify(record)}
                   </p>
                 </motion.div>
               ))}
@@ -390,7 +390,7 @@ function ExchangeEditList({
   onDelete,
   onAdd,
 }: {
-  records: string[];
+  records: ExchangeRecord[];
   onEdit: (idx: number) => void;
   onDelete: (idx: number) => void;
   onAdd: () => void;
@@ -406,7 +406,7 @@ function ExchangeEditList({
           className="p-3 rounded-lg border border-gray-100 bg-gray-50/50 flex items-start gap-2"
         >
           <p className="flex-1 text-sm text-gray-700 min-w-0 break-words">
-            {record}
+            {record.title || record.description || record.type || JSON.stringify(record)}
           </p>
           <div className="flex gap-1 shrink-0">
             <button

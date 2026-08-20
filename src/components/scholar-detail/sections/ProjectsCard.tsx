@@ -8,7 +8,23 @@ interface ProjectsCardProps {
 }
 
 export function ProjectsCard({ projects }: ProjectsCardProps) {
-  if (!projects || projects.length === 0) return null;
+  if (!projects || projects.length === 0) {
+    return (
+      <motion.div
+        variants={slideInUp}
+        className="bg-white rounded-xl border border-gray-200 shadow-sm p-6"
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <FileText className="w-5 h-5 text-primary-600" />
+          <h3 className="text-base font-semibold text-gray-900">联合研究项目</h3>
+          <span className="ml-auto text-xs text-gray-400">0 项</span>
+        </div>
+        <p className="text-sm text-gray-400 text-center py-4">
+          暂无联合研究项目，点击右上角编辑按钮添加
+        </p>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

@@ -16,7 +16,7 @@ import {
   patchScholarRelation,
   resolveProfileLinks,
 } from "@/services/scholarApi";
-import type { ScholarDetailPatch } from "@/services/scholarApi";
+import type { ScholarDetailPatch, ManagementRole, JointProject } from "@/services/scholarApi";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
 import { ProjectCategorySelector } from "@/components/scholar-detail/sections/ProjectCategorySelector";
 import { AchievementsDetailCard } from "@/components/scholar-detail/sections/AchievementsDetailCard";
@@ -45,6 +45,9 @@ const emptyScholar: ScholarDetail = {
     google_scholar: "",
     orcid: "",
     dblp: "",
+    x: "",
+    openreview: "",
+    aminer: "",
     other: [],
   },
   profile_url: "",
@@ -61,6 +64,11 @@ const emptyScholar: ScholarDetail = {
   google_scholar_url: "",
   dblp_url: "",
   orcid: "",
+  linkedin_url: "",
+  github_url: "",
+  x_url: "",
+  openreview_url: "",
+  aminer_url: "",
   phd_institution: "",
   phd_year: "",
   education: [],
@@ -144,7 +152,7 @@ export default function AddScholarDetailPage() {
   };
 
   // Management roles save handlers
-  const handleManagementRolesSave = async (records: string[]) => {
+  const handleManagementRolesSave = async (records: ManagementRole[]) => {
     try {
       setScholar((prev) => ({ ...prev, joint_management_roles: records }));
       setError(null);
@@ -158,6 +166,7 @@ export default function AddScholarDetailPage() {
     publications: PublicationRecord[];
     patents: PatentRecord[];
     awards: AwardRecord[];
+    projects: JointProject[];
   }) => {
     try {
       setScholar((prev) => ({
@@ -165,6 +174,7 @@ export default function AddScholarDetailPage() {
         representative_publications: data.publications,
         patents: data.patents,
         awards: data.awards,
+        joint_research_projects: data.projects,
       }));
       setShowAchievementsModal(false);
       setError(null);
@@ -261,6 +271,7 @@ export default function AddScholarDetailPage() {
             publications={scholar.representative_publications || []}
             patents={scholar.patents || []}
             awards={scholar.awards || []}
+            projects={scholar.joint_research_projects || []}
             onClose={() => setShowAchievementsModal(false)}
             onSubmit={handleAchievementsSave}
           />

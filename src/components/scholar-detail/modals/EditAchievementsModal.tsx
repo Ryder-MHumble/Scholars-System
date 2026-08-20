@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { X, Plus, Save, Upload, BookOpen, Award, Trophy } from "lucide-react";
+import { X, Plus, Save, Upload, BookOpen, Award, Trophy, FileText } from "lucide-react";
 import { cn } from "@/utils/cn";
 import type {
   PublicationRecord,
   PatentRecord,
   AwardRecord,
+  JointProject,
 } from "@/services/scholarApi";
 import {
   parsePublicationsFromText,
@@ -17,20 +18,23 @@ interface EditAchievementsModalProps {
   publications: PublicationRecord[];
   patents: PatentRecord[];
   awards: AwardRecord[];
+  projects: JointProject[];
   onClose: () => void;
   onSubmit: (data: {
     publications: PublicationRecord[];
     patents: PatentRecord[];
     awards: AwardRecord[];
+    projects: JointProject[];
   }) => void | Promise<void>;
 }
 
-type AchievementsTab = "publications" | "patents" | "awards";
+type AchievementsTab = "publications" | "patents" | "awards" | "projects";
 
 export function EditAchievementsModal({
   publications,
   patents,
   awards,
+  projects,
   onClose,
   onSubmit,
 }: EditAchievementsModalProps) {
@@ -42,11 +46,15 @@ export function EditAchievementsModal({
     useState<PublicationRecord[]>(publications);
   const [editedPatents, setEditedPatents] = useState<PatentRecord[]>(patents);
   const [editedAwards, setEditedAwards] = useState<AwardRecord[]>(awards);
+  const [editedProjects, setEditedProjects] = useState<JointProject[]>(
+    projects,
+  );
 
   const [batchInputs, setBatchInputs] = useState({
     publications: "",
     patents: "",
     awards: "",
+    projects: "",
   });
 
   const parsedBatchItems = useMemo(
@@ -54,6 +62,7 @@ export function EditAchievementsModal({
       publications: parsePublicationsFromText(batchInputs.publications),
       patents: parsePatentsFromText(batchInputs.patents),
       awards: parseAwardsFromText(batchInputs.awards),
+      projects: parseProjectsFromText(batchInputs.projects),
     }),
     [batchInputs],
   );
@@ -62,6 +71,7 @@ export function EditAchievementsModal({
       publications: parsedBatchItems.publications.length,
       patents: parsedBatchItems.patents.length,
       awards: parsedBatchItems.awards.length,
+      projects: parsedBatchItems.projects.length,
     }),
     [parsedBatchItems],
   );
@@ -77,8 +87,12 @@ export function EditAchievementsModal({
     () => [...editedAwards, ...parsedBatchItems.awards],
     [editedAwards, parsedBatchItems.awards],
   );
+  const previewProjects = useMemo(
+    () => [...editedProjects, ...parsedBatchItems.projects],
+    [editedProjects, parsedBatchItems.projects],
+  );
 
-  const handleBatchChange = (field: AchievementsTab, value: string) => {
+  const handleBatchChange = (field: keyof typeof batchInputs, value: string) => {
     setBatchInputs((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -86,10 +100,12 @@ export function EditAchievementsModal({
     const batchPublications = parsedBatchItems.publications;
     const batchPatents = parsedBatchItems.patents;
     const batchAwards = parsedBatchItems.awards;
+    const batchProjects = parsedBatchItems.projects;
 
     const finalPublications = [...editedPublications, ...batchPublications];
     const finalPatents = [...editedPatents, ...batchPatents];
     const finalAwards = [...editedAwards, ...batchAwards];
+    const finalProjects = [...editedProjects, ...batchProjects];
 
     setIsSubmitting(true);
     try {
@@ -97,12 +113,14 @@ export function EditAchievementsModal({
         publications: finalPublications,
         patents: finalPatents,
         awards: finalAwards,
+        projects: finalProjects,
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // ---- Publications ----
   const addPublication = () => {
     setEditedPublications((prev) => [
       ...prev,
@@ -135,6 +153,7 @@ export function EditAchievementsModal({
     });
   };
 
+  // ---- Patents ----
   const addPatent = () => {
     setEditedPatents((prev) => [
       ...prev,
@@ -166,6 +185,7 @@ export function EditAchievementsModal({
     });
   };
 
+  // ---- Awards ----
   const addAward = () => {
     setEditedAwards((prev) => [
       ...prev,
@@ -190,6 +210,30 @@ export function EditAchievementsModal({
     value: unknown,
   ) => {
     setEditedAwards((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  // ---- Projects ----
+  const addProject = () => {
+    setEditedProjects((prev) => [
+      ...prev,
+      { title: "", year: "", description: "" },
+    ]);
+  };
+
+  const removeProject = (index: number) => {
+    setEditedProjects((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateProject = (
+    index: number,
+    field: keyof JointProject,
+    value: string,
+  ) => {
+    setEditedProjects((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
       return updated;
@@ -246,17 +290,17 @@ export function EditAchievementsModal({
             </div>
           </div>
           <p className="mt-2 text-xs text-gray-500">
-            支持同时导入论文、专利、奖项，点击顶部“保存全部”后一次性提交三类数据。
+            支持同时导入论文、专利、获奖、科研项目，点击顶部"保存全部"后一次性提交四类数据。
           </p>
           <p className="mt-1 text-[11px] text-gray-400">
-            无需先点击“批量导入”里的按钮；保存时会自动识别并导入文本框内容。
+            无需先点击"批量导入"里的按钮；保存时会自动识别并导入文本框内容。
           </p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {showBatchPanel && (
             <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-4 space-y-3">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <BatchImportCard
                   title="论文批量导入"
                   value={batchInputs.publications}
@@ -278,6 +322,13 @@ export function EditAchievementsModal({
                   placeholder={"[1] 2025年度XX一等奖\n[2] ..."}
                   onChange={(v) => handleBatchChange("awards", v)}
                 />
+                <BatchImportCard
+                  title="科研项目批量导入"
+                  value={batchInputs.projects}
+                  count={parsedBatchCounts.projects}
+                  placeholder={"[1] 基于大模型的代码生成 | 2024 | 描述\n[2] ..."}
+                  onChange={(v) => handleBatchChange("projects", v)}
+                />
               </div>
               <div className="flex items-center justify-end">
                 <p className="text-[11px] text-gray-400">
@@ -287,7 +338,7 @@ export function EditAchievementsModal({
             </div>
           )}
 
-          <div className="flex gap-2 border-b border-gray-200">
+          <div className="flex gap-2 border-b border-gray-200 flex-wrap">
             <TabButton
               active={activeTab === "publications"}
               onClick={() => setActiveTab("publications")}
@@ -304,7 +355,13 @@ export function EditAchievementsModal({
               active={activeTab === "awards"}
               onClick={() => setActiveTab("awards")}
               icon={Trophy}
-              label={`奖项 (${previewAwards.length})`}
+              label={`获奖 (${previewAwards.length})`}
+            />
+            <TabButton
+              active={activeTab === "projects"}
+              onClick={() => setActiveTab("projects")}
+              icon={FileText}
+              label={`科研项目 (${previewProjects.length})`}
             />
           </div>
 
@@ -593,6 +650,75 @@ export function EditAchievementsModal({
               )}
             </div>
           )}
+
+          {activeTab === "projects" && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={addProject}
+                className="px-3 py-1.5 border border-dashed border-primary-300 text-primary-600 rounded-lg text-sm hover:bg-primary-50 transition-colors"
+              >
+                <Plus className="w-4 h-4 inline mr-1" />
+                添加科研项目
+              </button>
+              {editedProjects.map((proj, i) => (
+                <div key={i} className="p-3 border border-gray-200 rounded-lg space-y-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-xs font-medium text-gray-500">科研项目 {i + 1}</span>
+                    <button
+                      onClick={() => removeProject(i)}
+                      className="text-red-600 hover:text-red-700 text-xs"
+                    >
+                      删除
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={proj.title || ""}
+                    onChange={(e) => updateProject(i, "title", e.target.value)}
+                    placeholder="项目名称"
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={proj.year ? String(proj.year) : ""}
+                      onChange={(e) => updateProject(i, "year", e.target.value)}
+                      placeholder="年份"
+                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                    />
+                  </div>
+                  <textarea
+                    value={proj.description || ""}
+                    onChange={(e) => updateProject(i, "description", e.target.value)}
+                    placeholder="项目描述"
+                    rows={2}
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1 resize-none"
+                  />
+                </div>
+              ))}
+              {parsedBatchItems.projects.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-blue-600">
+                    批量识别预览（保存后导入） {parsedBatchItems.projects.length} 条
+                  </p>
+                  {parsedBatchItems.projects.map((proj, i) => (
+                    <div
+                      key={`preview-project-${i}`}
+                      className="p-3 border border-blue-100 bg-blue-50/30 rounded-lg space-y-1"
+                    >
+                      <p className="text-sm font-medium text-gray-800">
+                        {proj.title || "未命名项目"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {[proj.year, proj.description].filter(Boolean).join(" · ") || "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="shrink-0 px-6 py-3 border-t border-gray-100 bg-white flex justify-end">
@@ -606,6 +732,21 @@ export function EditAchievementsModal({
       </motion.div>
     </motion.div>
   );
+}
+
+function parseProjectsFromText(text: string): JointProject[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(/[|｜]/).map((s) => s.trim());
+      return {
+        title: parts[0] || "",
+        year: parts[1] || "",
+        description: parts[2] || "",
+      };
+    });
 }
 
 function TabButton({

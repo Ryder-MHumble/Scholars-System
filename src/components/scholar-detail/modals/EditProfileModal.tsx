@@ -6,6 +6,7 @@ import type {
   ScholarDetail,
   ScholarDetailPatch,
   EducationRecord,
+  ManagementRole,
 } from "@/services/scholarApi";
 import {
   buildLegacyProfileLinkFields,
@@ -27,7 +28,7 @@ interface EditProfileModalProps {
   scholar: ScholarDetail;
   onClose: () => void;
   onSubmit: (patch: ScholarDetailPatch) => Promise<void>;
-  onSubmitManagementRoles?: (roles: string[]) => Promise<void>;
+  onSubmitManagementRoles?: (roles: ManagementRole[]) => Promise<void>;
 }
 
 type ProfileTab =
@@ -67,7 +68,7 @@ export function EditProfileModal({
   const [editedEducation, setEditedEducation] = useState<EducationRecord[]>(
     scholar.education ?? [],
   );
-  const [editedManagementRoles, setEditedManagementRoles] = useState<string[]>(
+  const [editedManagementRoles, setEditedManagementRoles] = useState<ManagementRole[]>(
     scholar.joint_management_roles ?? [],
   );
   const initialProfileLinks = resolveProfileLinks(scholar);
@@ -89,6 +90,9 @@ export function EditProfileModal({
     orcid: initialProfileLinks.orcid,
     github_url: initialProfileLinks.github,
     linkedin_url: initialProfileLinks.linkedin,
+    x_url: initialProfileLinks.x,
+    openreview_url: initialProfileLinks.openreview,
+    aminer_url: initialProfileLinks.aminer,
     other_profile_links: initialProfileLinks.other.join("\n"),
     bio: scholar.bio || "",
     bio_en: scholar.bio_en || "",
@@ -120,12 +124,12 @@ export function EditProfileModal({
   };
 
   const addRoleItem = () => {
-    setEditedManagementRoles((prev) => [...prev, ""]);
+    setEditedManagementRoles((prev) => [...prev, { role: "", organization: "", start_year: "", end_year: "" }]);
   };
 
   const updateRoleItem = (index: number, value: string) => {
     setEditedManagementRoles((prev) =>
-      prev.map((item, i) => (i === index ? value : item)),
+      prev.map((item, i) => (i === index ? { ...item, role: value } : item)),
     );
   };
 
@@ -182,6 +186,9 @@ export function EditProfileModal({
       google_scholar: form.google_scholar_url.trim(),
       orcid: form.orcid.trim(),
       dblp: form.dblp_url.trim(),
+      x: form.x_url.trim(),
+      openreview: form.openreview_url.trim(),
+      aminer: form.aminer_url.trim(),
       other: form.other_profile_links
         .split(/\n|,/)
         .map((s) => s.trim())
@@ -236,8 +243,7 @@ export function EditProfileModal({
 
     const patch = buildPatch(finalEducation);
     const normalizedRoles = finalManagementRoles
-      .map((item) => item.trim())
-      .filter(Boolean);
+      .filter((item) => item.role?.trim());
     const managementRolesChanged =
       JSON.stringify(normalizedRoles) !==
       JSON.stringify(scholar.joint_management_roles ?? []);
@@ -479,6 +485,28 @@ export function EditProfileModal({
                   onChange={(v) => set("lab_url", v)}
                   placeholder="https://..."
                 />
+                <Field
+                  label="X (Twitter)"
+                  value={form.x_url}
+                  onChange={(v) => set("x_url", v)}
+                  placeholder="https://x.com/..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="OpenReview"
+                  value={form.openreview_url}
+                  onChange={(v) => set("openreview_url", v)}
+                  placeholder="https://openreview.net/profile?id=..."
+                />
+                <Field
+                  label="AMiner"
+                  value={form.aminer_url}
+                  onChange={(v) => set("aminer_url", v)}
+                  placeholder="https://www.aminer.cn/profile/..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <TextareaField
                   label="其他链接"
                   value={form.other_profile_links}
@@ -628,7 +656,7 @@ export function EditProfileModal({
                     >
                       <input
                         type="text"
-                        value={item}
+                        value={item.role || ""}
                         onChange={(e) => updateRoleItem(index, e.target.value)}
                         placeholder="输入任职经历"
                         className={INPUT_CLASS}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { BookOpen, Award, Trophy, ExternalLink, Edit3 } from "lucide-react";
-import type { ScholarDetail } from "@/services/scholarApi";
+import { BookOpen, Award, Trophy, ExternalLink, Edit3, FileText } from "lucide-react";
+import type { ScholarDetail, AwardRecord } from "@/services/scholarApi";
 import { cn } from "@/utils/cn";
 import { slideInUp } from "@/utils/animations";
 import {
@@ -19,9 +19,9 @@ export function AchievementsDetailCard({
   scholar,
   onShowAchievementsModal,
 }: AchievementsDetailCardProps) {
-  const [activeTab, setActiveTab] = useState<"publications" | "patents" | "awards">(
-    "publications",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "publications" | "patents" | "awards" | "grants"
+  >("publications");
   const achievementTags = extractAchievementTags(scholar);
   const venueTags = achievementTags.filter(
     (tag) => getAchievementTagKind(tag) === "venue",
@@ -29,6 +29,9 @@ export function AchievementsDetailCard({
   const competitionTags = achievementTags.filter(
     (tag) => getAchievementTagKind(tag) === "competition",
   );
+  const allAwards = scholar.awards ?? [];
+  const grantsOnly = allAwards.filter((a) => a.level === "Grant");
+  const awardsOnly = allAwards.filter((a) => a.level !== "Grant");
   const tabs = [
     {
       key: "publications" as const,
@@ -45,8 +48,14 @@ export function AchievementsDetailCard({
     {
       key: "awards" as const,
       label: "获奖",
-      count: scholar.awards?.length ?? 0,
+      count: awardsOnly.length,
       icon: Trophy,
+    },
+    {
+      key: "grants" as const,
+      label: "科研项目",
+      count: grantsOnly.length,
+      icon: FileText,
     },
   ];
 
@@ -100,7 +109,8 @@ export function AchievementsDetailCard({
 
       {activeTab === "publications" && <PublicationsSection scholar={scholar} />}
       {activeTab === "patents" && <PatentsSection scholar={scholar} />}
-      {activeTab === "awards" && <AwardsSection scholar={scholar} />}
+      {activeTab === "awards" && <AwardsSection awards={awardsOnly} />}
+      {activeTab === "grants" && <GrantsSection grants={grantsOnly} />}
     </motion.div>
   );
 }
@@ -311,20 +321,112 @@ function PatentsSection({ scholar }: { scholar: ScholarDetail }) {
 }
 
 /* -- Awards -- */
-function AwardsSection({ scholar }: { scholar: ScholarDetail }) {
-  const awards = scholar.awards;
+function AwardsSection({
+  awards,
+}: {
+  awards: AwardRecord[];
+}) {
   return (
     <div className="mb-1">
       <div className="flex items-center gap-2 mb-3">
         <Trophy className="w-4 h-4 text-gray-400" />
         <h4 className="text-sm font-semibold text-gray-600">荣誉奖项</h4>
-        {awards && awards.length > 0 && (
+        {awards.length > 0 && (
           <span className="text-xs text-gray-400">{awards.length} 个</span>
         )}
       </div>
-      {awards && awards.length > 0 ? (
+      {awards.length > 0 ? (
         <div className="space-y-3">
-          {awards.map((award, i) => (
+          {awards.map((award, i) => {
+            let medal: { label: string; color: string } | null = null;
+            try {
+              const desc = JSON.parse(award.description || "{}");
+              if (desc.medal === "gold") {
+                medal = { label: "金奖", color: "bg-amber-50 border-amber-300 text-amber-800" };
+              } else if (desc.medal === "silver") {
+                medal = { label: "提名", color: "bg-slate-50 border-slate-300 text-slate-600" };
+              }
+            } catch {
+              /* not JSON */
+            }
+            const link = (() => {
+              try {
+                return JSON.parse(award.description || "{}").link || "";
+              } catch {
+                return "";
+              }
+            })();
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="text-sm font-medium text-gray-800 leading-snug">
+                      {award.title || "奖项"}
+                    </p>
+                    {award.year && (
+                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                        {award.year}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs mb-1">
+                    {medal && (
+                      <span className={`px-1.5 py-0.5 rounded border ${medal.color}`}>
+                        {medal.label}
+                      </span>
+                    )}
+                    {award.grantor && (
+                      <span className="bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 text-gray-600">
+                        {award.grantor}
+                      </span>
+                    )}
+                    {link && (
+                      <a
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 text-primary-600 hover:underline"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        详情
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400 text-center py-4">
+          暂无荣誉奖项数据
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* -- Grants (科研项目) -- */
+function GrantsSection({
+  grants,
+}: {
+  grants: AwardRecord[];
+}) {
+  return (
+    <div className="mb-1">
+      <div className="flex items-center gap-2 mb-3">
+        <FileText className="w-4 h-4 text-gray-400" />
+        <h4 className="text-sm font-semibold text-gray-600">科研项目</h4>
+        {grants.length > 0 && (
+          <span className="text-xs text-gray-400">{grants.length} 项</span>
+        )}
+      </div>
+      {grants.length > 0 ? (
+        <div className="space-y-3">
+          {grants.map((grant, i) => (
             <div
               key={i}
               className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 transition-colors"
@@ -332,38 +434,23 @@ function AwardsSection({ scholar }: { scholar: ScholarDetail }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <p className="text-sm font-medium text-gray-800 leading-snug">
-                    {award.title || "奖项"}
+                    {grant.title || "项目"}
                   </p>
-                  {award.year && (
-                    <span className="text-xs text-gray-500 whitespace-nowrap">
-                      {award.year}
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {grant.grantor && (
+                    <span className="bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 text-blue-600">
+                      {grant.grantor}
                     </span>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs mb-1">
-                  {award.level && (
-                    <span className="bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700">
-                      {award.level}
-                    </span>
-                  )}
-                  {award.grantor && (
-                    <span className="bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 text-gray-600">
-                      {award.grantor}
-                    </span>
-                  )}
-                </div>
-                {award.description && (
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    {award.description}
-                  </p>
-                )}
               </div>
             </div>
           ))}
         </div>
       ) : (
         <p className="text-sm text-gray-400 text-center py-4">
-          暂无荣誉奖项数据
+          暂无科研项目数据
         </p>
       )}
     </div>

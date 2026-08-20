@@ -14,6 +14,9 @@ import {
   type AwardRecord,
   type EducationRecord,
   type ScholarProjectTag,
+  type JointProject,
+  type ManagementRole,
+  type ExchangeRecord,
 } from "@/services/scholarApi";
 
 export function useScholarDetail(scholarId: string | undefined) {
@@ -87,7 +90,7 @@ export function useScholarDetail(scholarId: string | undefined) {
   };
 
   // -- Management roles save (modal) --
-  const handleManagementRolesSave = async (records: string[]) => {
+  const handleManagementRolesSave = async (records: ManagementRole[]) => {
     await withScholar((urlHash) => patchScholarRelation(urlHash, {
       joint_management_roles: records,
     }));
@@ -117,29 +120,42 @@ export function useScholarDetail(scholarId: string | undefined) {
     }
   };
 
-  // -- Achievements save --
+  // -- Achievements save (publications + patents + awards + projects) --
   const handleAchievementsSave = async (data: {
     publications: PublicationRecord[];
     patents: PatentRecord[];
     awards: AwardRecord[];
+    projects: JointProject[];
   }) => {
-    await withScholar((urlHash) => patchScholarAchievements(urlHash, {
-      representative_publications: data.publications,
+    await withScholar(async (urlHash) => {
+      // Save publications/patents/awards via achievements endpoint
+      const updated = await patchScholarAchievements(urlHash, {
+        representative_publications: data.publications,
+        patents: data.patents,
+        awards: data.awards,
+      });
+      // Save projects via relation endpoint
+      const finalUpdated = await patchScholarRelation(urlHash, {
+        joint_research_projects: data.projects,
+      });
+      return finalUpdated || updated;
+    });
+    setEditableAchievements({
+      publications: data.publications,
       patents: data.patents,
       awards: data.awards,
-    }));
-    setEditableAchievements(data);
+    });
   };
 
   // -- Exchange records save --
-  const handleSaveExchangeRecords = async (records: string[]) => {
+  const handleSaveExchangeRecords = async (records: ExchangeRecord[]) => {
     await withScholar((urlHash) => patchScholarRelation(urlHash, {
       academic_exchange_records: records,
     }));
   };
 
   // -- Management roles inline save --
-  const handleSaveManagementRolesInline = async (roles: string[]) => {
+  const handleSaveManagementRolesInline = async (roles: ManagementRole[]) => {
     await withScholar((urlHash) => patchScholarRelation(urlHash, {
       joint_management_roles: roles,
     }));

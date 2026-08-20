@@ -3,6 +3,7 @@ import type {
   EducationRecord,
   PatentRecord,
   AwardRecord,
+  ManagementRole,
 } from "@/services/scholarApi";
 
 // ─── Publication Parser ──────────────────────────────────────────────────────
@@ -372,11 +373,20 @@ export function parseEducationFromText(text: string): EducationRecord[] {
 //
 // Parses each non-empty line as a plain string role entry.
 //
-export function parseManagementRolesFromText(text: string): string[] {
+export function parseManagementRolesFromText(text: string): ManagementRole[] {
   return text
     .split("\n")
     .map((l) => l.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((l) => {
+      const parts = l.split(/[|｜]/).map((s) => s.trim());
+      return {
+        role: parts[0] || "",
+        organization: parts[1] || "",
+        start_year: parts[2] || "",
+        end_year: parts[3] || "",
+      };
+    });
 }
 
 // ─── Patent Parser ───────────────────────────────────────────────────────────

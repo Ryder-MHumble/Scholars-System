@@ -2,11 +2,12 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Plus } from "lucide-react";
 import { parseManagementRolesFromText } from "@/utils/textParsers";
+import type { ManagementRole } from "@/services/scholarApi";
 
 interface EditManagementRolesModalProps {
-  roles: string[];
+  roles: ManagementRole[];
   onClose: () => void;
-  onSubmit: (records: string[]) => void;
+  onSubmit: (records: ManagementRole[]) => void;
 }
 
 export function EditManagementRolesModal({
@@ -14,11 +15,11 @@ export function EditManagementRolesModal({
   onClose,
   onSubmit,
 }: EditManagementRolesModalProps) {
-  const [records, setRecords] = useState<string[]>(roles);
+  const [records, setRecords] = useState<ManagementRole[]>(roles);
   const [batchMode, setBatchMode] = useState(false);
   const [batchText, setBatchText] = useState("");
 
-  const addRecord = () => setRecords((prev) => [...prev, ""]);
+  const addRecord = () => setRecords((prev) => [...prev, { role: "", organization: "", start_year: "", end_year: "" }]);
 
   const removeRecord = (i: number) =>
     setRecords((prev) => prev.filter((_, idx) => idx !== i));
@@ -26,7 +27,7 @@ export function EditManagementRolesModal({
   const updateRecord = (i: number, val: string) =>
     setRecords((prev) => {
       const updated = [...prev];
-      updated[i] = val;
+      updated[i] = { ...updated[i], role: val };
       return updated;
     });
 
@@ -65,7 +66,7 @@ export function EditManagementRolesModal({
           {records.map((rec, i) => (
             <div key={i} className="flex items-center gap-2">
               <input
-                value={rec}
+                value={rec.role}
                 onChange={(e) => updateRecord(i, e.target.value)}
                 placeholder="职务描述，如：顾问委员会委员"
                 className="flex-1 text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-400"

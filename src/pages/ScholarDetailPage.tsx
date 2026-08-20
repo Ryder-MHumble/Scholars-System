@@ -78,6 +78,7 @@ export default function ScholarDetailPageDemo() {
             publications={editableAchievements.publications}
             patents={editableAchievements.patents}
             awards={editableAchievements.awards}
+            projects={scholar.joint_research_projects ?? []}
             onClose={() => setShowAchievementsModal(false)}
             onSubmit={async (data) => {
               await handleAchievementsSave(data);
@@ -98,14 +99,14 @@ export default function ScholarDetailPageDemo() {
           />
         )}
       </AnimatePresence>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-[1600px] mx-auto px-4 py-6">
+      <div className="h-screen bg-gray-50 overflow-hidden">
+        <div className="max-w-[1600px] mx-auto px-4 py-6 h-full flex flex-col">
           {/* Header with breadcrumb and actions */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="mb-6"
+            className="mb-4 shrink-0"
           >
             <Link
               to={backLink}
@@ -116,17 +117,19 @@ export default function ScholarDetailPageDemo() {
             </Link>
           </motion.div>
 
-          {/* Three Column Layout */}
-          <div className="flex gap-5">
-            {/* Left Sidebar */}
+          {/* Three Column Layout — left/right fixed, center scrolls */}
+          <div className="flex gap-5 flex-1 min-h-0">
+            {/* Left Sidebar — fixed */}
+            <div className="shrink-0 overflow-y-auto custom-scrollbar" style={{ position: "sticky", top: 0 }}>
             <DetailLeftSidebar
               scholar={scholar}
               onEditProfile={() => setShowProfileModal(true)}
             />
+            </div>
 
-            {/* Center Content */}
+            {/* Center Content — scrollable */}
             <motion.main
-              className="flex-1 min-w-0 space-y-4"
+              className="flex-1 min-w-0 space-y-4 overflow-y-auto custom-scrollbar pr-1"
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
@@ -142,8 +145,9 @@ export default function ScholarDetailPageDemo() {
               />
             </motion.main>
 
-            {/* Right Sidebar */}
+            {/* Right Sidebar — fixed */}
             <motion.div
+              className="shrink-0"
               variants={slideInRight}
               initial="hidden"
               animate="visible"
