@@ -79,7 +79,31 @@ export function useScholarDetail(scholarId: string | undefined) {
 
   // -- Field save --
   const handleFieldSave = async (patch: ScholarDetailPatch) => {
-    await withScholar((urlHash) => patchScholarDetail(urlHash, patch));
+    const {
+      h_index,
+      citations_count,
+      publications_count,
+      ...basicPatch
+    } = patch;
+    const metricsPatch = {
+      ...(h_index !== undefined ? { h_index } : {}),
+      ...(citations_count !== undefined ? { citations_count } : {}),
+      ...(publications_count !== undefined ? { publications_count } : {}),
+    };
+
+    await withScholar(async (urlHash) => {
+      if (!scholar) {
+        throw new Error("Scholar detail is not loaded");
+      }
+      let updated: ScholarDetail = scholar;
+      if (Object.keys(basicPatch).length > 0) {
+        updated = await patchScholarDetail(urlHash, basicPatch);
+      }
+      if (Object.keys(metricsPatch).length > 0) {
+        updated = await patchScholarAchievements(urlHash, metricsPatch);
+      }
+      return updated;
+    });
   };
 
   // -- Education save --

@@ -110,6 +110,10 @@ export function ComboboxInput({
     setSearchText(text);
     setIsOpen(true);
     setHighlightedIndex(-1);
+    const exactOption = options.find((opt) => opt === text);
+    if (exactOption !== undefined) {
+      onChange(exactOption);
+    }
   };
 
   const handleInputFocus = () => {

@@ -41,11 +41,15 @@ export function InstitutionAutocomplete({
   const [highlightIdx, setHighlightIdx] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Debounced search
   useEffect(() => {
-    if (!value || value.length < 2) {
+    const query = value.trim();
+    if (!query || query.length < 2) {
       setResults([]);
+      setLoading(false);
       return;
     }
 
@@ -56,26 +60,33 @@ export function InstitutionAutocomplete({
 
     // Set new timeout
     searchTimeoutRef.current = setTimeout(async () => {
+      const requestId = ++requestIdRef.current;
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
       setLoading(true);
       try {
-        const response = await searchInstitutions(value, {
+        const response = await searchInstitutions(query, {
           limit: 20,
           region,
           orgType,
-        });
-        setResults(response.results);
+        }, controller.signal);
+        if (requestId === requestIdRef.current) setResults(response.results);
       } catch (error) {
-        console.error("Failed to search institutions:", error);
-        setResults([]);
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("Failed to search institutions:", error);
+          if (requestId === requestIdRef.current) setResults([]);
+        }
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) setLoading(false);
       }
-    }, 300); // 300ms debounce
+    }, 180);
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
+      abortControllerRef.current?.abort();
     };
   }, [value, region, orgType]);
 

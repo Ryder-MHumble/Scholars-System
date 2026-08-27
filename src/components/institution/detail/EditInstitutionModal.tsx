@@ -231,7 +231,7 @@ export function EditInstitutionModal({
       };
 
       if (form.entity_type === "organization") {
-        payload.departments = sanitizeDepartments(form.departments);
+        payload.secondary_institutions = sanitizeDepartments(form.departments);
       }
 
       const updated = await patchInstitution(institution.id, payload);
@@ -383,7 +383,10 @@ export function EditInstitutionModal({
                   <input
                     type="text"
                     value={form.name}
-                    onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => {
+                      setAvatarPreviewError(false);
+                      setForm((prev) => ({ ...prev, name: e.target.value }));
+                    }}
                     className={inputClass}
                   />
                 </div>

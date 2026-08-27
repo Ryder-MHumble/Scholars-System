@@ -4,6 +4,7 @@ import type {
   PatentRecord,
   AwardRecord,
   ManagementRole,
+  JointProject,
 } from "@/services/scholarApi";
 
 // ─── Publication Parser ──────────────────────────────────────────────────────
@@ -26,15 +27,59 @@ export function parsePublicationsFromText(text: string): PublicationRecord[] {
     authors?: string;
     venue?: string;
     year?: string;
+    url?: string;
   }): PublicationRecord => ({
     title: data.title?.trim() || "",
     authors: data.authors?.trim() || undefined,
     venue: data.venue?.trim() || undefined,
     year: data.year?.trim() || undefined,
+    url: data.url?.trim() || undefined,
     citation_count: 0,
     is_corresponding: false,
     added_by: "user",
   });
+
+  const stripListPrefix = (line: string): string =>
+    line
+      .replace(/^\s*\[\d+\]\s*/, "")
+      .replace(/^\s*\d+[.)、]\s*/, "")
+      .replace(/^[•·]\s*/, "")
+      .trim();
+
+  const splitDelimited = (value: string): string[] =>
+    value
+      .split(/[|｜\t]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const parseLabeledFields = (value: string): PublicationRecord | null => {
+    const pairs = value
+      .split(/[；;]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (pairs.length < 2) return null;
+
+    const mapped: Record<string, string> = {};
+    for (const pair of pairs) {
+      const match = pair.match(/^([^:：]+)[:：]\s*(.+)$/);
+      if (!match) continue;
+      const key = match[1].trim().toLowerCase();
+      const val = match[2].trim();
+      if (/^(标题|论文标题|题名|title)$/.test(key)) mapped.title = val;
+      if (/^(作者|论文作者|authors?)$/.test(key)) mapped.authors = val;
+      if (/^(会议|期刊|会议期刊|会议\/期刊|venue|journal|conference)$/.test(key)) {
+        mapped.venue = val;
+      }
+      if (/^(年份|发表年份|出版年份|year)$/.test(key)) mapped.year = val;
+      if (/^(链接|论文链接|url|doi)$/.test(key)) mapped.url = val;
+    }
+
+    if (!mapped.title && !mapped.venue) return null;
+    return {
+      ...buildPublication(mapped),
+      url: mapped.url,
+    };
+  };
 
   const lines = text
     .split("\n")
@@ -43,13 +88,13 @@ export function parsePublicationsFromText(text: string): PublicationRecord[] {
 
   return lines.map((line): PublicationRecord => {
     // Remove citation index [1], [2] / 1. / •
-    const raw = line
-      .replace(/^\[\d+\]\s*/, "")
-      .replace(/^\d+[.)]\s+/, "")
-      .replace(/^[•·]\s*/, "");
+    const raw = stripListPrefix(line);
+
+    const labeled = parseLabeledFields(raw);
+    if (labeled) return labeled;
 
     // Extract title in quotes — handle ASCII " " and Unicode " "
-    const titleMatch = raw.match(/[\u201c""]([^\u201d""]+)[\u201d""]/);
+    const titleMatch = raw.match(/[“"《]([^”"》]+)[”"》]/);
     const yearEndMatch = raw.match(/\((\d{4})\)[,.]?\s*$/);
     const year = yearEndMatch?.[1] ?? "";
 
@@ -81,14 +126,33 @@ export function parsePublicationsFromText(text: string): PublicationRecord[] {
     }
 
     // Pipe-delimited fallback
-    if (raw.includes("|")) {
-      const p = raw.split("|").map((s) => s.trim());
+    const delimitedParts = splitDelimited(raw);
+    if (delimitedParts.length >= 2) {
+      const p = delimitedParts;
       return buildPublication({
         title: p[0] ?? "",
         venue: p[1] ?? "",
         year: p[2] ?? "",
         authors: p[3] ?? "",
+        url: p[4] ?? "",
       });
+    }
+
+    const dashParts = raw
+      .split(/\s+[—–-]\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (dashParts.length >= 2) {
+      const maybeYear = dashParts[dashParts.length - 1];
+      const yearFromTail = extractYear(maybeYear);
+      const bodyParts = yearFromTail ? dashParts.slice(0, -1) : dashParts;
+      if (bodyParts.length >= 2) {
+        return buildPublication({
+          title: bodyParts[0],
+          venue: bodyParts.slice(1).join(" - "),
+          year: yearFromTail || extractYear(raw),
+        });
+      }
     }
 
     // Sentence citation fallback:
@@ -161,10 +225,11 @@ export function parsePublicationsFromText(text: string): PublicationRecord[] {
 // ─── Education Parser ────────────────────────────────────────────────────────
 //
 // Supports:
-//   1. "2006/11 to 2009/10  Bonn University  PhD in Mathematical Physics"
-//   2. "2006-2009  MIT  PhD, Computer Science"
-//   3. "PhD in Computer Science, MIT, 2015-2020"
-//   4. Degree | Institution | Major | StartYear | EndYear   — pipe fallback
+//   1. "2015-2019 清华大学 本科 数学"
+//   2. "2006/11 to 2009/10  Bonn University  PhD in Mathematical Physics"
+//   3. "2006-2009  MIT  PhD, Computer Science"
+//   4. "PhD in Computer Science, MIT, 2015-2020"
+//   5. Degree | Institution | Major | StartYear | EndYear   — pipe fallback
 //
 //   Multi-line entries are auto-merged: a new entry only starts when a line
 //   begins with a 4-digit year or a pipe character.
@@ -178,10 +243,10 @@ export function parseEducationFromText(text: string): EducationRecord[] {
   );
 
   const DEGREE_PATTERNS = [
-    { re: /\bPostdoc(?:toral)?\b|\b博士后\b/i, label: "博士后" },
-    { re: /\bPh\.?D\.?\b|\bDoctor(?:al|ate)?\b|\b博士\b/i, label: "博士" },
-    { re: /\bM\.?Sc?\.?\b|\bMaster\b|\b硕士\b/i, label: "硕士" },
-    { re: /\bB\.?Sc?\.?\b|\bBachelor\b|\b学士\b|\b本科\b/i, label: "学士" },
+    { re: /\bPostdoc(?:toral)?\b|博士后/i, label: "博士后" },
+    { re: /\bPh\.?D\.?\b|\bDoctor(?:al|ate)?\b|博士/i, label: "博士" },
+    { re: /\bM\.?Sc?\.?\b|\bMaster\b|硕士/i, label: "硕士" },
+    { re: /\bB\.?Sc?\.?\b|\bBachelor\b|学士|本科/i, label: "本科" },
   ];
 
   const normalizeYear = (value: string): string => {
@@ -204,6 +269,19 @@ export function parseEducationFromText(text: string): EducationRecord[] {
     if (match?.[1]) return match[1].replace(/^[,，\s]+|[,，.\s]+$/g, "").trim();
     return "";
   };
+
+  const stripListPrefix = (line: string): string =>
+    line
+      .replace(/^\s*\[\d+\]\s*/, "")
+      .replace(/^\s*\d+[.)、]\s*/, "")
+      .replace(/^[•·]\s*/, "")
+      .trim();
+
+  const splitDelimited = (value: string): string[] =>
+    value
+      .split(/[|｜\t]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
   const parseDateToken = (
     value: string,
@@ -229,16 +307,47 @@ export function parseEducationFromText(text: string): EducationRecord[] {
     return { start, end };
   };
 
+  const parseStandardEducationLine = (value: string): EducationRecord | null => {
+    const match = value.match(
+      /^((?:19|20)\d{2}(?:[./-]\d{1,2})?(?:\s*(?:to|TO|至|—|–|-|~|～)\s*(?:(?:19|20)\d{2}(?:[./-]\d{1,2})?|present|now|至今))?)\s+(.+)$/i,
+    );
+    if (!match) return null;
+
+    const date = parseDateToken(match[1]);
+    if (!date) return null;
+
+    const tokens = match[2].split(/\s+/).map((s) => s.trim()).filter(Boolean);
+    const degreeIndex = tokens.findIndex((token) => Boolean(detectDegree(token)));
+    if (degreeIndex <= 0) return null;
+
+    const degreeToken = tokens[degreeIndex];
+    const institution = tokens.slice(0, degreeIndex).join(" ").trim();
+    const major = tokens.slice(degreeIndex + 1).join(" ").trim();
+    if (!institution) return null;
+
+    return {
+      year: date.start,
+      end_year: date.end,
+      institution,
+      degree: detectDegree(degreeToken) || degreeToken,
+      major,
+    };
+  };
+
   // ── Group lines into entries ──────────────────────────────────────────────
   const lines = text
     .split("\n")
-    .map((l) => l.trim())
+    .map((l) => stripListPrefix(l.trim()))
     .filter(Boolean);
 
   const chunks: string[] = [];
   let cur = "";
   for (const line of lines) {
-    const beginsNewEntry = /^\d{4}/.test(line) || line.includes("|");
+    const beginsWithDate = /^\s*(?:19|20)\d{2}/.test(line);
+    const beginsWithDegree =
+      Boolean(detectDegree(line)) && (DATE_RANGE_RE.test(line) || /[,，;；]/.test(line));
+    const beginsNewEntry =
+      beginsWithDate || beginsWithDegree || /[|｜\t]/.test(line);
     if (beginsNewEntry && cur) {
       chunks.push(cur);
       cur = line;
@@ -251,9 +360,69 @@ export function parseEducationFromText(text: string): EducationRecord[] {
   // ── Parse each chunk ──────────────────────────────────────────────────────
   return chunks
     .map((chunk): EducationRecord => {
-      // Pipe fallback
-      if (chunk.includes("|")) {
-        const p = chunk.split("|").map((s) => s.trim());
+      const labeledParts = chunk
+        .split(/[；;]/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (labeledParts.length >= 2 && labeledParts.some((part) => /[:：]/.test(part))) {
+        const mapped: Record<string, string> = {};
+        for (const part of labeledParts) {
+          const match = part.match(/^([^:：]+)[:：]\s*(.+)$/);
+          if (!match) continue;
+          const key = match[1].trim().toLowerCase();
+          const value = match[2].trim();
+          if (/^(学位|学历|degree)$/.test(key)) mapped.degree = value;
+          if (/^(院校|学校|毕业院校|培养院校|institution|school|university)$/.test(key)) {
+            mapped.institution = value;
+          }
+          if (/^(专业|方向|学科|major|field|discipline)$/.test(key)) mapped.major = value;
+          if (/^(起始年份|开始年份|入学年份|开始时间|start|start_year|year)$/.test(key)) {
+            mapped.year = normalizeYear(value);
+          }
+          if (/^(结束年份|毕业年份|结束时间|end|end_year)$/.test(key)) {
+            mapped.end_year = normalizeYear(value);
+          }
+          if (/^(时间|日期|period|date|duration)$/.test(key)) {
+            const range = value.match(DATE_RANGE_RE);
+            if (range) {
+              mapped.year = normalizeYear(range[1]);
+              mapped.end_year = normalizeYear(range[2]);
+            } else {
+              mapped.year = normalizeYear(value);
+            }
+          }
+        }
+        return {
+          degree: mapped.degree || detectDegree(chunk),
+          institution: mapped.institution || "",
+          major: mapped.major || "",
+          year: mapped.year || "",
+          end_year: mapped.end_year || "",
+        };
+      }
+
+      const delimitedParts = splitDelimited(chunk);
+      if (delimitedParts.length >= 2) {
+        const p = delimitedParts;
+        const firstDate = parseDateToken(p[0] || "");
+        if (firstDate) {
+          const degreePart = p.find((part) => detectDegree(part)) || "";
+          const institutionPart =
+            p.find((part) => part !== p[0] && part !== degreePart) || "";
+          return {
+            degree: detectDegree(degreePart),
+            institution: institutionPart,
+            major:
+              extractMajorAfterDegree(degreePart) ||
+              p.find(
+                (part) =>
+                  part !== p[0] && part !== degreePart && part !== institutionPart,
+              ) ||
+              "",
+            year: firstDate.start,
+            end_year: firstDate.end,
+          };
+        }
         return {
           degree: p[0] ?? "",
           institution: p[1] ?? "",
@@ -262,6 +431,9 @@ export function parseEducationFromText(text: string): EducationRecord[] {
           end_year: p[4] ?? "",
         };
       }
+
+      const standard = parseStandardEducationLine(chunk);
+      if (standard) return standard;
 
       let remaining = chunk;
       let year = "";
@@ -430,6 +602,41 @@ export function parsePatentsFromText(text: string): PatentRecord[] {
     return patentNoRe.test(s);
   };
 
+  const parseLabeledFields = (value: string): PatentRecord | null => {
+    const pairs = value
+      .split(/[；;]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (pairs.length < 2) return null;
+
+    const mapped: Record<string, string> = {};
+    for (const pair of pairs) {
+      const match = pair.match(/^([^:：]+)[:：]\s*(.+)$/);
+      if (!match) continue;
+      const key = match[1].trim().toLowerCase();
+      const val = match[2].trim();
+      if (/^(专利名称|专利标题|标题|名称|title)$/.test(key)) mapped.title = val;
+      if (/^(专利号|申请号|公开号|授权号|patent_no|patent number)$/.test(key)) {
+        mapped.patent_no = val;
+      }
+      if (/^(年份|申请年份|授权年份|year)$/.test(key)) mapped.year = val;
+      if (/^(发明人|作者|inventors?)$/.test(key)) mapped.inventors = val;
+      if (/^(类型|专利类型|patent_type|type)$/.test(key)) mapped.patent_type = val;
+      if (/^(状态|法律状态|status)$/.test(key)) mapped.status = val;
+    }
+
+    if (!mapped.title && !mapped.patent_no && !mapped.inventors) return null;
+    return {
+      title: mapped.title || "",
+      patent_no: mapped.patent_no || "",
+      year: mapped.year || "",
+      inventors: mapped.inventors || "",
+      patent_type: mapped.patent_type || inferPatentType(mapped.patent_no || ""),
+      status: mapped.status || inferStatus(mapped.patent_no || ""),
+      added_by: "user",
+    };
+  };
+
   const lines = text
     .split("\n")
     .map((l) => l.trim())
@@ -439,9 +646,12 @@ export function parsePatentsFromText(text: string): PatentRecord[] {
     .map((line): PatentRecord => {
       const raw = stripListPrefix(line);
 
+      const labeled = parseLabeledFields(raw);
+      if (labeled) return labeled;
+
       // Keep legacy pipe format fully compatible.
-      if (raw.includes("|")) {
-        const p = raw.split("|").map((s) => s.trim());
+      if (raw.includes("|") || raw.includes("｜")) {
+        const p = raw.split(/[|｜]/).map((s) => s.trim());
         return {
           title: p[0] || "",
           patent_no: p[1] || "",
@@ -534,6 +744,37 @@ export function parseAwardsFromText(text: string): AwardRecord[] {
   const stripListPrefix = (line: string): string =>
     line.replace(/^\s*\[\d+\]\s*/, "").replace(/^\s*\d+[.)、]\s*/, "").trim();
 
+  const parseLabeledFields = (value: string): AwardRecord | null => {
+    const pairs = value
+      .split(/[；;]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (pairs.length < 2) return null;
+
+    const mapped: Record<string, string> = {};
+    for (const pair of pairs) {
+      const match = pair.match(/^([^:：]+)[:：]\s*(.+)$/);
+      if (!match) continue;
+      const key = match[1].trim().toLowerCase();
+      const val = match[2].trim();
+      if (/^(奖项名称|奖项|标题|名称|title)$/.test(key)) mapped.title = val;
+      if (/^(年份|获奖年份|year)$/.test(key)) mapped.year = val;
+      if (/^(等级|级别|奖项等级|level)$/.test(key)) mapped.level = val;
+      if (/^(颁发单位|授奖单位|主办单位|grantor|issuer)$/.test(key)) mapped.grantor = val;
+      if (/^(描述|说明|备注|description|note)$/.test(key)) mapped.description = val;
+    }
+
+    if (!mapped.title && !mapped.year && !mapped.level) return null;
+    return {
+      title: mapped.title || "",
+      year: mapped.year || "",
+      level: mapped.level || "",
+      grantor: mapped.grantor || "",
+      description: mapped.description || "",
+      added_by: "user",
+    };
+  };
+
   const lines = text
     .split("\n")
     .map((l) => l.trim())
@@ -543,9 +784,12 @@ export function parseAwardsFromText(text: string): AwardRecord[] {
     .map((line): AwardRecord => {
       const raw = stripListPrefix(line);
 
+      const labeled = parseLabeledFields(raw);
+      if (labeled) return labeled;
+
       // Keep legacy pipe format fully compatible.
-      if (raw.includes("|")) {
-        const p = raw.split("|").map((s) => s.trim());
+      if (raw.includes("|") || raw.includes("｜")) {
+        const p = raw.split(/[|｜]/).map((s) => s.trim());
         return {
           title: p[0] || "",
           year: p[1] || "",
@@ -609,4 +853,76 @@ export function parseAwardsFromText(text: string): AwardRecord[] {
       };
     })
     .filter((item) => item.title || item.year || item.level);
+}
+
+// ─── Project Parser ──────────────────────────────────────────────────────────
+//
+// Supports:
+//   1. "项目名称 | 年份 | 描述"
+//   2. "项目名称：...；年份：2024；描述：..."
+//   3. "2024 项目名称 描述"
+//
+export function parseProjectsFromText(text: string): JointProject[] {
+  const stripListPrefix = (line: string): string =>
+    line.replace(/^\s*\[\d+\]\s*/, "").replace(/^\s*\d+[.)、]\s*/, "").trim();
+
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  return lines
+    .map((line): JointProject => {
+      const raw = stripListPrefix(line);
+
+      const labeledParts = raw
+        .split(/[；;]/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (labeledParts.length >= 2 && labeledParts.some((part) => /[:：]/.test(part))) {
+        const mapped: Record<string, string> = {};
+        for (const part of labeledParts) {
+          const match = part.match(/^([^:：]+)[:：]\s*(.+)$/);
+          if (!match) continue;
+          const key = match[1].trim().toLowerCase();
+          const value = match[2].trim();
+          if (/^(项目名称|项目|标题|名称|title)$/.test(key)) mapped.title = value;
+          if (/^(年份|立项年份|year)$/.test(key)) mapped.year = value;
+          if (/^(描述|说明|项目描述|description)$/.test(key)) mapped.description = value;
+        }
+        return {
+          title: mapped.title || "",
+          year: mapped.year || "",
+          description: mapped.description || "",
+        };
+      }
+
+      if (raw.includes("|") || raw.includes("｜")) {
+        const parts = raw.split(/[|｜]/).map((s) => s.trim());
+        return {
+          title: parts[0] || "",
+          year: parts[1] || "",
+          description: parts[2] || "",
+        };
+      }
+
+      const yearPrefix = raw.match(/^((?:19|20)\d{2})\s+(.+)$/);
+      if (yearPrefix) {
+        const rest = yearPrefix[2].trim();
+        const parts = rest.split(/\s{2,}|[，,；;]/).map((s) => s.trim()).filter(Boolean);
+        return {
+          year: yearPrefix[1],
+          title: parts[0] || rest,
+          description: parts.slice(1).join("；"),
+        };
+      }
+
+      const yearMatch = raw.match(/\b(19|20)\d{2}\b/);
+      return {
+        title: raw.replace(/\b(19|20)\d{2}\b/, "").trim() || raw,
+        year: yearMatch?.[0] || "",
+        description: "",
+      };
+    })
+    .filter((item) => item.title || item.year || item.description);
 }

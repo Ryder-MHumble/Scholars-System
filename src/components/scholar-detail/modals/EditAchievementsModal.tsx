@@ -12,6 +12,7 @@ import {
   parsePublicationsFromText,
   parsePatentsFromText,
   parseAwardsFromText,
+  parseProjectsFromText,
 } from "@/utils/textParsers";
 
 interface EditAchievementsModalProps {
@@ -305,28 +306,28 @@ export function EditAchievementsModal({
                   title="论文批量导入"
                   value={batchInputs.publications}
                   count={parsedBatchCounts.publications}
-                  placeholder={'[1] Authors, "Title", Venue (2025)\n[2] ...'}
+                  placeholder={"论文标题 | 会议/期刊 | 年份 | 作者 | 链接\n标题：A Better Parser；作者：A Wang；会议/期刊：ICML；年份：2024"}
                   onChange={(v) => handleBatchChange("publications", v)}
                 />
                 <BatchImportCard
                   title="专利批量导入"
                   value={batchInputs.patents}
                   count={parsedBatchCounts.patents}
-                  placeholder={"[1] 发明人.专利标题, ZL202511129049.1\n[2] ..."}
+                  placeholder={"专利名称 | 专利号 | 年份 | 发明人 | 类型 | 状态\n专利名称：一种方法；专利号：ZL202511129049.1；年份：2025；发明人：张三、李四；类型：发明专利；状态：已授权"}
                   onChange={(v) => handleBatchChange("patents", v)}
                 />
                 <BatchImportCard
                   title="奖项批量导入"
                   value={batchInputs.awards}
                   count={parsedBatchCounts.awards}
-                  placeholder={"[1] 2025年度XX一等奖\n[2] ..."}
+                  placeholder={"奖项名称 | 年份 | 等级 | 颁发单位 | 描述\n奖项名称：自然科学一等奖；年份：2025；等级：一等奖；颁发单位：中国自动化学会；描述：排1"}
                   onChange={(v) => handleBatchChange("awards", v)}
                 />
                 <BatchImportCard
                   title="科研项目批量导入"
                   value={batchInputs.projects}
                   count={parsedBatchCounts.projects}
-                  placeholder={"[1] 基于大模型的代码生成 | 2024 | 描述\n[2] ..."}
+                  placeholder={"项目名称 | 年份 | 描述\n项目名称：基于大模型的代码生成；年份：2024；描述：校企联合项目"}
                   onChange={(v) => handleBatchChange("projects", v)}
                 />
               </div>
@@ -465,7 +466,7 @@ export function EditAchievementsModal({
                         {pub.title || "未命名论文"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {[pub.authors, pub.venue, pub.year].filter(Boolean).join(" · ") || "—"}
+                        {formatPublicationPreview(pub)}
                       </p>
                     </div>
                   ))}
@@ -557,9 +558,7 @@ export function EditAchievementsModal({
                         {patent.title || "未命名专利"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {[patent.patent_no, patent.patent_type, patent.year]
-                          .filter(Boolean)
-                          .join(" · ") || "—"}
+                        {formatPatentPreview(patent)}
                       </p>
                     </div>
                   ))}
@@ -642,7 +641,7 @@ export function EditAchievementsModal({
                         {award.title || "未命名奖项"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {[award.level, award.grantor, award.year].filter(Boolean).join(" · ") || "—"}
+                        {formatAwardPreview(award)}
                       </p>
                     </div>
                   ))}
@@ -711,7 +710,7 @@ export function EditAchievementsModal({
                         {proj.title || "未命名项目"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {[proj.year, proj.description].filter(Boolean).join(" · ") || "—"}
+                        {formatProjectPreview(proj)}
                       </p>
                     </div>
                   ))}
@@ -734,19 +733,26 @@ export function EditAchievementsModal({
   );
 }
 
-function parseProjectsFromText(text: string): JointProject[] {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parts = line.split(/[|｜]/).map((s) => s.trim());
-      return {
-        title: parts[0] || "",
-        year: parts[1] || "",
-        description: parts[2] || "",
-      };
-    });
+function formatPublicationPreview(pub: PublicationRecord): string {
+  return [pub.authors, pub.venue, pub.year, pub.url].filter(Boolean).join(" · ") || "—";
+}
+
+function formatPatentPreview(patent: PatentRecord): string {
+  return [
+    patent.patent_no,
+    patent.year,
+    patent.inventors,
+    patent.patent_type,
+    patent.status,
+  ].filter(Boolean).join(" · ") || "—";
+}
+
+function formatAwardPreview(award: AwardRecord): string {
+  return [award.year, award.level, award.grantor, award.description].filter(Boolean).join(" · ") || "—";
+}
+
+function formatProjectPreview(project: JointProject): string {
+  return [project.year, project.description].filter(Boolean).join(" · ") || "—";
 }
 
 function TabButton({

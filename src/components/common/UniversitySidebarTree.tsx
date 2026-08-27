@@ -27,9 +27,12 @@ export interface DeptNode {
 }
 
 export interface UniNode {
+  id?: string;
   name: string;
   departments: DeptNode[];
   count: number;
+  departmentCount?: number;
+  departmentsLoaded?: boolean;
 }
 
 interface CategoryGroup {
@@ -46,6 +49,7 @@ interface UniversitySidebarTreeProps {
   activeDept: string | null;
   onSelectUni: (name: string | null) => void;
   onSelectDept: (uniName: string, deptName: string) => void;
+  onLoadDepartments?: (institutionId?: string, uniName?: string) => Promise<void> | void;
   uniNodes: UniNode[];
   totalCount: number;
 }
@@ -56,6 +60,7 @@ export function UniversitySidebarTree({
   activeDept,
   onSelectUni,
   onSelectDept,
+  onLoadDepartments,
   uniNodes,
   totalCount,
 }: UniversitySidebarTreeProps) {
@@ -75,13 +80,19 @@ export function UniversitySidebarTree({
       return next;
     });
 
-  const toggleUni = (name: string) =>
+  const toggleUni = (uni: UniNode) => {
+    const name = uni.name;
+    const shouldExpand = !expandedUnis.has(name);
+    if (shouldExpand && uni.departmentCount && !uni.departmentsLoaded) {
+      void onLoadDepartments?.(uni.id, uni.name);
+    }
     setExpandedUnis((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
       return next;
     });
+  };
 
   const q = sidebarSearch.toLowerCase().trim();
 
@@ -296,7 +307,7 @@ export function UniversitySidebarTree({
                         <div className="flex items-center gap-0.5">
                           {/* expand toggle */}
                           <button
-                            onClick={() => toggleUni(uni.name)}
+                            onClick={() => toggleUni(uni)}
                             className={cn(
                               "p-1 rounded-lg transition-all duration-150 shrink-0",
                               isUniActive
@@ -314,10 +325,10 @@ export function UniversitySidebarTree({
 
                           {/* university button */}
                           <button
-                            onClick={() => {
-                              onSelectUni(uni.name);
-                              if (!expandedUnis.has(uni.name))
-                                toggleUni(uni.name);
+                              onClick={() => {
+                                onSelectUni(uni.name);
+                                if (!expandedUnis.has(uni.name))
+                                toggleUni(uni);
                             }}
                             className={cn(
                               "flex-1 flex items-center gap-2 px-2 py-2 rounded-xl text-sm transition-all duration-150 min-w-0",
@@ -357,6 +368,11 @@ export function UniversitySidebarTree({
                               transition={{ duration: 0.18, ease: "easeOut" }}
                               className="overflow-hidden ml-6 space-y-px mt-0.5 mb-0.5"
                             >
+                              {!uni.departmentsLoaded && uni.departmentCount ? (
+                                <div className="px-2.5 py-1.5 text-xs text-gray-400">
+                                  正在加载院系...
+                                </div>
+                              ) : null}
                               {visibleDepts.map((dept) => {
                                 const isDeptActive =
                                   activeDept === dept.name &&

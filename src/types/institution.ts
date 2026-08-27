@@ -50,6 +50,7 @@ export interface InstitutionListItem {
   category?: string | null;
   priority: string | null;
   scholar_count: number;
+  department_count?: number | null;
   student_count_total: number | null;
   mentor_count: number | null;
   parent_id: string | null;
@@ -195,6 +196,7 @@ export interface InstitutionPatchRequest {
   recruitment_events?: string[];
   visit_exchanges?: string[];
   cooperation_focus?: string[];
+  secondary_institutions?: DepartmentPatchRequest[];
   departments?: DepartmentPatchRequest[];
   custom_fields?: Record<string, string | null>;
 }

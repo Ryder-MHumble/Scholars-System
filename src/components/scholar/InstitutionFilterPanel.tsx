@@ -5,6 +5,8 @@ import { cn } from "@/utils/cn";
 import type { UniNode } from "@/components/common/UniversitySidebarTree";
 
 const SCHOLAR_PANEL_SEARCH_KEY = "scholar_institution_panel_search";
+const INITIAL_VISIBLE_INSTITUTIONS = 200;
+const VISIBLE_INSTITUTION_STEP = 200;
 
 interface InstitutionFilterPanelProps {
   uniNodes: UniNode[];
@@ -13,6 +15,7 @@ interface InstitutionFilterPanelProps {
   activeDept: string | null;
   onSelectUni: (name: string | null) => void;
   onSelectDept: (uniName: string, deptName: string) => void;
+  onLoadDepartments?: (institutionId?: string, uniName?: string) => Promise<void> | void;
   loading: boolean;
 }
 
@@ -23,6 +26,7 @@ export function InstitutionFilterPanel({
   activeDept,
   onSelectUni,
   onSelectDept,
+  onLoadDepartments,
   loading,
 }: InstitutionFilterPanelProps) {
   const [panelSearch, setPanelSearch] = useState(() => {
@@ -30,20 +34,29 @@ export function InstitutionFilterPanel({
     return window.sessionStorage.getItem(SCHOLAR_PANEL_SEARCH_KEY) ?? "";
   });
   const [expandedUnis, setExpandedUnis] = useState<Set<string>>(new Set());
+  const [visibleLimit, setVisibleLimit] = useState(INITIAL_VISIBLE_INSTITUTIONS);
+  const q = panelSearch.toLowerCase().trim();
 
   useEffect(() => {
     window.sessionStorage.setItem(SCHOLAR_PANEL_SEARCH_KEY, panelSearch);
   }, [panelSearch]);
 
-  const toggleUni = (name: string) =>
+  useEffect(() => {
+    setVisibleLimit(INITIAL_VISIBLE_INSTITUTIONS);
+  }, [q, uniNodes]);
+
+  const toggleUni = (uni: UniNode) => {
+    const shouldExpand = !expandedUnis.has(uni.name);
+    if (shouldExpand && uni.departmentCount && !uni.departmentsLoaded) {
+      void onLoadDepartments?.(uni.id, uni.name);
+    }
     setExpandedUnis((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+      if (next.has(uni.name)) next.delete(uni.name);
+      else next.add(uni.name);
       return next;
     });
-
-  const q = panelSearch.toLowerCase().trim();
+  };
 
   const filteredNodes = useMemo(() => {
     let nodes = uniNodes;
@@ -62,6 +75,8 @@ export function InstitutionFilterPanel({
   }, [uniNodes, q]);
 
   const isAllActive = !activeUni && !activeDept;
+  const visibleNodes = filteredNodes.slice(0, visibleLimit);
+  const hasMoreNodes = visibleLimit < filteredNodes.length;
 
   return (
     <div className="flex flex-col h-full">
@@ -124,7 +139,7 @@ export function InstitutionFilterPanel({
               </span>
             </button>
 
-            {filteredNodes.map((uni) => {
+            {visibleNodes.map((uni) => {
               const expanded = q ? true : expandedUnis.has(uni.name);
               const isUniActive = activeUni === uni.name && !activeDept;
 
@@ -142,9 +157,9 @@ export function InstitutionFilterPanel({
               return (
                 <div key={uni.name}>
                   <div className="flex items-center gap-0.5">
-                    {uni.departments.length > 0 ? (
+                    {(uni.departmentCount ?? uni.departments.length) > 0 ? (
                       <button
-                        onClick={() => toggleUni(uni.name)}
+                        onClick={() => toggleUni(uni)}
                         className={cn(
                           "p-1 rounded-lg transition-all duration-150 shrink-0",
                           isUniActive
@@ -166,10 +181,10 @@ export function InstitutionFilterPanel({
                       onClick={() => {
                         onSelectUni(uni.name);
                         if (
-                          uni.departments.length > 0 &&
+                          (uni.departmentCount ?? uni.departments.length) > 0 &&
                           !expandedUnis.has(uni.name)
                         ) {
-                          toggleUni(uni.name);
+                          toggleUni(uni);
                         }
                       }}
                       className={cn(
@@ -196,7 +211,7 @@ export function InstitutionFilterPanel({
                   </div>
 
                   <AnimatePresence initial={false}>
-                    {expanded && visibleDepts.length > 0 && (
+                    {expanded && ((uni.departmentCount ?? 0) > 0 || visibleDepts.length > 0) && (
                       <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
@@ -204,6 +219,11 @@ export function InstitutionFilterPanel({
                         transition={{ duration: 0.15, ease: "easeOut" }}
                         className="overflow-hidden ml-8 space-y-px mt-0.5 mb-0.5"
                       >
+                        {!uni.departmentsLoaded && uni.departmentCount ? (
+                          <div className="px-2.5 py-1.5 text-xs text-gray-400">
+                            正在加载院系...
+                          </div>
+                        ) : null}
                         {visibleDepts.map((dept) => {
                           const isDeptActive =
                             activeDept === dept.name && activeUni === uni.name;
@@ -255,6 +275,17 @@ export function InstitutionFilterPanel({
               <p className="text-xs text-gray-400 text-center py-6">
                 未找到匹配的机构
               </p>
+            )}
+
+            {hasMoreNodes && (
+              <button
+                onClick={() =>
+                  setVisibleLimit((current) => current + VISIBLE_INSTITUTION_STEP)
+                }
+                className="w-full mt-2 py-2 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                显示更多机构（{Math.min(visibleLimit, filteredNodes.length)}/{filteredNodes.length}）
+              </button>
             )}
           </>
         )}

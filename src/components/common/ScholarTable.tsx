@@ -144,10 +144,10 @@ export function ScholarTable({
                 {/* 所属机构 */}
                 <td className="px-4 py-2.5">
                   <div className="min-w-0">
-                    <p className="text-sm text-gray-700 font-medium truncate max-w-[160px]">
+                    <p className="text-sm text-gray-700 font-medium truncate max-w-[10rem]">
                       {s.university || "—"}
                     </p>
-                    <p className="text-xs text-gray-400 truncate max-w-[160px] mt-0.5">
+                    <p className="text-xs text-gray-400 truncate max-w-[10rem] mt-0.5">
                       {s.department || ""}
                     </p>
                   </div>
@@ -155,7 +155,7 @@ export function ScholarTable({
 
                 {/* 研究方向 */}
                 <td className="px-4 py-2.5">
-                  <div className="flex flex-wrap gap-1 max-w-[200px]">
+                  <div className="flex flex-wrap gap-1 max-w-[12.5rem]">
                     {(s.research_areas ?? []).slice(0, 2).map((f) => (
                       <span
                         key={f}
@@ -190,7 +190,7 @@ export function ScholarTable({
                       return <span className="text-xs text-gray-300">—</span>;
                     }
                     return (
-                      <div className="flex flex-wrap gap-1 max-w-[180px]">
+                      <div className="flex flex-wrap gap-1 max-w-[11.25rem]">
                         {achievementTags.slice(0, 3).map((label) => (
                           <span
                             key={label}
@@ -217,7 +217,7 @@ export function ScholarTable({
                       return <span className="text-xs text-gray-300">—</span>;
                     }
                     return (
-                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                      <div className="flex flex-wrap gap-1 max-w-[13.75rem]">
                         {mentorTypes.slice(0, 2).map((label) => (
                           <span
                             key={label}

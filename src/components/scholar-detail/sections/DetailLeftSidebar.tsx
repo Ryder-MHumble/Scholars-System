@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Mail,
   Award,
+  BarChart3,
   Building2,
   GraduationCap,
   Briefcase,
@@ -22,6 +23,7 @@ import {
   Twitter,
   FileText,
   UserSearch,
+  Quote,
 } from "lucide-react";
 import { resolveProfileLinks, type ScholarDetail } from "@/services/scholarApi";
 import { SideLabel } from "@/components/scholar-detail/shared/SideLabel";
@@ -32,7 +34,6 @@ const BIO_LIMIT = 200;
 
 interface DetailLeftSidebarProps {
   scholar: ScholarDetail;
-  isManageMode?: boolean;
   onEditProfile?: () => void;
 }
 
@@ -43,20 +44,36 @@ type IdentityTag = {
 
 export function DetailLeftSidebar({
   scholar,
-  isManageMode = false,
   onEditProfile,
 }: DetailLeftSidebarProps) {
   const [bioExpanded, setBioExpanded] = useState(false);
-  const [photoLoadError, setPhotoLoadError] = useState(false);
-
-  useEffect(() => {
-    setPhotoLoadError(false);
-  }, [scholar.photo_url]);
 
   const bioText = scholar.bio ?? "";
   const bioNeedsExpand = bioText.length > BIO_LIMIT;
   const profileLinks = resolveProfileLinks(scholar);
   const identityTag = getChineseIdentityTag(scholar.custom_fields);
+  const showMetrics = scholar.url_hash !== "new";
+  const metrics = [
+    {
+      label: "H-index",
+      value: scholar.h_index,
+      icon: BarChart3,
+      iconClassName: "text-sky-500",
+    },
+    {
+      label: "论文数",
+      value: scholar.publications_count,
+      icon: FileText,
+      iconClassName: "text-emerald-500",
+    },
+    {
+      label: "引用数",
+      value: scholar.citations_count,
+      icon: Quote,
+      iconClassName: "text-violet-500",
+    },
+  ];
+  const metricsUpdatedAt = formatMetricDate(scholar.metrics_updated_at);
 
   const eduItems =
     scholar.education && scholar.education.length > 0
@@ -87,18 +104,11 @@ export function DetailLeftSidebar({
         <div className="p-6">
           <div className="flex items-center gap-4 mb-5">
             <div className="flex-shrink-0 relative">
-              {scholar.photo_url && !photoLoadError ? (
-                <img
-                  src={scholar.photo_url}
-                  alt={scholar.name}
-                  className="w-[120px] h-[120px] rounded-2xl object-cover border border-gray-200 shadow-sm"
-                  onError={() => setPhotoLoadError(true)}
-                />
-              ) : (
-                <div className="w-[120px] h-[120px] rounded-2xl flex items-center justify-center text-4xl font-bold bg-primary-600 text-white shadow-sm">
-                  {getInitial(scholar.name)}
-                </div>
-              )}
+              <ScholarAvatar
+                key={scholar.photo_url || scholar.name}
+                name={scholar.name}
+                photoUrl={scholar.photo_url}
+              />
               <span
                 className={`absolute left-2 bottom-2 rounded-full border px-2 py-0.5 text-[11px] font-medium shadow-sm backdrop-blur ${identityTag.className}`}
               >
@@ -132,41 +142,69 @@ export function DetailLeftSidebar({
 
           <ProfileLinkIcons profileLinks={profileLinks} />
 
-          {onEditProfile && (
-            <button
-              onClick={onEditProfile}
-              className="w-full flex items-center justify-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg text-sm hover:bg-primary-50 hover:text-primary-600 hover:border-primary-200 transition-colors"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              编辑资料
-              {isManageMode ? (
-                <span className="text-[11px] text-primary-500">(管理模式)</span>
-              ) : null}
-            </button>
+          {showMetrics && (
+            <>
+              <div className="mt-4 mb-4 rounded-xl border border-gray-100 bg-gray-50/80 overflow-hidden">
+                <div className="grid grid-cols-3 divide-x divide-gray-100">
+                  {metrics.map((metric) => {
+                    const MetricIcon = metric.icon;
+                    return (
+                      <div key={metric.label} className="px-3 py-3">
+                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
+                          <MetricIcon className={`w-3.5 h-3.5 ${metric.iconClassName}`} />
+                          <span>{metric.label}</span>
+                        </div>
+                        <div className="mt-1 text-lg font-semibold text-gray-900 leading-none">
+                          {formatMetricValue(metric.value)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {metricsUpdatedAt && (
+                <p className="mb-4 text-[11px] text-gray-400">
+                  指标更新时间：{metricsUpdatedAt}
+                </p>
+              )}
+            </>
           )}
 
-          {scholar.academic_titles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-4">
-              {scholar.academic_titles.slice(0, 3).map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-200"
-                >
-                  <Award className="w-3 h-3" />
-                  {t.length > 12 ? `${t.slice(0, 12)}...` : t}
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <div className="min-w-0 flex flex-wrap gap-1.5">
+              {scholar.academic_titles.length > 0 && (
+                <>
+                  {scholar.academic_titles.slice(0, 3).map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex max-w-full items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-700"
+                    >
+                      <Award className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{t}</span>
+                    </span>
+                  ))}
+                </>
+              )}
+              {scholar.is_academician && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-xs text-red-700">
+                  <Award className="h-3 w-3" />
+                  院士
                 </span>
-              ))}
+              )}
             </div>
-          )}
+            {onEditProfile && (
+              <button
+                type="button"
+                onClick={onEditProfile}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                编辑资料
+              </button>
+            )}
+          </div>
 
-          {scholar.is_academician && (
-            <div className="flex flex-wrap gap-1.5 mt-4">
-              <span className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-red-50 text-red-700 rounded-full border border-red-200">
-                <Award className="w-3 h-3" />
-                院士
-              </span>
-            </div>
-          )}
         </div>
 
         <div className="px-5 py-4 border-t border-gray-100">
@@ -244,25 +282,27 @@ export function DetailLeftSidebar({
                   {i < eduItems.length - 1 && (
                     <div className="absolute left-[4px] top-4 w-0.5 h-full bg-gray-200" />
                   )}
-                  <div className="space-y-0.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-semibold text-gray-800">
-                        {edu.degree || "学历"}
-                      </span>
-                      {(edu.year || edu.end_year) && (
-                        <span className="text-xs text-gray-400 whitespace-nowrap">
-                          {edu.end_year
-                            ? `${edu.year}–${edu.end_year}`
-                            : edu.year}
+                  <div className="space-y-1.5 min-w-0">
+                    {(edu.year || edu.end_year) && (
+                      <p className="text-[11px] font-medium text-gray-400">
+                        {formatEducationYears(edu)}
+                      </p>
+                    )}
+                    <p className="text-sm font-semibold text-gray-800 leading-snug break-words">
+                      {edu.institution || "院校"}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {edu.degree && (
+                        <span className="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700">
+                          {edu.degree}
+                        </span>
+                      )}
+                      {edu.major && (
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                          {edu.major}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600">
-                      {edu.institution || ""}
-                    </p>
-                    {edu.major && (
-                      <p className="text-xs text-gray-400">{edu.major}</p>
-                    )}
                   </div>
                 </div>
               ))}
@@ -311,6 +351,54 @@ export function DetailLeftSidebar({
 
 function buildOrcidHref(orcid: string): string {
   return /^https?:\/\//i.test(orcid) ? orcid : `https://orcid.org/${orcid}`;
+}
+
+function formatMetricValue(value: number | null | undefined): string {
+  if (typeof value !== "number" || value < 0) return "—";
+  return value.toLocaleString("zh-CN");
+}
+
+function formatEducationYears(
+  edu: NonNullable<ScholarDetail["education"]>[number],
+): string {
+  const start = String(edu.year || "").trim();
+  const end = String(edu.end_year || "").trim();
+  if (start && end) return `${start}-${end}`;
+  return start || end || "";
+}
+
+function formatMetricDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("zh-CN");
+}
+
+function ScholarAvatar({
+  name,
+  photoUrl,
+}: {
+  name: string;
+  photoUrl: string;
+}) {
+  const [photoLoadError, setPhotoLoadError] = useState(false);
+
+  if (photoUrl && !photoLoadError) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name}
+        className="w-[120px] h-[120px] rounded-2xl object-cover border border-gray-200 shadow-sm"
+        onError={() => setPhotoLoadError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className="w-[120px] h-[120px] rounded-2xl flex items-center justify-center text-4xl font-bold bg-primary-600 text-white shadow-sm">
+      {getInitial(name)}
+    </div>
+  );
 }
 
 function readNestedBoolean(

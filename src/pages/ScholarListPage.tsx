@@ -34,6 +34,7 @@ export default function ScholarListPage() {
     activeDept,
     handleSelectUni,
     handleSelectDept,
+    loadUniversityDepartments,
     setQuery,
     searchInput,
     setSearchInput,
@@ -88,6 +89,7 @@ export default function ScholarListPage() {
           activeDept={activeDept}
           onSelectUni={handleSelectUni}
           onSelectDept={handleSelectDept}
+          onLoadDepartments={loadUniversityDepartments}
           loading={uniLoading}
         />
       </div>

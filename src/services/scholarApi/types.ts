@@ -280,6 +280,9 @@ export interface ScholarDetailPatch {
   department?: string;
   secondary_departments?: string[];
   position?: string;
+  academic_titles?: string[];
+  is_academician?: boolean;
+  custom_fields?: Record<string, unknown>;
   bio?: string;
   bio_en?: string;
   email?: string;
@@ -301,6 +304,9 @@ export interface ScholarDetailPatch {
   research_areas?: string[];
   institute_relation_notes?: string;
   education?: EducationRecord[];
+  publications_count?: number;
+  h_index?: number;
+  citations_count?: number;
 }
 
 export interface AchievementsPatch {
@@ -368,6 +374,7 @@ export interface ScholarUniversityItem {
   institution_id?: string;
   university: string;
   scholar_count: number;
+  department_count?: number;
   departments: { id?: string; name: string; scholar_count: number }[];
 }
 
@@ -381,12 +388,18 @@ export interface BackendInstitutionItem {
   id?: string;
   name?: string;
   scholar_count?: number;
+  department_count?: number;
   departments?: BackendInstitutionDepartment[];
 }
 
 export interface BackendInstitutionHierarchyResponse {
   organizations?: BackendInstitutionItem[];
   items?: BackendInstitutionItem[];
+}
+
+export interface BackendInstitutionDepartmentsResponse {
+  institution_id?: string;
+  departments?: BackendInstitutionDepartment[];
 }
 
 export interface ScholarProjectFields {
@@ -437,6 +450,9 @@ export interface ScholarCreate {
   phd_institution?: string;
   phd_year?: string;
   education?: EducationRecord[];
+  publications_count?: number;
+  h_index?: number;
+  citations_count?: number;
   project_tags?: ScholarProjectTag[];
   event_tags?: ScholarEventTag[];
   participated_event_ids?: string[];

@@ -23,6 +23,7 @@ import {
   parseEducationFromText,
   parseManagementRolesFromText,
 } from "@/utils/textParsers";
+import { readProfileFlag } from "@/utils/scholarIdentity";
 
 interface EditProfileModalProps {
   scholar: ScholarDetail;
@@ -72,6 +73,8 @@ export function EditProfileModal({
     scholar.joint_management_roles ?? [],
   );
   const initialProfileLinks = resolveProfileLinks(scholar);
+  const initialChineseIdentity = readProfileFlag(scholar.custom_fields, "is_chinese");
+  const initialTitles = scholar.academic_titles ?? [];
 
   const [form, setForm] = useState({
     name: scholar.name || "",
@@ -97,6 +100,16 @@ export function EditProfileModal({
     bio: scholar.bio || "",
     bio_en: scholar.bio_en || "",
     research_areas: (scholar.research_areas ?? []).join(", "),
+    h_index: formatMetricInput(scholar.h_index),
+    publications_count: formatMetricInput(scholar.publications_count),
+    citations_count: formatMetricInput(scholar.citations_count),
+    chinese_identity: initialChineseIdentity === true
+      ? "chinese"
+      : initialChineseIdentity === false
+        ? "non_chinese"
+        : "unknown",
+    academic_titles: initialTitles.join("\n"),
+    is_academician: scholar.is_academician === true,
   });
 
   const set = (field: string, value: string) =>
@@ -168,6 +181,18 @@ export function EditProfileModal({
         (patch as Record<string, unknown>)[key] = formVal;
       }
     };
+    const checkMetric = (
+      key: "h_index" | "publications_count" | "citations_count",
+      formVal: string,
+      origVal: number | null | undefined,
+    ) => {
+      const nextValue = parseMetricInput(formVal);
+      const prevValue =
+        typeof origVal === "number" && origVal >= 0 ? origVal : -1;
+      if (nextValue !== prevValue) {
+        patch[key] = nextValue;
+      }
+    };
 
     check("name", form.name, scholar.name);
     check("name_en", form.name_en, scholar.name_en);
@@ -175,6 +200,26 @@ export function EditProfileModal({
     check("university", form.university, scholar.university);
     check("department", form.department, scholar.department);
     check("position", form.position, scholar.position);
+    const academicTitles = form.academic_titles
+      .split(/\n|,|，/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (JSON.stringify(academicTitles) !== JSON.stringify(initialTitles)) {
+      patch.academic_titles = academicTitles;
+    }
+    if (form.is_academician !== (scholar.is_academician === true)) {
+      patch.is_academician = form.is_academician;
+    }
+    const nextCustomFields = buildProfileCustomFields(
+      scholar.custom_fields,
+      form.chinese_identity,
+    );
+    if (JSON.stringify(nextCustomFields) !== JSON.stringify(scholar.custom_fields ?? {})) {
+      patch.custom_fields = nextCustomFields;
+    }
+    checkMetric("h_index", form.h_index, scholar.h_index);
+    checkMetric("publications_count", form.publications_count, scholar.publications_count);
+    checkMetric("citations_count", form.citations_count, scholar.citations_count);
     check("email", form.email, scholar.email);
     check("phone", form.phone, scholar.phone);
     check("office", form.office, scholar.office);
@@ -281,10 +326,10 @@ export function EditProfileModal({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl mx-4 max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl mx-3 sm:mx-5 h-[min(820px,92vh)] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 shrink-0 bg-white">
+        <div className="px-5 sm:px-8 pt-5 pb-4 shrink-0 bg-white">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-slate-900">编辑学者资料</h3>
@@ -301,27 +346,28 @@ export function EditProfileModal({
           </div>
         </div>
 
-        <div className="shrink-0 px-6 py-3 border-b border-slate-100 bg-slate-50/80">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex min-h-0 flex-1 flex-col bg-slate-50/70 md:flex-row">
+          <nav className="shrink-0 bg-slate-50 px-5 py-3 sm:px-8 md:w-44 md:px-3 md:py-5">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide md:flex-col">
             {PROFILE_TABS.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  "px-3.5 py-2 text-xs rounded-xl border whitespace-nowrap transition-all",
+                  "px-3.5 py-2 text-left text-xs rounded-xl whitespace-nowrap transition-all md:w-full",
                   activeTab === tab.key
-                    ? "bg-white text-primary-700 border-primary-200 shadow-sm font-semibold"
-                    : "bg-slate-50 text-slate-600 border-slate-200 hover:border-primary-200 hover:text-primary-600",
+                    ? "bg-white text-primary-700 shadow-sm font-semibold"
+                    : "text-slate-600 hover:bg-white/70 hover:text-primary-600",
                 )}
               >
                 {tab.label}
               </button>
             ))}
           </div>
-        </div>
+          </nav>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 bg-slate-50/35">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
           {activeTab === "basic" && (
             <div className="space-y-6">
               <Section title="基本信息">
@@ -401,10 +447,63 @@ export function EditProfileModal({
                   onChange={(v) => set("position", v)}
                   placeholder="教授 / 副教授 / ..."
                 />
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <ChoiceField
+                    label="华人身份"
+                    value={form.chinese_identity}
+                    onChange={(value) => set("chinese_identity", value)}
+                    options={[
+                      { value: "unknown", label: "待判定" },
+                      { value: "chinese", label: "华人" },
+                      { value: "non_chinese", label: "非华人" },
+                    ]}
+                  />
+                  <ToggleField
+                    label="院士身份"
+                    checked={form.is_academician}
+                    onChange={(checked) => setForm((prev) => ({ ...prev, is_academician: checked }))}
+                  />
+                </div>
+                <TextareaField
+                  label="学术头衔 / 荣誉"
+                  value={form.academic_titles}
+                  onChange={(v) => set("academic_titles", v)}
+                  rows={3}
+                  placeholder="每行一个，例如：ACM Fellow\nIEEE Fellow"
+                />
+                <div className="grid grid-cols-3 gap-3">
+                  <Field
+                    label="H-index"
+                    value={form.h_index}
+                    onChange={(v) => set("h_index", v)}
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="未获取"
+                  />
+                  <Field
+                    label="论文数"
+                    value={form.publications_count}
+                    onChange={(v) => set("publications_count", v)}
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="未获取"
+                  />
+                  <Field
+                    label="引用数"
+                    value={form.citations_count}
+                    onChange={(v) => set("citations_count", v)}
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="未获取"
+                  />
+                </div>
               </Section>
 
               <Section title="联系方式">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <Field
                     label="邮箱"
                     value={form.email}
@@ -436,7 +535,7 @@ export function EditProfileModal({
 
           {activeTab === "links" && (
             <Section title="主页链接">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Field
                   label="个人主页"
                   value={form.profile_url}
@@ -450,7 +549,7 @@ export function EditProfileModal({
                   placeholder="https://..."
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Field
                   label="LinkedIn"
                   value={form.linkedin_url}
@@ -464,7 +563,7 @@ export function EditProfileModal({
                   placeholder="https://..."
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Field
                   label="ORCID"
                   value={form.orcid}
@@ -478,7 +577,7 @@ export function EditProfileModal({
                   placeholder="https://..."
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Field
                   label="实验室网站"
                   value={form.lab_url}
@@ -492,7 +591,7 @@ export function EditProfileModal({
                   placeholder="https://x.com/..."
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Field
                   label="OpenReview"
                   value={form.openreview_url}
@@ -506,7 +605,7 @@ export function EditProfileModal({
                   placeholder="https://www.aminer.cn/profile/..."
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <TextareaField
                   label="其他链接"
                   value={form.other_profile_links}
@@ -619,7 +718,7 @@ export function EditProfileModal({
                   value={educationBatchText}
                   onChange={(e) => handleEducationBatchTextChange(e.target.value)}
                   rows={4}
-                  placeholder={"示例：\n2015-2019 清华大学 本科\n2019-2024 北京大学 博士"}
+                  placeholder={"示例：\n2015-2019 清华大学 本科 数学\n2019-2024 北京大学 博士 计算机科学"}
                   className={TEXTAREA_CLASS}
                 />
                 <div className="mt-2">
@@ -692,8 +791,9 @@ export function EditProfileModal({
             </Section>
           )}
         </div>
+        </div>
 
-        <div className="flex gap-3 px-6 py-4 border-t border-slate-100 bg-white shrink-0">
+        <div className="flex gap-3 px-5 sm:px-8 py-4 bg-white shrink-0">
           <button
             onClick={onClose}
             className="flex-1 h-11 px-4 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors"
@@ -721,13 +821,25 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
-      <h4 className="text-sm font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-100">
+    <section className="rounded-2xl bg-white/90 p-4 md:p-5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+      <h4 className="mb-4 text-sm font-semibold text-slate-800">
         {title}
       </h4>
       <div className="space-y-3">{children}</div>
     </section>
   );
+}
+
+function formatMetricInput(value: number | null | undefined): string {
+  if (typeof value !== "number" || value < 0) return "";
+  return String(value);
+}
+
+function parseMetricInput(value: string): number {
+  const trimmed = value.trim();
+  if (!trimmed) return -1;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : -1;
 }
 
 function Field({
@@ -736,12 +848,18 @@ function Field({
   onChange,
   placeholder,
   required,
+  type = "text",
+  min,
+  step,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   required?: boolean;
+  type?: React.HTMLInputTypeAttribute;
+  min?: number;
+  step?: number;
 }) {
   return (
     <div>
@@ -750,7 +868,9 @@ function Field({
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       <input
-        type="text"
+        type={type}
+        min={min}
+        step={step}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -811,4 +931,112 @@ function TextareaField({
       />
     </div>
   );
+}
+
+function ChoiceField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-slate-600">{label}</label>
+      <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "h-9 rounded-lg px-2 text-xs transition-colors",
+              value === option.value
+                ? "bg-white font-semibold text-primary-700 shadow-sm"
+                : "text-slate-500 hover:text-slate-800",
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ToggleField({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div>
+      <span className="mb-1.5 block text-xs font-medium text-slate-600">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={cn(
+          "flex h-11 w-full items-center justify-between rounded-xl px-3 text-sm transition-colors",
+          checked ? "bg-primary-50 text-primary-700" : "bg-slate-100 text-slate-500",
+        )}
+      >
+        <span>{checked ? "是，展示院士标识" : "否"}</span>
+        <span className={cn(
+          "relative h-5 w-9 rounded-full transition-colors",
+          checked ? "bg-primary-600" : "bg-slate-300",
+        )}>
+          <span className={cn(
+            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+            checked ? "translate-x-4" : "translate-x-0.5",
+          )} />
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function readCustomFieldGroup(
+  customFields: Record<string, unknown> | undefined,
+  key: string,
+): Record<string, unknown> {
+  const value = customFields?.[key];
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? { ...(value as Record<string, unknown>) }
+    : {};
+}
+
+function buildProfileCustomFields(
+  customFields: Record<string, unknown> | undefined,
+  identity: string,
+): Record<string, unknown> {
+  const next = { ...(customFields ?? {}) };
+  const profileFlags = readCustomFieldGroup(customFields, "profile_flags");
+  const metadataProfile = readCustomFieldGroup(customFields, "metadata_profile");
+
+  if (identity === "chinese") {
+    profileFlags.is_chinese = true;
+    delete metadataProfile.is_chinese;
+  } else if (identity === "non_chinese") {
+    profileFlags.is_chinese = false;
+    delete metadataProfile.is_chinese;
+  } else {
+    delete profileFlags.is_chinese;
+    delete metadataProfile.is_chinese;
+  }
+
+  if (Object.keys(profileFlags).length > 0) next.profile_flags = profileFlags;
+  else delete next.profile_flags;
+  if (Object.keys(metadataProfile).length > 0) next.metadata_profile = metadataProfile;
+  else if ("metadata_profile" in next) delete next.metadata_profile;
+  return next;
 }

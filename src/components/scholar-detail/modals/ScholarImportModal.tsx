@@ -165,9 +165,15 @@ export function ScholarImportModal({
     setIsProcessing(true);
     setParseResult(null);
     try {
+      const expectedType =
+        selectedType === "education"
+          ? "education"
+          : selectedType === "achievements"
+            ? "publication"
+            : "scholar";
       const result = await smartParseExcel<Record<string, unknown>>(
         selectedFile,
-        "scholar",
+        expectedType,
       );
       setParseResult(result);
     } catch (err) {

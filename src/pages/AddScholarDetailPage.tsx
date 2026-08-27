@@ -225,6 +225,9 @@ export default function AddScholarDetailPage() {
         research_areas: scholar.research_areas || [],
         academic_titles: scholar.academic_titles || [],
         education: scholar.education || [],
+        publications_count: scholar.publications_count,
+        h_index: scholar.h_index,
+        citations_count: scholar.citations_count,
         bio: scholar.bio || undefined,
         project_tags: scholar.project_tags || [],
         is_cobuild_scholar: (scholar.project_tags?.length ?? 0) > 0,
@@ -346,7 +349,6 @@ export default function AddScholarDetailPage() {
             >
               <DetailLeftSidebar
                 scholar={scholar}
-                isManageMode
                 onEditProfile={() => setShowProfileModal(true)}
               />
             </motion.div>

@@ -67,3 +67,14 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+html {
+  font-size: clamp(13px, calc(10px + 0.3125vw), 18px);
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}

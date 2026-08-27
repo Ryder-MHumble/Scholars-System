@@ -21,6 +21,7 @@ export {
 // ====== Scholar read operations ======
 export {
   fetchScholarUniversities,
+  fetchScholarUniversityDepartments,
   fetchScholarList,
   fetchAllScholars,
   fetchScholarDetail,

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   fetchScholarList,
@@ -169,12 +169,11 @@ export function useScholarList(options: UseScholarListOptions = {}) {
   const participatedEventId = searchParams.get("participated_event_id");
   const eventTitle = searchParams.get("event_title");
 
-  const [query, setQuery] = useState("");
+  const [query, setQueryState] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(parsePageParam(pageParam));
   const [reloadSeed, setReloadSeed] = useState(0);
   const [universityReloadSeed, setUniversityReloadSeed] = useState(0);
-  const prevQueryRef = useRef(query);
   const listRequestSeqRef = useRef(0);
   const pageUpdateSourceRef = useRef<"url" | null>(null);
 
@@ -302,6 +301,10 @@ export function useScholarList(options: UseScholarListOptions = {}) {
       effectiveProjectSubcategory,
     ],
   );
+  const setQuery = useCallback((nextQuery: string) => {
+    setPage(1);
+    setQueryState(nextQuery);
+  }, []);
 
   /* University counts — filtered by current subtab */
   const {
@@ -309,6 +312,7 @@ export function useScholarList(options: UseScholarListOptions = {}) {
     totalCount: defaultTotalCount,
     loading: defaultUniLoading,
     error: defaultUniError,
+    loadDepartments: loadDefaultDepartments,
   } = useUniversityCounts({
     region: apiRegion,
     affiliation_type: apiAffiliationType,
@@ -321,13 +325,23 @@ export function useScholarList(options: UseScholarListOptions = {}) {
     if (!Array.isArray(universities)) return [];
     return universities.map((uni) => ({
       name: uni.name,
+      id: uni.institutionId,
       departments: uni.departments.map((dept) => ({
         name: dept.name,
         count: dept.scholar_count,
       })),
       count: uni.scholarCount,
+      departmentCount: uni.departmentCount,
+      departmentsLoaded: uni.departmentsLoaded,
     }));
   }, [universities]);
+
+  useEffect(() => {
+    if (!activeUni || !activeDept) return;
+    const selected = universities.find((uni) => uni.name === activeUni);
+    if (!selected || selected.departmentsLoaded) return;
+    void loadDefaultDepartments(selected.institutionId, selected.name);
+  }, [activeUni, activeDept, universities, loadDefaultDepartments]);
 
   useEffect(() => {
     setEventScopedUniNodes([]);
@@ -401,16 +415,7 @@ export function useScholarList(options: UseScholarListOptions = {}) {
   }, [
     page,
     reloadSeed,
-    query,
-    mentorType,
-    studentIdentity,
-    chineseIdentity,
-    achievementTags,
     apiListFilters,
-    activeTab,
-    activeSubTab,
-    projectFilter,
-    normalizedQuery,
   ]);
 
   /* Sync external URL page changes back to local state. */
@@ -439,13 +444,6 @@ export function useScholarList(options: UseScholarListOptions = {}) {
     }
     setSearchParams(newParams, { replace: true });
   }, [page, pageParam, searchParams, setSearchParams]);
-
-  /* Reset page only when query actually changes after initial mount */
-  useEffect(() => {
-    if (prevQueryRef.current === query) return;
-    prevQueryRef.current = query;
-    setPage(1);
-  }, [query]);
 
   const handleSelectUni = (name: string | null) => {
     setPage(1);
@@ -719,6 +717,7 @@ export function useScholarList(options: UseScholarListOptions = {}) {
     activeSubTab,
     handleSelectUni,
     handleSelectDept,
+    loadUniversityDepartments: loadDefaultDepartments,
 
     // Search & filter
     query,

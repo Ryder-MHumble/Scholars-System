@@ -36,11 +36,13 @@ export function buildUniversityCacheKey(filters?: {
   region?: string;
   affiliation_type?: string;
   is_adjunct_supervisor?: boolean;
+  include_departments?: boolean;
 }): string {
   return JSON.stringify({
     region: filters?.region ?? "",
     affiliation_type: filters?.affiliation_type ?? "",
     is_adjunct_supervisor: Boolean(filters?.is_adjunct_supervisor),
+    include_departments: filters?.include_departments !== false,
   });
 }
 
@@ -422,11 +424,30 @@ export function buildScholarPayload<
   },
 >(data: T): T {
   const payload = { ...data };
+  const linkKeys = [
+    "profile_links",
+    "profile_url",
+    "lab_url",
+    "google_scholar_url",
+    "dblp_url",
+    "orcid",
+    "linkedin_url",
+    "github_url",
+    "x_url",
+    "openreview_url",
+    "aminer_url",
+  ] as const;
+  const hasLinkPatch = linkKeys.some((key) =>
+    Object.prototype.hasOwnProperty.call(payload, key),
+  );
+
+  if (!hasLinkPatch) {
+    return payload;
+  }
+
   const nextLinks = resolveProfileLinks(payload);
 
-  if (hasProfileLinks(nextLinks)) {
-    payload.profile_links = nextLinks;
-  }
+  payload.profile_links = nextLinks;
 
   return {
     ...payload,

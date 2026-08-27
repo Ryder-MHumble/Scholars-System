@@ -1,10 +1,12 @@
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { NavTreeItem } from "@/components/nav/NavTreeItem";
 import { NAV_TREE, getAncestorIds } from "@/constants/navTree";
 import type { TabId } from "@/constants/navTree";
 import { lazyWithRetry } from "@/utils/lazyWithRetry";
+import { cn } from "@/utils/cn";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const ScholarListPage = lazyWithRetry(
   () => import("./ScholarListPage"),
@@ -37,6 +39,17 @@ export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get("tab") as TabId) || "institutions";
   const activeSubTab = searchParams.get("subtab");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("scholars-home-sidebar-collapsed") === "1";
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "scholars-home-sidebar-collapsed",
+      isSidebarCollapsed ? "1" : "0",
+    );
+  }, [isSidebarCollapsed]);
 
   const [manualExpandedIds, setManualExpandedIds] = useState<Set<string>>(() => {
     return new Set(getAncestorIds(activeTab, activeSubTab));
@@ -91,36 +104,78 @@ export default function HomePage() {
   return (
     <div className="h-screen flex overflow-hidden">
       {/* Left Sidebar Navigation */}
-      <aside className="w-56 bg-white border-r border-gray-100 flex flex-col shrink-0 overflow-hidden">
-        <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100">
-          <div className="flex items-center gap-2">
+      <aside
+        className={cn(
+          "bg-white border-r border-gray-100 flex flex-col shrink-0 overflow-hidden transition-[width] duration-200 ease-out",
+          isSidebarCollapsed ? "w-[4.5rem]" : "w-56",
+        )}
+      >
+        <div
+          className={cn(
+            "px-4 pt-4 pb-3 shrink-0 border-b border-gray-100",
+            isSidebarCollapsed && "px-3",
+          )}
+        >
+          <div
+            className={cn(
+              "flex items-center gap-2",
+              isSidebarCollapsed && "flex-col items-center",
+            )}
+          >
             <img
               src="/ScholarDB.png"
               alt="ScholarDB Logo"
-              className="w-10 h-10 rounded object-contain"
+              className="w-10 h-10 rounded object-contain shrink-0"
             />
-            <div>
-              <h1 className="text-sm font-bold text-gray-900 leading-snug">
-                学者知识图谱
-              </h1>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                Scholar Knowledge Graph
-              </p>
-            </div>
+            {!isSidebarCollapsed && (
+              <div>
+                <h1 className="text-sm font-bold text-gray-900 leading-snug">
+                  学者知识图谱
+                </h1>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Scholar Knowledge Graph
+                </p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+              className={cn(
+                "ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors",
+                isSidebarCollapsed && "ml-0 self-center",
+              )}
+              aria-label={isSidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+              title={isSidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+            >
+              {isSidebarCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
+            </button>
           </div>
         </div>
 
         {/* Support Notice */}
-        <div className="px-4 py-3 border-b border-gray-100 bg-blue-50">
-          <p className="text-xs text-blue-700 leading-relaxed">
-            💬 如遇到相关问题请咨询孙铭浩
-          </p>
-        </div>
+        {!isSidebarCollapsed && (
+          <div className="px-4 py-3 border-b border-gray-100 bg-blue-50">
+            <p className="text-xs text-blue-700 leading-relaxed">
+              💬 如遇到相关问题请咨询孙铭浩
+            </p>
+          </div>
+        )}
 
-        <nav className="flex-1 overflow-y-auto scrollbar-hide py-3 px-2.5">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3 px-3">
-            核心数据库
-          </p>
+        <nav
+          className={cn(
+            "flex-1 overflow-y-auto scrollbar-hide py-3",
+            isSidebarCollapsed ? "px-1.5" : "px-2.5",
+          )}
+        >
+          {!isSidebarCollapsed && (
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3 px-3">
+              核心数据库
+            </p>
+          )}
           <div className="space-y-1">
             {NAV_TREE.map((node) => (
               <NavTreeItem
@@ -132,6 +187,7 @@ export default function HomePage() {
                 onNavigate={handleNavigate}
                 expandedIds={expandedIds}
                 onToggle={handleToggle}
+                collapsed={isSidebarCollapsed}
               />
             ))}
           </div>

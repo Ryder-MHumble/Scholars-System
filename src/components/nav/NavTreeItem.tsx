@@ -12,6 +12,7 @@ export interface NavTreeItemProps {
   onNavigate: (tab: TabId, subtab?: string) => void;
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
+  collapsed?: boolean;
 }
 
 export function NavTreeItem({
@@ -22,6 +23,7 @@ export function NavTreeItem({
   onNavigate,
   expandedIds,
   onToggle,
+  collapsed = false,
 }: NavTreeItemProps) {
   const hasChildren = !!(node.children && node.children.length > 0);
   const isExpanded = expandedIds.has(node.id);
@@ -46,10 +48,13 @@ export function NavTreeItem({
     <div>
       <button
         onClick={handleClick}
+        title={collapsed && depth === 0 ? node.label : undefined}
         className={cn(
           "w-full flex items-center gap-2 rounded-xl transition-all duration-150 text-left select-none",
           depth === 0
-            ? "px-3 py-2.5 font-semibold text-[15px]"
+            ? collapsed
+              ? "justify-center px-2.5 py-2.5 font-semibold text-[15px]"
+              : "px-3 py-2.5 font-semibold text-[15px]"
             : depth === 1
               ? "px-2.5 py-2 text-sm font-medium"
               : "px-2.5 py-1.5 text-[13px]",
@@ -64,7 +69,7 @@ export function NavTreeItem({
               : "text-gray-600 hover:bg-gray-100 hover:text-gray-800",
         )}
       >
-        {hasChildren ? (
+        {!collapsed && hasChildren ? (
           <motion.div
             animate={{ rotate: isExpanded ? 90 : 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
@@ -82,7 +87,7 @@ export function NavTreeItem({
               )}
             />
           </motion.div>
-        ) : (
+        ) : !collapsed ? (
           <span
             className={cn(
               "shrink-0 rounded-full",
@@ -90,12 +95,12 @@ export function NavTreeItem({
               isExactActive ? "bg-primary-500" : "bg-gray-300",
             )}
           />
-        )}
+        ) : null}
 
         {Icon && (
           <Icon
             className={cn(
-              "w-[18px] h-[18px] shrink-0 transition-colors duration-150",
+              "w-[1.125rem] h-[1.125rem] shrink-0 transition-colors duration-150",
               isExactActive && depth === 0
                 ? "text-white/80"
                 : hasActiveDescendant
@@ -105,11 +110,11 @@ export function NavTreeItem({
           />
         )}
 
-        <span className="truncate leading-snug">{node.label}</span>
+        {!collapsed && <span className="truncate leading-snug">{node.label}</span>}
       </button>
 
       <AnimatePresence initial={false}>
-        {hasChildren && isExpanded && (
+        {hasChildren && isExpanded && !collapsed && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
@@ -133,6 +138,7 @@ export function NavTreeItem({
                   onNavigate={onNavigate}
                   expandedIds={expandedIds}
                   onToggle={onToggle}
+                  collapsed={collapsed}
                 />
               ))}
             </div>

@@ -224,7 +224,9 @@ export function InstitutionCard({
 }: InstitutionCardProps) {
   const navigate = useNavigate();
   const hasDepartmentField = Array.isArray(institution.departments);
-  const hasDepartments = (institution.departments?.length ?? 0) > 0;
+  const departmentCount = institution.department_count ?? institution.departments?.length ?? 0;
+  const hasDepartmentCount = institution.department_count !== null &&
+    (institution.department_count !== undefined || hasDepartmentField);
 
   return (
     <motion.article
@@ -281,14 +283,14 @@ export function InstitutionCard({
               </div>
             </div>
 
-            {(hasDepartments || hasDepartmentField) && (
+            {hasDepartmentCount && (
               <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-2">
-                {hasDepartments && (
+                {departmentCount > 0 && (
                   <span className="inline-flex max-w-full items-center truncate rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                    {institution.departments!.length} 个子机构
+                    {departmentCount} 个子机构
                   </span>
                 )}
-                {!hasDepartments && hasDepartmentField && (
+                {departmentCount === 0 && (
                   <span className="inline-flex max-w-full items-center truncate rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-400">
                     暂无院系数据
                   </span>

@@ -2,15 +2,21 @@
  * 获取高校/院系学者数量的自定义 Hook
  * 使用 /api/institutions?view=hierarchy 从机构数据聚合，支持 region/org_type 过滤
  */
-import { useEffect, useState } from "react";
-import { fetchScholarUniversities } from "@/services/scholarApi";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  fetchScholarUniversities,
+  fetchScholarUniversityDepartments,
+} from "@/services/scholarApi";
 import type { InstitutionDepartmentListItem } from "@/types/institution";
 
 export interface UniversityData {
   id: string;
+  institutionId?: string;
   name: string;
   count: number;
   scholarCount: number;
+  departmentCount: number;
+  departmentsLoaded: boolean;
   departments: InstitutionDepartmentListItem[];
 }
 
@@ -25,6 +31,7 @@ export function useUniversityCounts(filters?: {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const departmentRequestRef = useRef<Set<string>>(new Set());
 
   const region = filters?.region;
   const affiliationType = filters?.affiliation_type;
@@ -43,6 +50,7 @@ export function useUniversityCounts(filters?: {
           region,
           affiliation_type: affiliationType,
           is_adjunct_supervisor: isAdjunctSupervisor,
+          include_departments: false,
         });
         if (cancelled) return;
 
@@ -53,15 +61,13 @@ export function useUniversityCounts(filters?: {
         for (const item of items) {
           const uniData: UniversityData = {
             id: item.university,
+            institutionId: item.institution_id,
             name: item.university,
-            count: item.departments.length,
+            count: item.scholar_count,
             scholarCount: item.scholar_count,
-            departments: item.departments.map((d) => ({
-              id: d.name,
-              name: d.name,
-              scholar_count: d.scholar_count,
-              org_name: "", // Not provided by /api/institutions endpoint
-            })),
+            departmentCount: item.department_count ?? item.departments.length,
+            departmentsLoaded: item.departments.length > 0,
+            departments: [],
           };
           unis.push(uniData);
           countsMap[item.university] = item.scholar_count;
@@ -94,5 +100,48 @@ export function useUniversityCounts(filters?: {
     };
   }, [region, affiliationType, isAdjunctSupervisor, refreshSeed]);
 
-  return { universities, counts, totalCount, loading, error };
+  const loadDepartments = useCallback(async (institutionId?: string, universityName?: string) => {
+    if (!institutionId) return;
+    const requestKey = `${institutionId}::${universityName ?? ""}`;
+    if (departmentRequestRef.current.has(requestKey)) return;
+
+    const target = universities.find(
+      (uni) => uni.institutionId === institutionId || uni.name === universityName,
+    );
+    if (!target || target.departmentsLoaded) return;
+
+    departmentRequestRef.current.add(requestKey);
+    try {
+      const departments = await fetchScholarUniversityDepartments(institutionId);
+      setUniversities((prev) =>
+        prev.map((uni) => {
+          if (uni.institutionId !== institutionId && uni.name !== universityName) {
+            return uni;
+          }
+          return {
+            ...uni,
+            departmentCount: departments.length,
+            departmentsLoaded: true,
+            departments: departments.map((d) => ({
+              id: d.name,
+              name: d.name,
+              scholar_count: d.scholar_count,
+              org_name: "",
+            })),
+          };
+        }),
+      );
+      setCounts((prev) => {
+        const next = { ...prev };
+        for (const dept of departments) {
+          next[`${universityName ?? target.name}::${dept.name}`] = dept.scholar_count;
+        }
+        return next;
+      });
+    } finally {
+      departmentRequestRef.current.delete(requestKey);
+    }
+  }, [universities]);
+
+  return { universities, counts, totalCount, loading, error, loadDepartments };
 }

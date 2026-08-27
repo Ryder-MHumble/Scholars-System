@@ -169,10 +169,10 @@ export default function InstitutionListPage() {
   const [deptMapByName, setDeptMapByName] = useState<
     Record<string, InstitutionDepartmentListItem[]>
   >({});
-  const [scholarCountMapById, setScholarCountMapById] = useState<
+  const [departmentCountMapById, setDepartmentCountMapById] = useState<
     Record<string, number>
   >({});
-  const [scholarCountMapByName, setScholarCountMapByName] = useState<
+  const [departmentCountMapByName, setDepartmentCountMapByName] = useState<
     Record<string, number>
   >({});
   const [moduleTotal, setModuleTotal] = useState(0);
@@ -221,13 +221,16 @@ export default function InstitutionListPage() {
         if (cancelled) return;
         const nextById: Record<string, InstitutionDepartmentListItem[]> = {};
         const nextByName: Record<string, InstitutionDepartmentListItem[]> = {};
-        const nextScholarById: Record<string, number> = {};
-        const nextScholarByName: Record<string, number> = {};
+        const nextDepartmentCountById: Record<string, number> = {};
+        const nextDepartmentCountByName: Record<string, number> = {};
         organizations.forEach((org) => {
           const normalizedOrgName = normalizeName(org.name);
-          nextScholarById[org.id] = Number(org.scholar_count ?? 0);
+          const departmentCount = Number(
+            org.department_count ?? org.departments?.length ?? 0,
+          );
+          nextDepartmentCountById[org.id] = departmentCount;
           if (normalizedOrgName) {
-            nextScholarByName[normalizedOrgName] = Number(org.scholar_count ?? 0);
+            nextDepartmentCountByName[normalizedOrgName] = departmentCount;
           }
 
           const departments = (org.departments ?? []).map((dept) => ({
@@ -243,15 +246,15 @@ export default function InstitutionListPage() {
         });
         setDeptMapById(nextById);
         setDeptMapByName(nextByName);
-        setScholarCountMapById(nextScholarById);
-        setScholarCountMapByName(nextScholarByName);
+        setDepartmentCountMapById(nextDepartmentCountById);
+        setDepartmentCountMapByName(nextDepartmentCountByName);
       })
       .catch(() => {
         if (cancelled) return;
         setDeptMapById({});
         setDeptMapByName({});
-        setScholarCountMapById({});
-        setScholarCountMapByName({});
+        setDepartmentCountMapById({});
+        setDepartmentCountMapByName({});
       });
 
     return () => {
@@ -478,17 +481,17 @@ export default function InstitutionListPage() {
     const fallback = hierarchyDepartments ?? [];
     const mergedDepartments =
       fallback.length > 0 ? fallback : institution.departments;
-    const hierarchyScholarCount =
-      scholarCountMapById[institution.id] ?? scholarCountMapByName[normalizedName];
+    const hierarchyDepartmentCount =
+      departmentCountMapById[institution.id] ??
+      departmentCountMapByName[normalizedName];
 
-    if (!mergedDepartments && hierarchyScholarCount === undefined) return institution;
+    if (!mergedDepartments && hierarchyDepartmentCount === undefined) return institution;
 
     return {
       ...institution,
-      scholar_count:
-        hierarchyScholarCount !== undefined
-          ? hierarchyScholarCount
-          : institution.scholar_count,
+      ...(hierarchyDepartmentCount !== undefined
+        ? { department_count: hierarchyDepartmentCount }
+        : {}),
       ...(mergedDepartments ? { departments: mergedDepartments } : {}),
     };
   };

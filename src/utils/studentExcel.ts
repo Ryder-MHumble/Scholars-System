@@ -67,13 +67,6 @@ export const STUDENT_TEMPLATE_FIELDS: StudentTemplateField[] = [
     description: "例如 硕士/博士",
   },
   {
-    header: "预计毕业年份",
-    key: "expected_graduation_year",
-    required: "否",
-    example: "2028",
-    description: "支持四位年份",
-  },
-  {
     header: "状态",
     key: "status",
     required: "否",
@@ -87,13 +80,6 @@ export const STUDENT_TEMPLATE_FIELDS: StudentTemplateField[] = [
     example: "13800000000",
     description: "联系电话",
   },
-  {
-    header: "备注",
-    key: "notes",
-    required: "否",
-    example: "可选备注",
-    description: "自由填写",
-  },
 ];
 
 const HEADER_ALIASES: Record<string, string[]> = {
@@ -105,15 +91,8 @@ const HEADER_ALIASES: Record<string, string[]> = {
   email: ["邮箱", "email", "Email"],
   major: ["专业", "major"],
   degree_type: ["学位类型", "degree_type", "degreeType"],
-  expected_graduation_year: [
-    "预计毕业年份",
-    "expected_graduation_year",
-    "毕业年份",
-    "expectedGraduationYear",
-  ],
   status: ["状态", "status"],
   phone: ["电话", "phone"],
-  notes: ["备注", "notes"],
 };
 
 function getValue(
@@ -157,10 +136,8 @@ export function downloadStudentTemplate() {
     邮箱: "zhangsan@example.com",
     专业: "人工智能",
     学位类型: "硕士",
-    预计毕业年份: "2028",
     状态: "在读",
     电话: "13800000000",
-    备注: "示例数据",
   };
 
   const dataSheet = XLSX.utils.json_to_sheet([sampleRow], { header: headers });
@@ -256,12 +233,8 @@ export async function parseStudentExcel(
         email: getValue(record, HEADER_ALIASES.email) || undefined,
         major: getValue(record, HEADER_ALIASES.major) || undefined,
         degree_type: getValue(record, HEADER_ALIASES.degree_type) || undefined,
-        expected_graduation_year:
-          parseYear(getValue(record, HEADER_ALIASES.expected_graduation_year)) ||
-          undefined,
         status: getValue(record, HEADER_ALIASES.status) || undefined,
         phone: getValue(record, HEADER_ALIASES.phone) || undefined,
-        notes: getValue(record, HEADER_ALIASES.notes) || undefined,
       },
     });
   });
@@ -284,8 +257,6 @@ export function exportStudentsToExcel(
     学位类型: item.degree_type || "",
     状态: item.status || "",
     电话: item.phone || "",
-    预计毕业年份: item.expected_graduation_year || "",
-    备注: item.notes || "",
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -294,8 +265,6 @@ export function exportStudentsToExcel(
     { wch: 10 },
     { wch: 18 },
     { wch: 12 },
-    { wch: 14 },
-    { wch: 24 },
     { wch: 16 },
     { wch: 12 },
     { wch: 10 },
@@ -316,4 +285,3 @@ export function exportStudentsToExcel(
     }),
   );
 }
-

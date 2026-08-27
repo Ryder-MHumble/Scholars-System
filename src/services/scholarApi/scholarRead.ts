@@ -26,6 +26,7 @@ import type {
   ScholarStatsResponse,
   ScholarUniversityItem,
   UniversityOption,
+  BackendInstitutionDepartmentsResponse,
 } from "./types";
 
 // ====== University hierarchy ======
@@ -34,6 +35,7 @@ export async function fetchScholarUniversities(filters?: {
   region?: string;
   affiliation_type?: string;
   is_adjunct_supervisor?: boolean;
+  include_departments?: boolean;
 }): Promise<ScholarUniversityItem[]> {
   const cacheKey = buildUniversityCacheKey(filters);
   const now = Date.now();
@@ -49,6 +51,9 @@ export async function fetchScholarUniversities(filters?: {
   const params = new URLSearchParams();
   params.set("view", "hierarchy");
   params.set("entity_type", "organization");
+  if (filters?.include_departments === false) {
+    params.set("include_departments", "false");
+  }
   if (filters?.region) params.set("region", filters.region);
   if (filters?.affiliation_type)
     params.set("org_type", filters.affiliation_type);
@@ -70,6 +75,7 @@ export async function fetchScholarUniversities(filters?: {
       institution_id: String(inst.id ?? "").trim() || undefined,
       university: String(inst.name ?? "").trim(),
       scholar_count: inst.scholar_count || 0,
+      department_count: inst.department_count ?? inst.departments?.length ?? 0,
       departments: (inst.departments ?? []).map((dept) => ({
         id: String(dept.id ?? "").trim() || undefined,
         name: String(dept.name ?? "").trim(),
@@ -90,6 +96,23 @@ export async function fetchScholarUniversities(filters?: {
   } finally {
     scholarUniversityInFlight.delete(cacheKey);
   }
+}
+
+export async function fetchScholarUniversityDepartments(
+  institutionId: string,
+): Promise<ScholarUniversityItem["departments"]> {
+  const res = await fetch(
+    `${BASE_URL}/api/institutions/${encodeURIComponent(institutionId)}/departments`,
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to fetch institution departments: ${res.status}`);
+  }
+  const data = (await res.json()) as BackendInstitutionDepartmentsResponse;
+  return (data.departments ?? []).map((dept) => ({
+    id: String(dept.id ?? "").trim() || undefined,
+    name: String(dept.name ?? "").trim(),
+    scholar_count: dept.scholar_count || 0,
+  }));
 }
 
 // ====== Scholar list ======

@@ -91,6 +91,21 @@ const COLUMN_MAPPINGS = {
     grantor: ["授予机构", "颁奖单位", "grantor"],
     description: ["描述", "说明", "description"],
   },
+  education: {
+    degree: ["学位", "学历", "degree", "education_degree"],
+    institution: ["院校", "学校", "毕业院校", "培养院校", "教育机构", "institution", "school", "university"],
+    major: ["专业", "研究方向", "学科", "major", "field", "discipline"],
+    startYear: ["起始年份", "开始年份", "入学年份", "开始时间", "start_year", "start", "from", "year"],
+    endYear: ["结束年份", "毕业年份", "结束时间", "end_year", "end", "to"],
+  },
+  publication: {
+    title: ["论文标题", "成果名称", "标题", "题名", "title", "paper_title", "publication_title"],
+    venue: ["会议期刊", "会议/期刊", "期刊会议", "期刊", "会议", "发表 venue", "venue", "journal", "conference"],
+    year: ["年份", "发表年份", "出版年份", "publication_year", "year"],
+    authors: ["作者", "论文作者", "authors", "author_list"],
+    url: ["论文链接", "成果链接", "链接", "url", "doi", "paper_url"],
+    citationCount: ["引用数", "引用次数", "被引次数", "citation_count", "citations"],
+  },
   // Activity fields
   activity: {
     title: ["讲座标题", "活动标题", "标题", "title", "topic"],
@@ -206,6 +221,8 @@ function detectColumnMapping(
 function detectDataType(headers: string[]): keyof typeof COLUMN_MAPPINGS {
   const scores: Record<keyof typeof COLUMN_MAPPINGS, number> = {
     scholar: 0,
+    education: 0,
+    publication: 0,
     activity: 0,
     institution: 0,
     project: 0,

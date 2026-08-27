@@ -10,17 +10,10 @@ export interface StudentRecord {
   major: string;
   degree_type: string;
   enrollment_year: string;
-  expected_graduation_year: string;
-  entry_date?: string;
-  paper_date_floor?: string;
   status: string;
   email: string;
   phone: string;
-  notes: string;
   mentor_name: string;
-  added_by: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface StudentListResponse {
@@ -40,13 +33,9 @@ export interface StudentCreatePayload {
   major?: string;
   degree_type?: string;
   enrollment_year?: string;
-  expected_graduation_year?: string;
-  entry_date?: string;
-  paper_date_floor?: string;
   status?: string;
   email?: string;
   phone?: string;
-  notes?: string;
   added_by?: string;
 }
 
@@ -59,13 +48,9 @@ export interface StudentUpdatePayload {
   major?: string;
   degree_type?: string;
   enrollment_year?: string;
-  expected_graduation_year?: string;
-  entry_date?: string;
-  paper_date_floor?: string;
   status?: string;
   email?: string;
   phone?: string;
-  notes?: string;
   updated_by?: string;
 }
 
@@ -241,15 +226,32 @@ export async function fetchStudentListAll(
   filters: StudentListFilters = {},
   signal?: AbortSignal,
 ): Promise<StudentRecord[]> {
-  const pageSize = Math.max(1, Math.min(filters.page_size ?? 500, 500));
-  const firstPage = await fetchStudentList(
-    {
-      ...filters,
-      page: 1,
-      page_size: pageSize,
-    },
-    signal,
-  );
+  // Keep requests below the backend's largest response size. A transient
+  // connection reset must not turn the whole student dataset into an empty list.
+  const pageSize = Math.max(1, Math.min(filters.page_size ?? 200, 200));
+  const fetchPageWithRetry = async (page: number): Promise<StudentListResponse> => {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (signal?.aborted) throw new DOMException("The operation was aborted", "AbortError");
+      try {
+        return await fetchStudentList(
+          {
+            ...filters,
+            page,
+            page_size: pageSize,
+          },
+          signal,
+        );
+      } catch (error) {
+        lastError = error;
+        if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
+        if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)));
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error("Failed to fetch all students");
+  };
+
+  const firstPage = await fetchPageWithRetry(1);
 
   const items = [...(firstPage.items ?? [])];
   const totalPages = Math.max(firstPage.total_pages || 1, 1);
@@ -257,14 +259,7 @@ export async function fetchStudentListAll(
 
   for (let page = 2; page <= totalPages; page += 1) {
     if (signal?.aborted) break;
-    const nextPage = await fetchStudentList(
-      {
-        ...filters,
-        page,
-        page_size: pageSize,
-      },
-      signal,
-    );
+    const nextPage = await fetchPageWithRetry(page);
     items.push(...(nextPage.items ?? []));
   }
 

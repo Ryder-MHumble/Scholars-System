@@ -102,6 +102,7 @@ export function InstitutionCreateModal({
         const cleanData: InstitutionCreateRequest = {
           id: instId,
           name: institutionForm.name.trim(),
+          entity_type: "organization",
           type: "university",
         };
 
@@ -149,6 +150,7 @@ export function InstitutionCreateModal({
           await createInstitution({
             id: `${departmentForm.parentInstitutionId}_dept_${ts}_${i}`,
             name: depts[i],
+            entity_type: "department",
             type: "department",
             parent_id: departmentForm.parentInstitutionId,
           });

@@ -40,6 +40,7 @@ export function DepartmentAutocomplete({
   const [departments, setDepartments] = useState<string[]>([]);
   const [highlightIdx, setHighlightIdx] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load departments when university changes
   useEffect(() => {
@@ -48,14 +49,24 @@ export function DepartmentAutocomplete({
       return;
     }
 
+    const controller = new AbortController();
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = controller;
     setLoading(true);
-    getDepartmentsForUniversity(university)
-      .then(setDepartments)
-      .catch((error) => {
-        console.error("Failed to load departments:", error);
-        setDepartments([]);
+    getDepartmentsForUniversity(university, controller.signal)
+      .then((nextDepartments) => {
+        if (!controller.signal.aborted) setDepartments(nextDepartments);
       })
-      .finally(() => setLoading(false));
+      .catch((error) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("Failed to load departments:", error);
+          setDepartments([]);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [university]);
 
   // Click outside to close

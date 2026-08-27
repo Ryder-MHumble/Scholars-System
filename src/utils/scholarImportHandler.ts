@@ -193,6 +193,33 @@ function parseBasicInfo(data: Record<string, string>): ScholarDetailPatch {
   return patch;
 }
 
+function getCell(
+  row: Record<string, string>,
+  aliases: string[],
+): string | undefined {
+  for (const alias of aliases) {
+    const direct = row[alias];
+    if (direct !== undefined && String(direct).trim()) {
+      return String(direct).trim();
+    }
+    const matchedKey = Object.keys(row).find(
+      (key) => key.toLowerCase().trim() === alias.toLowerCase().trim(),
+    );
+    if (matchedKey && String(row[matchedKey] ?? "").trim()) {
+      return String(row[matchedKey]).trim();
+    }
+  }
+  return undefined;
+}
+
+function parseOptionalInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const match = value.match(/\d+/);
+  if (!match) return undefined;
+  const parsed = Number.parseInt(match[0], 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 /**
  * Parse education records from imported data
  */
@@ -201,11 +228,33 @@ function parseEducationRecords(
 ): EducationRecord[] {
   return data
     .map((row) => ({
-      degree: row["学位"] || row["degree"],
-      institution: row["院校"] || row["institution"],
-      major: row["专业"] || row["major"],
-      year: row["起始年份"] || row["start_year"],
-      end_year: row["结束年份"] || row["end_year"],
+      degree: getCell(row, ["学位", "学历", "degree"]),
+      institution: getCell(row, [
+        "院校",
+        "学校",
+        "毕业院校",
+        "培养院校",
+        "institution",
+        "school",
+        "university",
+      ]),
+      major: getCell(row, ["专业", "研究方向", "学科", "major", "field"]),
+      year: getCell(row, [
+        "起始年份",
+        "开始年份",
+        "入学年份",
+        "开始时间",
+        "startYear",
+        "start_year",
+        "year",
+      ]),
+      end_year: getCell(row, [
+        "结束年份",
+        "毕业年份",
+        "结束时间",
+        "endYear",
+        "end_year",
+      ]),
     }))
     .filter((edu) => edu.degree || edu.institution); // Filter out completely empty rows
 }
@@ -218,12 +267,23 @@ function parsePublicationRecords(
 ): PublicationRecord[] {
   return data
     .map((row) => ({
-      title: row["标题"] || row["title"],
-      venue: row["会议期刊"] || row["venue"],
-      year: row["年份"] || row["year"],
-      authors: row["作者"] || row["authors"],
-      url: row["论文链接"] || row["url"],
-      citation_count: row["引用数"] ? parseInt(row["引用数"], 10) : undefined,
+      title: getCell(row, ["论文标题", "标题", "题名", "title"]),
+      venue: getCell(row, [
+        "会议期刊",
+        "会议/期刊",
+        "期刊会议",
+        "期刊",
+        "会议",
+        "venue",
+        "journal",
+        "conference",
+      ]),
+      year: getCell(row, ["年份", "发表年份", "出版年份", "year"]),
+      authors: getCell(row, ["作者", "论文作者", "authors"]),
+      url: getCell(row, ["论文链接", "链接", "url", "doi"]),
+      citation_count: parseOptionalInt(
+        getCell(row, ["引用数", "引用次数", "被引次数", "citationCount", "citation_count"]),
+      ),
     }))
     .filter((pub) => pub.title || pub.venue); // Filter out completely empty rows
 }

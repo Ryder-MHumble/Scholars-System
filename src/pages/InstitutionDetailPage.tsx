@@ -381,32 +381,8 @@ function applyUnifiedScholarCounts(
     };
   });
 
-  const existingDeptIds = new Set(mergedDepartments.map((dept) => dept.id).filter(Boolean));
-  const existingDeptNames = new Set(
-    mergedDepartments
-      .map((dept) => normalizeName(dept.name))
-      .filter((name) => name.length > 0),
-  );
-
-  for (const dept of matchedHierarchy.departments ?? []) {
-    const deptName = String(dept.name ?? "").trim();
-    if (!deptName) continue;
-    if (dept.id && existingDeptIds.has(dept.id)) continue;
-    if (existingDeptNames.has(normalizeName(deptName))) continue;
-
-    mergedDepartments.push({
-      id: dept.id ?? `${institution.id}::${deptName}`,
-      name: deptName,
-      org_name: null,
-      parent_id: institution.id,
-      scholar_count: dept.scholar_count,
-      sources: [],
-    });
-  }
-
   return {
     ...institution,
-    scholar_count: matchedHierarchy.scholar_count,
     departments: mergedDepartments,
   };
 }
@@ -461,19 +437,27 @@ export default function InstitutionDetailPage() {
     if (showPageLoading) setLoading(true);
     setLeadershipLoading(true);
     try {
-      const [institutionDetail, leadershipDetail, hierarchyOrganizations] =
-        await Promise.all([
-          fetchInstitutionDetail(institutionId),
-          fetchInstitutionLeadership(institutionId).catch(() => null),
-          fetchScholarUniversities().catch(() => [] as ScholarUniversityItem[]),
-        ]);
-      setInstitution(
-        applyUnifiedScholarCounts(institutionDetail, hierarchyOrganizations),
-      );
-      setLeadership(leadershipDetail);
+      const institutionDetail = await fetchInstitutionDetail(institutionId);
+      setInstitution(institutionDetail);
+      if (showPageLoading) setLoading(false);
+
+      void fetchInstitutionLeadership(institutionId)
+        .then(setLeadership)
+        .catch(() => setLeadership(null))
+        .finally(() => setLeadershipLoading(false));
+
+      if ((institutionDetail.departments?.length ?? 0) > 0) {
+        void fetchScholarUniversities()
+          .then((hierarchyOrganizations) => {
+            setInstitution((current) => {
+              if (!current || current.id !== institutionId) return current;
+              return applyUnifiedScholarCounts(current, hierarchyOrganizations);
+            });
+          })
+          .catch(() => undefined);
+      }
     } catch {
       setInstitution(null);
-    } finally {
       if (showPageLoading) setLoading(false);
       setLeadershipLoading(false);
     }
@@ -1047,11 +1031,8 @@ function HeroHeader({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="relative overflow-hidden rounded-2xl border border-blue-900/30 bg-gradient-to-br from-[#0b1633] via-[#152a59] to-[#2452b8] text-white shadow-[0_24px_60px_-36px_rgba(20,45,110,0.75)]"
+      className="relative overflow-hidden rounded-2xl bg-[#102a56] text-white shadow-[0_24px_60px_-36px_rgba(20,45,110,0.75)]"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(125,211,252,0.20),transparent_38%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_0%,rgba(96,165,250,0.34),transparent_46%)]" />
-      <div className="absolute -right-16 -bottom-20 w-80 h-80 rounded-full bg-cyan-300/15 blur-3xl" />
       <div className="relative p-4 md:p-5">
         <div className="flex items-center justify-between gap-3">
           <button
@@ -1077,44 +1058,38 @@ function HeroHeader({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(500px,560px)] gap-4">
-          <div className="rounded-2xl border border-white/15 bg-white/5 p-4 md:p-5">
-            <div className="flex items-start gap-4">
-              <UniversityLogo
-                name={institution.name}
-                id={institution.id}
-                avatar={institution.avatar}
-                onEditAvatar={onEdit}
-              />
-              <div className="min-w-0 flex-1">
-                <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
-                  {institution.name}
-                </h1>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-sm text-slate-300">
-                  {institution.org_name && <span className="font-medium">{institution.org_name}</span>}
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/10 text-xs border border-white/10 text-slate-100">
-                    ID: {institution.id}
-                  </span>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {institution.category && <CategoryBadge label={institution.category} />}
-                  {institution.priority && <PriorityBadge label={institution.priority} />}
-                  {institution.classification && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-white/20 bg-white/10 text-slate-100">
-                      {institution.classification}
-                    </span>
-                  )}
-                </div>
+        <div className="mt-4 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(460px,0.9fr)] gap-5 xl:gap-8 items-center">
+          <div className="flex items-start gap-4 md:gap-5 min-w-0">
+            <UniversityLogo
+              name={institution.name}
+              id={institution.id}
+              avatar={institution.avatar}
+              onEditAvatar={onEdit}
+            />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
+                {institution.name}
+              </h1>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-300">
+                {institution.org_name && <span className="font-medium">{institution.org_name}</span>}
+                <span className="text-xs text-blue-100/70">ID: {institution.id}</span>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {institution.category && <CategoryBadge label={institution.category} />}
+                {institution.priority && <PriorityBadge label={institution.priority} />}
+                {institution.classification && (
+                  <span className="text-xs font-semibold text-blue-100">{institution.classification}</span>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/15 bg-slate-950/18 backdrop-blur-sm p-3 md:p-3.5">
+          <div className="border-t border-white/15 pt-4 xl:border-t-0 xl:border-l xl:pl-7 xl:pt-0">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-[11px] md:text-xs text-blue-100/90 font-medium">核心数据总览</p>
               <p className="text-[10px] md:text-[11px] text-blue-100/70">点击指标可直接进入筛选</p>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 divide-x divide-white/15">
               <HeroMetricCard
                 icon={Users}
                 label="学者"
@@ -1167,14 +1142,14 @@ function HeroMetricCard({
   onClick?: () => void;
 }) {
   const baseClass =
-    "rounded-xl border px-3 py-2.5 text-left transition-all duration-150 bg-white/10 border-white/15";
+    "px-3 py-2.5 text-left transition-all duration-150 first:pl-0 last:pr-0";
 
   if (clickable && onClick) {
     return (
       <button
         type="button"
         onClick={onClick}
-        className={`${baseClass} hover:bg-white/18 hover:border-white/35 hover:shadow-[0_10px_25px_-18px_rgba(165,203,255,0.9)]`}
+        className={`${baseClass} hover:bg-white/10`}
       >
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] md:text-xs text-slate-100/80 font-semibold">{label}</span>

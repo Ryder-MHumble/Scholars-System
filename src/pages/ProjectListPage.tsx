@@ -87,6 +87,7 @@ export default function ProjectListPage() {
     activeDept,
     handleSelectUni,
     handleSelectDept,
+    loadUniversityDepartments,
     setQuery,
     searchInput,
     setSearchInput,
@@ -147,6 +148,7 @@ export default function ProjectListPage() {
             activeDept={activeDept}
             onSelectUni={handleSelectUni}
             onSelectDept={handleSelectDept}
+            onLoadDepartments={loadUniversityDepartments}
             loading={uniLoading}
           />
         </div>
