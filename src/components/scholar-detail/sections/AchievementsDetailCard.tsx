@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { BookOpen, Award, Trophy, ExternalLink, Edit3, FileText } from "lucide-react";
-import type { ScholarDetail, AwardRecord } from "@/services/scholarApi";
+import type {
+  ScholarDetail,
+  AwardRecord,
+  JointProject,
+} from "@/services/scholarApi";
 import { cn } from "@/utils/cn";
 import { slideInUp } from "@/utils/animations";
 import {
@@ -30,8 +34,8 @@ export function AchievementsDetailCard({
     (tag) => getAchievementTagKind(tag) === "competition",
   );
   const allAwards = scholar.awards ?? [];
-  const grantsOnly = allAwards.filter((a) => a.level === "Grant");
   const awardsOnly = allAwards.filter((a) => a.level !== "Grant");
+  const projects = scholar.joint_research_projects ?? [];
   const tabs = [
     {
       key: "publications" as const,
@@ -54,7 +58,7 @@ export function AchievementsDetailCard({
     {
       key: "grants" as const,
       label: "科研项目",
-      count: grantsOnly.length,
+      count: projects.length,
       icon: FileText,
     },
   ];
@@ -110,7 +114,7 @@ export function AchievementsDetailCard({
       {activeTab === "publications" && <PublicationsSection scholar={scholar} />}
       {activeTab === "patents" && <PatentsSection scholar={scholar} />}
       {activeTab === "awards" && <AwardsSection awards={awardsOnly} />}
-      {activeTab === "grants" && <GrantsSection grants={grantsOnly} />}
+      {activeTab === "grants" && <GrantsSection grants={projects} />}
     </motion.div>
   );
 }
@@ -413,7 +417,7 @@ function AwardsSection({
 function GrantsSection({
   grants,
 }: {
-  grants: AwardRecord[];
+  grants: JointProject[];
 }) {
   return (
     <div className="mb-1">
@@ -436,14 +440,17 @@ function GrantsSection({
                   <p className="text-sm font-medium text-gray-800 leading-snug">
                     {grant.title || "项目"}
                   </p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {grant.grantor && (
-                    <span className="bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 text-blue-600">
-                      {grant.grantor}
+                  {grant.year && (
+                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                      {grant.year}
                     </span>
                   )}
                 </div>
+                {grant.description && (
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    {grant.description}
+                  </p>
+                )}
               </div>
             </div>
           ))}

@@ -154,6 +154,13 @@ export async function createScholar(
     } catch {
       // ignore non-json response
     }
+    if (res.status === 409) {
+      throw new Error(
+        detail
+          ? `学者已存在，${detail.replace(/^Scholar already exists with url_hash:\s*/i, "已有记录 ID：")}`
+          : "学者已存在，请检查姓名、机构和联系方式",
+      );
+    }
     throw new Error(
       detail
         ? `Failed to create scholar: ${res.status} (${detail})`

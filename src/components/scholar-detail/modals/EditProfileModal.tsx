@@ -118,7 +118,7 @@ export function EditProfileModal({
   const addEducationItem = () => {
     setEditedEducation((prev) => [
       ...prev,
-      { degree: "", institution: "", major: "", year: "", end_year: "" },
+      { degree: "", institution: "", department: "", major: "", year: "", end_year: "" },
     ]);
   };
 
@@ -140,9 +140,13 @@ export function EditProfileModal({
     setEditedManagementRoles((prev) => [...prev, { role: "", organization: "", start_year: "", end_year: "" }]);
   };
 
-  const updateRoleItem = (index: number, value: string) => {
+  const updateRoleItem = (
+    index: number,
+    key: keyof ManagementRole,
+    value: string,
+  ) => {
     setEditedManagementRoles((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, role: value } : item)),
+      prev.map((item, i) => (i === index ? { ...item, [key]: value } : item)),
     );
   };
 
@@ -680,12 +684,19 @@ export function EditProfileModal({
                           onChange={(v) => updateEducationItem(index, "institution", v)}
                         />
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <FieldCompact
+                          label="院系/学院"
+                          value={String(item.department ?? "")}
+                          onChange={(v) => updateEducationItem(index, "department", v)}
+                        />
                         <FieldCompact
                           label="专业"
                           value={String(item.major ?? "")}
                           onChange={(v) => updateEducationItem(index, "major", v)}
                         />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
                         <FieldCompact
                           label="起始年份"
                           value={String(item.year ?? "")}
@@ -718,7 +729,7 @@ export function EditProfileModal({
                   value={educationBatchText}
                   onChange={(e) => handleEducationBatchTextChange(e.target.value)}
                   rows={4}
-                  placeholder={"示例：\n2015-2019 清华大学 本科 数学\n2019-2024 北京大学 博士 计算机科学"}
+                  placeholder={"示例：\n2015-2019 清华大学 本科 数学\n2019.9 - 2025.6 清华大学 交叉信息研究院 计算机科学与技术 博士"}
                   className={TEXTAREA_CLASS}
                 />
                 <div className="mt-2">
@@ -751,13 +762,34 @@ export function EditProfileModal({
                   editedManagementRoles.map((item, index) => (
                     <div
                       key={`role-${index}`}
-                      className="rounded-xl border border-slate-200 bg-white p-2 flex items-center gap-2"
+                      className="rounded-xl border border-slate-200 bg-white p-2 grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_5rem_5rem_auto] items-center gap-2"
                     >
                       <input
                         type="text"
                         value={item.role || ""}
-                        onChange={(e) => updateRoleItem(index, e.target.value)}
+                        onChange={(e) => updateRoleItem(index, "role", e.target.value)}
                         placeholder="输入任职经历"
+                        className={INPUT_CLASS}
+                      />
+                      <input
+                        type="text"
+                        value={item.organization || ""}
+                        onChange={(e) => updateRoleItem(index, "organization", e.target.value)}
+                        placeholder="机构"
+                        className={INPUT_CLASS}
+                      />
+                      <input
+                        type="text"
+                        value={item.start_year || ""}
+                        onChange={(e) => updateRoleItem(index, "start_year", e.target.value)}
+                        placeholder="开始"
+                        className={INPUT_CLASS}
+                      />
+                      <input
+                        type="text"
+                        value={item.end_year || ""}
+                        onChange={(e) => updateRoleItem(index, "end_year", e.target.value)}
+                        placeholder="结束"
                         className={INPUT_CLASS}
                       />
                       <button

@@ -22,7 +22,7 @@ export function EditEducationModal({
   const addRecord = () => {
     setRecords((prev) => [
       ...prev,
-      { degree: "", institution: "", major: "", year: "", end_year: "" },
+      { degree: "", institution: "", department: "", major: "", year: "", end_year: "" },
     ]);
   };
 
@@ -114,6 +114,12 @@ export function EditEducationModal({
                 className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
               />
               <input
+                value={rec.department?.toString() || ""}
+                onChange={(e) => updateRecord(i, "department", e.target.value)}
+                placeholder="院系/学院"
+                className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              />
+              <input
                 value={rec.major?.toString() || ""}
                 onChange={(e) => updateRecord(i, "major", e.target.value)}
                 placeholder="专业方向"
@@ -136,6 +142,7 @@ export function EditEducationModal({
                 </p>
                 <p className="text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded leading-relaxed text-[11px]">
                   2015-02至2018-04, 美国明尼苏达大学, 电子与计算机工程, 博士
+                  2019.9 - 2025.6 清华大学 交叉信息研究院 计算机科学与技术 博士
                   <br />
                   2006/11 to 2009/10 Bonn University PhD in Mathematical Physics
                   <br />

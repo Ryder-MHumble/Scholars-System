@@ -291,6 +291,11 @@ export function DetailLeftSidebar({
                     <p className="text-sm font-semibold text-gray-800 leading-snug break-words">
                       {edu.institution || "院校"}
                     </p>
+                    {edu.department && (
+                      <p className="text-xs text-gray-500 break-words">
+                        {edu.department}
+                      </p>
+                    )}
                     <div className="flex flex-wrap gap-1.5">
                       {edu.degree && (
                         <span className="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700">
@@ -318,7 +323,15 @@ export function DetailLeftSidebar({
               {scholar.joint_management_roles.map((role, i) => (
                 <div key={i} className="relative pl-5">
                   <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
-                  <p className="text-sm text-gray-700">{role.role}</p>
+                  <p className="text-sm text-gray-700">{role.role || "任职经历"}</p>
+                  {role.organization && (
+                    <p className="text-xs text-gray-500">{role.organization}</p>
+                  )}
+                  {(role.start_year || role.end_year) && (
+                    <p className="text-[11px] text-gray-400">
+                      {formatRoleYears(role)}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -363,6 +376,15 @@ function formatEducationYears(
 ): string {
   const start = String(edu.year || "").trim();
   const end = String(edu.end_year || "").trim();
+  if (start && end) return `${start}-${end}`;
+  return start || end || "";
+}
+
+function formatRoleYears(
+  role: NonNullable<ScholarDetail["joint_management_roles"]>[number],
+): string {
+  const start = String(role.start_year || "").trim();
+  const end = String(role.end_year || "").trim();
   if (start && end) return `${start}-${end}`;
   return start || end || "";
 }

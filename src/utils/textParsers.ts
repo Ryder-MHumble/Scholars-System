@@ -6,6 +6,7 @@ import type {
   ManagementRole,
   JointProject,
 } from "@/services/scholarApi";
+import { DOMAIN_MAP } from "@/utils/institutionLogoUtils";
 
 // ─── Publication Parser ──────────────────────────────────────────────────────
 //
@@ -42,7 +43,7 @@ export function parsePublicationsFromText(text: string): PublicationRecord[] {
   const stripListPrefix = (line: string): string =>
     line
       .replace(/^\s*\[\d+\]\s*/, "")
-      .replace(/^\s*\d+[.)、]\s*/, "")
+      .replace(/^\s*\d{1,3}[.)、]\s*/, "")
       .replace(/^[•·]\s*/, "")
       .trim();
 
@@ -246,7 +247,8 @@ export function parseEducationFromText(text: string): EducationRecord[] {
     { re: /\bPostdoc(?:toral)?\b|博士后/i, label: "博士后" },
     { re: /\bPh\.?D\.?\b|\bDoctor(?:al|ate)?\b|博士/i, label: "博士" },
     { re: /\bM\.?Sc?\.?\b|\bMaster\b|硕士/i, label: "硕士" },
-    { re: /\bB\.?Sc?\.?\b|\bBachelor\b|学士|本科/i, label: "本科" },
+    { re: /\bB\.?Sc?\.?\b|\bBachelor\b|学士/i, label: "学士" },
+    { re: /本科/i, label: "本科" },
   ];
 
   const normalizeYear = (value: string): string => {
@@ -270,10 +272,47 @@ export function parseEducationFromText(text: string): EducationRecord[] {
     return "";
   };
 
+  const normalizeMajor = (value: string): string => {
+    const major = value.trim();
+    return /^(无专业信息|无专业|暂无专业信息|未提供专业)$/i.test(major)
+      ? ""
+      : major;
+  };
+
+  const splitChineseInstitution = (
+    tokens: string[],
+  ): { institution: string; department: string } => {
+    const combined = tokens.join(" ").trim();
+    if (!combined || !/^[\u3400-\u9fff\s]+$/.test(combined)) {
+      return { institution: combined, department: "" };
+    }
+
+    const institutionNames = Object.keys(DOMAIN_MAP).sort(
+      (a, b) => b.length - a.length,
+    );
+    const institution = institutionNames.find((name) =>
+      combined.replace(/\s+/g, "").startsWith(name),
+    );
+    if (institution) {
+      const compactCombined = combined.replace(/\s+/g, "");
+      return {
+        institution,
+        department: compactCombined.slice(institution.length).trim(),
+      };
+    }
+
+    const fallback = combined
+      .replace(/\s+/g, "")
+      .match(/^(.+?(?:大学|学院))(.+)$/);
+    return fallback
+      ? { institution: fallback[1], department: fallback[2] }
+      : { institution: combined, department: "" };
+  };
+
   const stripListPrefix = (line: string): string =>
     line
       .replace(/^\s*\[\d+\]\s*/, "")
-      .replace(/^\s*\d+[.)、]\s*/, "")
+      .replace(/^\s*\d{1,3}[.)、]\s*/, "")
       .replace(/^[•·]\s*/, "")
       .trim();
 
@@ -308,27 +347,64 @@ export function parseEducationFromText(text: string): EducationRecord[] {
   };
 
   const parseStandardEducationLine = (value: string): EducationRecord | null => {
-    const match = value.match(
-      /^((?:19|20)\d{2}(?:[./-]\d{1,2})?(?:\s*(?:to|TO|至|—|–|-|~|～)\s*(?:(?:19|20)\d{2}(?:[./-]\d{1,2})?|present|now|至今))?)\s+(.+)$/i,
+    const rangeMatch = value.match(
+      /^((?:19|20)\d{2}(?:[./]\d{1,2})?)\s*(?:to|TO|至|—|–|-|~|～)\s*((?:19|20)\d{2}(?:[./]\d{1,2})?|present|now|至今)\s+(.+)$/i,
     );
-    if (!match) return null;
+    const singleMatch = value.match(
+      /^((?:19|20)\d{2}(?:[./]\d{1,2})?)\s+(.+)$/i,
+    );
+    if (!rangeMatch && !singleMatch) return null;
 
-    const date = parseDateToken(match[1]);
+    const date = rangeMatch
+      ? {
+          start: normalizeYear(rangeMatch[1]),
+          end: normalizeYear(rangeMatch[2]),
+        }
+      : parseDateToken(singleMatch?.[1] || "");
     if (!date) return null;
 
-    const tokens = match[2].split(/\s+/).map((s) => s.trim()).filter(Boolean);
+    const tokens = (rangeMatch?.[3] || singleMatch?.[2] || "")
+      .split(/\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
     const degreeIndex = tokens.findIndex((token) => Boolean(detectDegree(token)));
     if (degreeIndex <= 0) return null;
 
     const degreeToken = tokens[degreeIndex];
-    const institution = tokens.slice(0, degreeIndex).join(" ").trim();
-    const major = tokens.slice(degreeIndex + 1).join(" ").trim();
+    const beforeDegree = tokens.slice(0, degreeIndex);
+    const afterDegree = tokens.slice(degreeIndex + 1);
+    let institution = beforeDegree.join(" ").trim();
+    let department = "";
+    let major = normalizeMajor(afterDegree.join(" "));
+
+    const compactInstitution = splitChineseInstitution(beforeDegree);
+    if (beforeDegree.length === 1 && compactInstitution.department) {
+      institution = compactInstitution.institution;
+      department = compactInstitution.department;
+    }
+
+    // Chinese CVs commonly place school, department, major, and degree in order.
+    // Preserve the old whitespace-based format for English or shorter entries.
+    if (
+      !department &&
+      beforeDegree.length >= 3 &&
+      beforeDegree.some((token) => /[\u3400-\u9fff]/.test(token))
+    ) {
+      institution = beforeDegree[0] || "";
+      department = beforeDegree.slice(1, -1).join(" ").trim();
+      major = normalizeMajor(
+        [beforeDegree[beforeDegree.length - 1], ...afterDegree]
+          .filter(Boolean)
+          .join(" "),
+      );
+    }
     if (!institution) return null;
 
     return {
       year: date.start,
       end_year: date.end,
       institution,
+      department,
       degree: detectDegree(degreeToken) || degreeToken,
       major,
     };

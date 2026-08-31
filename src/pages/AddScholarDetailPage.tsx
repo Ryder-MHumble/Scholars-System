@@ -225,6 +225,7 @@ export default function AddScholarDetailPage() {
         research_areas: scholar.research_areas || [],
         academic_titles: scholar.academic_titles || [],
         education: scholar.education || [],
+        joint_research_projects: scholar.joint_research_projects || [],
         publications_count: scholar.publications_count,
         h_index: scholar.h_index,
         citations_count: scholar.citations_count,
@@ -251,8 +252,12 @@ export default function AddScholarDetailPage() {
         });
       }
 
-      if ((scholar.joint_management_roles?.length ?? 0) > 0) {
+      if (
+        (scholar.joint_research_projects?.length ?? 0) > 0 ||
+        (scholar.joint_management_roles?.length ?? 0) > 0
+      ) {
         await patchScholarRelation(created.url_hash, {
+          joint_research_projects: scholar.joint_research_projects,
           joint_management_roles: scholar.joint_management_roles,
         });
       }

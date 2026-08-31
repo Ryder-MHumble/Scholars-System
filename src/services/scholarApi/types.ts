@@ -129,6 +129,7 @@ export interface ScholarDetail extends ScholarListItem {
 export interface EducationRecord {
   degree?: string;
   institution?: string;
+  department?: string;
   major?: string;
   year?: number | string;
   end_year?: number | string;
@@ -450,6 +451,7 @@ export interface ScholarCreate {
   phd_institution?: string;
   phd_year?: string;
   education?: EducationRecord[];
+  joint_research_projects?: JointProject[];
   publications_count?: number;
   h_index?: number;
   citations_count?: number;
