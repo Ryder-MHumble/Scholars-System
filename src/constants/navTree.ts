@@ -13,7 +13,8 @@ export type TabId =
   | "students"
   | "projects"
   | "activities"
-  | "venues";
+  | "venues"
+  | "talent-library";
 
 export interface NavNode {
   id: string;
@@ -25,6 +26,12 @@ export interface NavNode {
 }
 
 export const NAV_TREE: NavNode[] = [
+  {
+    id: "talent-library",
+    label: "人才库",
+    icon: Users,
+    tab: "talent-library",
+  },
   {
     id: "institutions",
     label: "机构",

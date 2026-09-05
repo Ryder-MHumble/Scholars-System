@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-scholars_business}
+      POSTGRES_USER: ${POSTGRES_USER:-scholars}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scholars_local_dev}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - scholars_business_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  scholars_business_postgres:

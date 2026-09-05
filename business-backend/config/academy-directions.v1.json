@@ -1,0 +1,20 @@
+{
+  "version": "2026-09-03",
+  "groups": [
+    {
+      "code": "ai_core_foundations",
+      "label": "AI核心和基础",
+      "subfields": ["AI系统", "大模型", "理论与算法", "具身智能", "AI安全"]
+    },
+    {
+      "code": "ai_natural_sciences",
+      "label": "AI+自然科学",
+      "subfields": ["科学计算", "生命科学", "物质科学"]
+    },
+    {
+      "code": "ai_humanities_social_sciences",
+      "label": "AI+人文社会科学",
+      "subfields": ["教育", "经济金融", "治理与法律"]
+    }
+  ]
+}

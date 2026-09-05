@@ -7,7 +7,16 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "backend:export": "node scripts/export-local-snapshot.mjs",
+    "backend:validate": "node scripts/validate-local-snapshot.mjs",
+    "backend:dev": "node local-backend/server.mjs",
+    "backend:test": "node scripts/test-local-backend.mjs",
+    "business:install": "npm --prefix business-backend install",
+    "business:dev": "npm --prefix business-backend run dev",
+    "business:build": "npm --prefix business-backend run build",
+    "business:test": "npm --prefix business-backend test",
+    "business:migrate": "npm --prefix business-backend run migrate"
   },
   "dependencies": {
     "clsx": "^2.1.1",

@@ -32,6 +32,10 @@ const VenueListPage = lazyWithRetry(
   () => import("./VenueListPage"),
   "VenueListPage",
 );
+const TalentLibraryPage = lazyWithRetry(
+  () => import("./TalentLibraryPage"),
+  "TalentLibraryPage",
+);
 
 const topLevelIds = NAV_TREE.map((n) => n.id);
 
@@ -84,6 +88,8 @@ export default function HomePage() {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case "talent-library":
+        return <TalentLibraryPage />;
       case "institutions":
         return <InstitutionListPage />;
       case "scholars":

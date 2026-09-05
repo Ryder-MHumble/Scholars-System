@@ -1,0 +1,25 @@
+{
+  "name": "scholars-business-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "migrate": "tsx src/cli/migrate.ts",
+    "test": "tsx --test test/*.test.ts",
+    "test:db": "tsx --test test/database.integration.test.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.12.3",
+    "pg": "^8.23.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.15.6",
+    "tsx": "^4.23.13",
+    "typescript": "~5.9.3"
+  }
+}
