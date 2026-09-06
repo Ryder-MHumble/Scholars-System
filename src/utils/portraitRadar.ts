@@ -7,10 +7,19 @@ export interface PortraitRadarDatum {
 
 export function getPortraitRadarData(dimensions: PortraitDimension[]): PortraitRadarDatum[] {
   return dimensions
-    .filter((dimension) => typeof dimension.score === "number" && Number.isFinite(dimension.score))
-    .sort((a, b) => a.display_order - b.display_order)
-    .map((dimension) => ({
+    .map((dimension) => {
+      const rawScore: unknown = dimension.score;
+      const score = typeof rawScore === "number"
+        ? rawScore
+        : typeof rawScore === "string" && rawScore.trim()
+          ? Number(rawScore)
+          : Number.NaN;
+      return { dimension, score };
+    })
+    .filter(({ score }) => Number.isFinite(score))
+    .sort((a, b) => a.dimension.display_order - b.dimension.display_order)
+    .map(({ dimension, score }) => ({
       label: dimension.dimension_label || dimension.dimension_code,
-      score: Math.max(0, Math.min(100, dimension.score as number)),
+      score: Math.max(0, Math.min(100, score)),
     }));
 }

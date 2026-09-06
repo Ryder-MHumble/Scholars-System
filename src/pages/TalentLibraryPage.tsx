@@ -105,6 +105,7 @@ export default function TalentLibraryPage() {
   const [portraitCache, setPortraitCache] = useState<Record<string, PortraitCacheEntry>>({});
   const [portraitLoadingLatest, setPortraitLoadingLatest] = useState(false);
   const portraitCacheRef = useRef(portraitCache);
+  const portraitPrefetchRef = useRef(new Map<string, symbol>());
   portraitCacheRef.current = portraitCache;
 
   useEffect(() => {
@@ -163,13 +164,18 @@ export default function TalentLibraryPage() {
   }, [query, scope, selectedDirection, selectedInstitution, selectedTag, selectedTitle]);
 
   const totalPages = Math.max(Math.ceil(filteredRecords.length / PAGE_SIZE), 1);
-  const visibleRecords = filteredRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visibleRecords = useMemo(
+    () => filteredRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredRecords, page],
+  );
   const visibleSelectedCount = visibleRecords.filter((record) => selectedIds.has(record.id)).length;
   const allVisibleSelected = visibleRecords.length > 0 && visibleSelectedCount === visibleRecords.length;
   const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected;
 
   useEffect(() => {
     const controller = new AbortController();
+    const requestToken = Symbol("portrait-prefetch");
+    const prefetches = portraitPrefetchRef.current;
     const cache = portraitCacheRef.current;
     const unsupported = visibleRecords.filter((record) => isScholar(record) && record.scope === "院内");
     const unsupportedToMark = unsupported.filter((record) => cache[record.id]?.status !== "unsupported");
@@ -180,8 +186,14 @@ export default function TalentLibraryPage() {
         return next;
       });
     }
-    const pending = visibleRecords.filter((record) => !unsupported.includes(record) && !cache[record.id]);
+    const pending = visibleRecords.filter((record) => {
+      if (unsupported.includes(record)) return false;
+      const entry = cache[record.id];
+      return !entry || (entry.status === "loading" && !prefetches.has(record.id));
+    });
     if (!pending.length) return () => controller.abort();
+
+    pending.forEach((record) => prefetches.set(record.id, requestToken));
 
     setPortraitCache((current) => {
       const next = { ...current };
@@ -204,12 +216,33 @@ export default function TalentLibraryPage() {
       if (controller.signal.aborted) return;
       setPortraitCache((current) => {
         const next = { ...current };
-        results.forEach((result) => { if (result) next[result[0]] = result[1]; });
+        results.forEach((result) => {
+          if (!result || prefetches.get(result[0]) !== requestToken) return;
+          prefetches.delete(result[0]);
+          next[result[0]] = result[1];
+        });
         return next;
       });
     });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      const retryableIds = pending
+        .map((record) => record.id)
+        .filter((recordId) => prefetches.get(recordId) === requestToken);
+      retryableIds.forEach((recordId) => prefetches.delete(recordId));
+      if (!retryableIds.length) return;
+      setPortraitCache((current) => {
+        const next = { ...current };
+        let changed = false;
+        retryableIds.forEach((recordId) => {
+          if (next[recordId]?.status !== "loading") return;
+          delete next[recordId];
+          changed = true;
+        });
+        return changed ? next : current;
+      });
+    };
   }, [visibleRecords]);
 
   const filterOptions = useMemo(() => {
@@ -286,6 +319,7 @@ export default function TalentLibraryPage() {
   const startPortrait = async (record: TalentLibraryRecord) => {
     if (isScholar(record) && record.scope === "院内") return;
     const recordId = portraitRecordId(record);
+    portraitPrefetchRef.current.delete(record.id);
     setMenuId(null);
     setPortraitRecord(record);
     setPortraitAssessment(null);
