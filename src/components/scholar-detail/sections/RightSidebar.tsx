@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -12,6 +12,10 @@ import {
   ClipboardList,
   ArrowUpRight,
   Users,
+  Newspaper,
+  Upload,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import {
@@ -25,6 +29,19 @@ import {
   type ScholarDetail,
 } from "@/services/scholarApi";
 import { fetchScholarActivities, type ActivityEvent } from "@/services/activityApi";
+import {
+  createScholarNews,
+  deleteScholarNews,
+  fetchScholarNews,
+  updateScholarNews,
+} from "@/services/scholarResourcesApi";
+import type {
+  ScholarNews,
+  ScholarNewsCreate,
+  ScholarNewsUpdate,
+} from "@/services/scholarApi/types";
+import { EditNewsModal } from "@/components/scholar-detail/modals/EditNewsModal";
+import { NewsBatchImportModal } from "@/components/scholar-detail/modals/NewsBatchImportModal";
 import { SelectInput } from "@/components/ui/SelectInput";
 
 interface Props {
@@ -85,7 +102,15 @@ export function RightSidebar({ scholar }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [scholarActivities, setScholarActivities] = useState<ActivityEvent[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"coauthors" | "activities">(
+  const [activityError, setActivityError] = useState("");
+  const [news, setNews] = useState<ScholarNews[]>([]);
+  const [isNewsLoading, setIsNewsLoading] = useState(true);
+  const [newsError, setNewsError] = useState("");
+  const [newsModal, setNewsModal] = useState<
+    { mode: "create" } | { mode: "edit"; news: ScholarNews } | null
+  >(null);
+  const [showBatchImport, setShowBatchImport] = useState(false);
+  const [activeTab, setActiveTab] = useState<"coauthors" | "news" | "activities">(
     "coauthors",
   );
 
@@ -94,27 +119,41 @@ export function RightSidebar({ scholar }: Props) {
   const coauthors = [...(scholar.coauthors ?? [])].sort(
     (a, b) => b.weight - a.weight,
   );
+  const approvedNews = news
+    .filter((item) => item.review_status === "approved")
+    .sort(
+      (a, b) =>
+        new Date(b.published_at).getTime() - new Date(a.published_at).getTime(),
+    );
+
+  const loadActivities = useCallback(async () => {
+    setIsActivityLoading(true);
+    setActivityError("");
+    try {
+      setScholarActivities(await fetchScholarActivities(scholar.url_hash));
+    } catch (error) {
+      setActivityError(error instanceof Error ? error.message : "学院活动加载失败");
+    } finally {
+      setIsActivityLoading(false);
+    }
+  }, [scholar.url_hash]);
+
+  const loadNews = useCallback(async () => {
+    setIsNewsLoading(true);
+    setNewsError("");
+    try {
+      setNews(await fetchScholarNews(scholar.url_hash));
+    } catch (error) {
+      setNewsError(error instanceof Error ? error.message : "学者 News 加载失败");
+    } finally {
+      setIsNewsLoading(false);
+    }
+  }, [scholar.url_hash]);
 
   useEffect(() => {
-    let isActive = true;
-    setIsActivityLoading(true);
-    fetchScholarActivities(scholar.url_hash)
-      .then((items) => {
-        if (!isActive) return;
-        setScholarActivities(items);
-      })
-      .catch(() => {
-        if (!isActive) return;
-        setScholarActivities([]);
-      })
-      .finally(() => {
-        if (!isActive) return;
-        setIsActivityLoading(false);
-      });
-    return () => {
-      isActive = false;
-    };
-  }, [scholar.url_hash]);
+    void loadActivities();
+    void loadNews();
+  }, [loadActivities, loadNews]);
 
   useEffect(() => {
     if (!isAdjunctSupervisor) {
@@ -199,6 +238,27 @@ export function RightSidebar({ scholar }: Props) {
     }
   };
 
+  const handleNewsSubmit = async (
+    payload: ScholarNewsCreate | ScholarNewsUpdate,
+  ) => {
+    if (newsModal?.mode === "edit") {
+      await updateScholarNews(scholar.url_hash, newsModal.news.id, payload);
+    } else {
+      await createScholarNews(scholar.url_hash, payload as ScholarNewsCreate);
+    }
+    await loadNews();
+  };
+
+  const handleNewsDelete = async (item: ScholarNews) => {
+    if (!window.confirm(`确认删除“${item.title}”？`)) return;
+    try {
+      await deleteScholarNews(scholar.url_hash, item.id);
+      await loadNews();
+    } catch (error) {
+      setNewsError(error instanceof Error ? error.message : "删除学者 News 失败");
+    }
+  };
+
   return (
     <aside className="w-80 shrink-0 space-y-4">
       {/* Scholar Activities Card */}
@@ -210,11 +270,13 @@ export function RightSidebar({ scholar }: Props) {
       >
         <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
           <ClipboardList className="w-4 h-4 text-primary-600" />
-          <h3 className="text-sm font-semibold text-gray-900">学者活动</h3>
+          <h3 className="text-sm font-semibold text-gray-900">学者关系</h3>
           <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
             {activeTab === "coauthors"
               ? `${coauthors.length} 人`
-              : `${scholarActivities.length} 条`}
+              : activeTab === "news"
+                ? `${approvedNews.length} 条`
+                : `${scholarActivities.length} 条`}
           </span>
         </div>
 
@@ -235,16 +297,29 @@ export function RightSidebar({ scholar }: Props) {
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab("news")}
+              className={cn(
+                "inline-flex items-center gap-1 px-2 py-2 text-xs rounded-t-lg border-b-2 transition-colors",
+                activeTab === "news"
+                  ? "text-primary-700 border-primary-600 bg-primary-50/40"
+                  : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
+              )}
+            >
+              <Newspaper className="w-3.5 h-3.5" />
+              <span>学者 News</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab("activities")}
               className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-lg border-b-2 transition-colors",
+                "inline-flex items-center gap-1 px-2 py-2 text-xs rounded-t-lg border-b-2 transition-colors",
                 activeTab === "activities"
                   ? "text-primary-700 border-primary-600 bg-primary-50/40"
                   : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
               )}
             >
               <ClipboardList className="w-3.5 h-3.5" />
-              <span>学者活动</span>
+              <span>学院活动</span>
             </button>
           </div>
         </div>
@@ -327,9 +402,119 @@ export function RightSidebar({ scholar }: Props) {
                 <p className="text-sm text-gray-400">暂无合作学者</p>
               </div>
             )
+          ) : activeTab === "news" ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-end gap-1 border-b border-gray-100 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setNewsModal({ mode: "create" })}
+                  title="新增学者 News"
+                  aria-label="新增学者 News"
+                  className="rounded p-1.5 text-gray-500 hover:bg-primary-50 hover:text-primary-700"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBatchImport(true)}
+                  title="批量导入"
+                  aria-label="批量导入"
+                  className="rounded p-1.5 text-gray-500 hover:bg-primary-50 hover:text-primary-700"
+                >
+                  <Upload className="h-4 w-4" />
+                </button>
+              </div>
+              {isNewsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-300" />
+                </div>
+              ) : newsError ? (
+                <div className="flex flex-col items-center gap-2 py-7 text-center">
+                  <AlertCircle className="h-6 w-6 text-red-300" />
+                  <p className="text-xs text-red-600">{newsError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void loadNews()}
+                    aria-label="重试学者 News"
+                    className="inline-flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                  >
+                    <RefreshCw className="h-3 w-3" /> 重试
+                  </button>
+                </div>
+              ) : approvedNews.length > 0 ? (
+                approvedNews.map((item) => (
+                  <article key={item.id} className="rounded-lg border border-gray-100 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p data-testid="news-title" className="text-sm font-medium text-gray-900">
+                          {item.title}
+                        </p>
+                        <p className="mt-1 text-[11px] text-gray-400">
+                          {new Date(item.published_at).toLocaleDateString("zh-CN")}
+                          {item.news_type ? ` · ${item.news_type}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setNewsModal({ mode: "edit", news: item })}
+                          title="编辑 News"
+                          aria-label={`编辑 ${item.title}`}
+                          className="rounded p-1 text-gray-400 hover:bg-primary-50 hover:text-primary-600"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleNewsDelete(item)}
+                          title="删除 News"
+                          aria-label={`删除 ${item.title}`}
+                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    {(item.summary || item.content) && (
+                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-gray-600">
+                        {item.summary || item.content}
+                      </p>
+                    )}
+                    {item.source_url && (
+                      <a
+                        href={item.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
+                      >
+                        查看来源 <ArrowUpRight className="h-3 w-3" />
+                      </a>
+                    )}
+                  </article>
+                ))
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-8">
+                  <Newspaper className="h-8 w-8 text-gray-200" />
+                  <p className="text-sm text-gray-400">暂无学者 News</p>
+                </div>
+              )}
+            </div>
           ) : isActivityLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
+            </div>
+          ) : activityError ? (
+            <div className="flex flex-col items-center gap-2 py-7 text-center">
+              <AlertCircle className="h-6 w-6 text-red-300" />
+              <p className="text-xs text-red-600">{activityError}</p>
+              <button
+                type="button"
+                onClick={() => void loadActivities()}
+                aria-label="重试学院活动"
+                className="inline-flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+              >
+                <RefreshCw className="h-3 w-3" /> 重试
+              </button>
             </div>
           ) : scholarActivities.length > 0 ? (
             <div className="space-y-3">
@@ -366,7 +551,7 @@ export function RightSidebar({ scholar }: Props) {
           ) : (
             <div className="flex flex-col items-center gap-2 py-8">
               <ClipboardList className="w-8 h-8 text-gray-200" />
-              <p className="text-sm text-gray-400">暂无关联活动</p>
+              <p className="text-sm text-gray-400">暂无学院活动</p>
             </div>
           )}
         </div>
@@ -496,6 +681,20 @@ export function RightSidebar({ scholar }: Props) {
           </div>
         </motion.div>
       )}
+
+      {newsModal && (
+        <EditNewsModal
+          news={newsModal.mode === "edit" ? newsModal.news : undefined}
+          onClose={() => setNewsModal(null)}
+          onSubmit={handleNewsSubmit}
+        />
+      )}
+      <NewsBatchImportModal
+        isOpen={showBatchImport}
+        scholarRef={scholar.url_hash}
+        onClose={() => setShowBatchImport(false)}
+        onSuccess={() => void loadNews()}
+      />
     </aside>
   );
 }
