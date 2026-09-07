@@ -216,6 +216,122 @@ export interface AwardRecord {
   added_by?: string;
 }
 
+export type ScholarMatchStatus = "matched" | "pending_match" | "unmatched";
+export type ScholarNewsReviewStatus = "pending" | "approved" | "rejected";
+export type BatchRowStatus =
+  | "created"
+  | "updated"
+  | "skipped"
+  | "pending_match"
+  | "failed";
+
+export interface ScholarResourceProvenance {
+  source_url?: string | null;
+  source_type?: string | null;
+  source_record_id?: string | null;
+  evidence?: Record<string, unknown>;
+  added_by?: string;
+}
+
+export interface ScholarResourceRecord {
+  id: string;
+  scholar_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScholarNewsCreate extends ScholarResourceProvenance {
+  title: string;
+  summary?: string | null;
+  content?: string | null;
+  news_type?: string | null;
+  published_at: string;
+  event_id?: string | null;
+  source_id?: string | null;
+  extraction_id?: string | null;
+  raw_payload?: Record<string, unknown>;
+  match_status?: ScholarMatchStatus;
+  match_method?: string | null;
+  match_confidence?: number | null;
+  matched_by?: string | null;
+  matched_at?: string | null;
+  review_status?: ScholarNewsReviewStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+  content_fingerprint?: string | null;
+}
+
+export type ScholarNewsUpdate = Partial<ScholarNewsCreate>;
+export type ScholarNews = ScholarNewsCreate & ScholarResourceRecord;
+export type ScholarNewsBatchRow = Partial<ScholarNewsCreate> & {
+  scholar_id?: string;
+  name?: string;
+  institution?: string;
+};
+
+export interface ResearchProjectCreate extends ScholarResourceProvenance {
+  name: string;
+  role?: string | null;
+  organization?: string | null;
+  project_type?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status?: string | null;
+  description?: string | null;
+}
+
+export type ResearchProjectUpdate = Partial<ResearchProjectCreate>;
+export type ResearchProject = ResearchProjectCreate & ScholarResourceRecord;
+
+export interface OpenSourceProjectCreate extends ScholarResourceProvenance {
+  name: string;
+  repository_url?: string | null;
+  homepage_url?: string | null;
+  platform?: string | null;
+  role?: string | null;
+  language?: string | null;
+  stars?: number | null;
+  forks?: number | null;
+  status?: string | null;
+  released_at?: string | null;
+  description?: string | null;
+}
+
+export type OpenSourceProjectUpdate = Partial<OpenSourceProjectCreate>;
+export type OpenSourceProject = OpenSourceProjectCreate & ScholarResourceRecord;
+
+export interface AcademicPositionCreate extends ScholarResourceProvenance {
+  organization: string;
+  department?: string | null;
+  title: string;
+  position_type?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current?: boolean;
+  description?: string | null;
+}
+
+export type AcademicPositionUpdate = Partial<AcademicPositionCreate>;
+export type AcademicPosition = AcademicPositionCreate & ScholarResourceRecord;
+
+export interface BatchRowResult {
+  row: number;
+  status: BatchRowStatus;
+  item_id: string;
+  error: string;
+}
+
+export interface BatchImportResponse {
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  pending_match: number;
+  failed: number;
+  rows: BatchRowResult[];
+}
+
 export interface ScholarListResponse {
   total: number;
   page: number;
