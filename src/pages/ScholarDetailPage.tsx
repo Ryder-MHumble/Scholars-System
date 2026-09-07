@@ -99,8 +99,11 @@ export default function ScholarDetailPageDemo() {
           />
         )}
       </AnimatePresence>
-      <div className="h-screen bg-gray-50 overflow-hidden">
-        <div className="max-w-[1600px] mx-auto px-4 py-6 h-full flex flex-col">
+      <div
+        data-testid="scholar-detail-page"
+        className="min-h-screen bg-gray-50 xl:h-screen xl:overflow-hidden"
+      >
+        <div className="max-w-[1600px] mx-auto min-h-screen px-3 py-4 flex flex-col sm:px-4 sm:py-6 xl:h-full xl:min-h-0">
           {/* Header with breadcrumb and actions */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -117,19 +120,20 @@ export default function ScholarDetailPageDemo() {
             </Link>
           </motion.div>
 
-          {/* Three Column Layout — left/right fixed, center scrolls */}
-          <div className="flex gap-5 flex-1 min-h-0">
-            {/* Left Sidebar — fixed */}
-            <div className="shrink-0 overflow-y-auto custom-scrollbar" style={{ position: "sticky", top: 0 }}>
-            <DetailLeftSidebar
-              scholar={scholar}
-              onEditProfile={() => setShowProfileModal(true)}
-            />
+          {/* Stacked on small screens; fixed sidebars with an independent center scroll on desktop. */}
+          <div
+            data-testid="scholar-detail-layout"
+            className="flex flex-col gap-4 xl:flex-1 xl:min-h-0 xl:flex-row xl:gap-5"
+          >
+            <div className="w-full xl:w-[400px] xl:shrink-0 xl:overflow-y-auto custom-scrollbar">
+              <DetailLeftSidebar
+                scholar={scholar}
+                onEditProfile={() => setShowProfileModal(true)}
+              />
             </div>
 
-            {/* Center Content — scrollable */}
             <motion.main
-              className="flex-1 min-w-0 space-y-4 overflow-y-auto custom-scrollbar pr-1"
+              className="w-full min-w-0 space-y-4 xl:flex-1 xl:overflow-y-auto xl:pr-1 custom-scrollbar"
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
@@ -145,9 +149,8 @@ export default function ScholarDetailPageDemo() {
               />
             </motion.main>
 
-            {/* Right Sidebar — fixed */}
             <motion.div
-              className="shrink-0"
+              className="w-full xl:w-80 xl:shrink-0"
               variants={slideInRight}
               initial="hidden"
               animate="visible"

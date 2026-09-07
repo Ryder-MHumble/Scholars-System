@@ -92,7 +92,7 @@ export function DetailLeftSidebar({
 
   return (
     <motion.aside
-      className="w-[400px] shrink-0 max-xl:w-full"
+      className="w-full xl:w-[400px] xl:shrink-0"
       variants={staggerContainer}
       initial="hidden"
       animate="visible"

@@ -260,7 +260,7 @@ export function RightSidebar({ scholar }: Props) {
   };
 
   return (
-    <aside className="w-80 shrink-0 space-y-4">
+    <aside className="w-full space-y-4 xl:w-80 xl:shrink-0">
       {/* Scholar Activities Card */}
       <motion.div
         initial={{ opacity: 0, x: 20 }}
@@ -280,13 +280,13 @@ export function RightSidebar({ scholar }: Props) {
           </span>
         </div>
 
-        <div className="px-5 pt-2 border-b border-gray-100">
-          <div className="flex items-center gap-2">
+        <div className="px-3 pt-2 border-b border-gray-100">
+          <div className="grid grid-cols-3">
             <button
               type="button"
               onClick={() => setActiveTab("coauthors")}
               className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-lg border-b-2 transition-colors",
+                "inline-flex min-w-0 items-center justify-center gap-1 px-1 py-2 text-[11px] whitespace-nowrap rounded-t-lg border-b-2 transition-colors",
                 activeTab === "coauthors"
                   ? "text-primary-700 border-primary-600 bg-primary-50/40"
                   : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
@@ -299,7 +299,7 @@ export function RightSidebar({ scholar }: Props) {
               type="button"
               onClick={() => setActiveTab("news")}
               className={cn(
-                "inline-flex items-center gap-1 px-2 py-2 text-xs rounded-t-lg border-b-2 transition-colors",
+                "inline-flex min-w-0 items-center justify-center gap-1 px-1 py-2 text-[11px] whitespace-nowrap rounded-t-lg border-b-2 transition-colors",
                 activeTab === "news"
                   ? "text-primary-700 border-primary-600 bg-primary-50/40"
                   : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
@@ -312,7 +312,7 @@ export function RightSidebar({ scholar }: Props) {
               type="button"
               onClick={() => setActiveTab("activities")}
               className={cn(
-                "inline-flex items-center gap-1 px-2 py-2 text-xs rounded-t-lg border-b-2 transition-colors",
+                "inline-flex min-w-0 items-center justify-center gap-1 px-1 py-2 text-[11px] whitespace-nowrap rounded-t-lg border-b-2 transition-colors",
                 activeTab === "activities"
                   ? "text-primary-700 border-primary-600 bg-primary-50/40"
                   : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
@@ -324,7 +324,7 @@ export function RightSidebar({ scholar }: Props) {
           </div>
         </div>
 
-        <div className="px-5 py-3 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar">
+        <div className="px-5 py-3 xl:max-h-[calc(100vh-280px)] xl:overflow-y-auto custom-scrollbar">
           {activeTab === "coauthors" ? (
             coauthors.length > 0 ? (
               <div className="space-y-3">

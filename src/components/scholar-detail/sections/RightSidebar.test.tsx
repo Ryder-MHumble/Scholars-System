@@ -64,6 +64,25 @@ describe("RightSidebar relation tabs", () => {
     mocks.deleteScholarNews.mockResolvedValue(undefined);
   });
 
+  it("keeps the sidebar and its three tabs responsive", () => {
+    renderSidebar();
+
+    const sidebar = screen.getByRole("complementary");
+    expect(sidebar.className).toContain("w-full");
+    expect(sidebar.className).toContain("xl:w-80");
+
+    const tabs = [
+      screen.getByRole("button", { name: /合作学者/ }),
+      screen.getByRole("button", { name: /学者 News/ }),
+      screen.getByRole("button", { name: /学院活动/ }),
+    ];
+    expect(tabs[0].parentElement?.className).toContain("grid-cols-3");
+    tabs.forEach((tab) => {
+      expect(tab.className).toContain("min-w-0");
+      expect(tab.className).toContain("whitespace-nowrap");
+    });
+  });
+
   it("renders three independent tabs and approved News newest first", async () => {
     mocks.fetchScholarNews.mockResolvedValue([
       {
