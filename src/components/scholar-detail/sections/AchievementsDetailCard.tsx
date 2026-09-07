@@ -11,6 +11,9 @@ import { slideInUp } from "@/utils/animations";
 import {
   extractAchievementTags,
   getAchievementTagKind,
+  hasTwoInstitutesAchievement,
+  isTwoInstitutesPublication,
+  TWO_INSTITUTES_ACHIEVEMENT_TAG,
   type AchievementTag,
 } from "@/utils/scholarAchievementTags";
 
@@ -33,13 +36,14 @@ export function AchievementsDetailCard({
   const competitionTags = achievementTags.filter(
     (tag) => getAchievementTagKind(tag) === "competition",
   );
+  const hasTwoInstitutesPapers = hasTwoInstitutesAchievement(scholar);
   const allAwards = scholar.awards ?? [];
   const awardsOnly = allAwards.filter((a) => a.level !== "Grant");
   const projects = scholar.joint_research_projects ?? [];
   const tabs = [
     {
       key: "publications" as const,
-      label: "论文",
+      label: "代表论文",
       count: scholar.representative_publications?.length ?? 0,
       icon: BookOpen,
     },
@@ -81,11 +85,16 @@ export function AchievementsDetailCard({
         </button>
       </div>
 
-      {achievementTags.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2">
-          <span className="text-xs font-semibold text-gray-500">学术标识</span>
+      {(achievementTags.length > 0 || hasTwoInstitutesPapers) && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2">
+          <span className="shrink-0 text-xs font-semibold text-gray-500">学术标识</span>
           <AchievementTagGroup label="顶刊顶会" tags={venueTags} />
           <AchievementTagGroup label="竞赛" tags={competitionTags} />
+          {hasTwoInstitutesPapers && (
+            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              {TWO_INSTITUTES_ACHIEVEMENT_TAG}
+            </span>
+          )}
         </div>
       )}
 
@@ -177,6 +186,11 @@ function PublicationsSection({ scholar }: { scholar: ScholarDetail }) {
                       {pub.is_corresponding && (
                         <span className="inline-block text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded mt-1">
                           通讯作者
+                        </span>
+                      )}
+                      {isTwoInstitutesPublication(pub) && (
+                        <span className="mt-1 inline-block rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700">
+                          {TWO_INSTITUTES_ACHIEVEMENT_TAG}
                         </span>
                       )}
                     </div>

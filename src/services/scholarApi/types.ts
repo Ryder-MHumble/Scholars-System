@@ -179,6 +179,7 @@ export interface PublicationRecord {
   venue?: string;
   year?: string;
   authors?: string;
+  affiliations?: unknown[];
   url?: string;
   doi?: string;
   abstract?: string;
@@ -187,6 +188,12 @@ export interface PublicationRecord {
   source_type?: string;
   citation_count?: number;
   is_corresponding?: boolean;
+  is_first_author?: boolean;
+  achievement_tags?: string[];
+  academic_division?: string;
+  match_confidence?: string;
+  match_method?: string;
+  source_sheet?: string;
   added_by?: string;
 }
 
@@ -374,6 +381,8 @@ export interface StudentPatch {
 export interface ScholarUniversityItem {
   institution_id?: string;
   university: string;
+  region?: string | null;
+  org_type?: string | null;
   scholar_count: number;
   department_count?: number;
   departments: { id?: string; name: string; scholar_count: number }[];
@@ -388,6 +397,8 @@ export interface BackendInstitutionDepartment {
 export interface BackendInstitutionItem {
   id?: string;
   name?: string;
+  region?: string | null;
+  org_type?: string | null;
   scholar_count?: number;
   department_count?: number;
   departments?: BackendInstitutionDepartment[];
@@ -451,7 +462,18 @@ export interface ScholarCreate {
   phd_institution?: string;
   phd_year?: string;
   education?: EducationRecord[];
+  is_advisor_committee?: boolean;
+  adjunct_supervisor?: AdjunctSupervisorInfo;
+  is_potential_recruit?: boolean;
+  institute_relation_notes?: string;
+  supervised_students?: string[];
   joint_research_projects?: JointProject[];
+  joint_management_roles?: ManagementRole[];
+  academic_exchange_records?: ExchangeRecord[];
+  representative_publications?: PublicationRecord[];
+  patents?: PatentRecord[];
+  awards?: AwardRecord[];
+  coauthors?: CoauthorInfo[];
   publications_count?: number;
   h_index?: number;
   citations_count?: number;
@@ -459,6 +481,10 @@ export interface ScholarCreate {
   event_tags?: ScholarEventTag[];
   participated_event_ids?: string[];
   is_cobuild_scholar?: boolean;
+  project_category?: string;
+  project_subcategory?: string;
+  tags?: string[];
+  custom_fields?: Record<string, unknown>;
   added_by?: string;
 }
 
