@@ -36,6 +36,21 @@ async function parseError(response: Response): Promise<string> {
     if (typeof payload.detail === "string" && payload.detail.trim()) {
       return payload.detail.trim();
     }
+    if (Array.isArray(payload.detail)) {
+      const messages = payload.detail.map((item) => {
+        if (item && typeof item === "object") {
+          const detail = item as { loc?: unknown; msg?: unknown };
+          const location = Array.isArray(detail.loc) ? detail.loc.join(".") : "";
+          const message = typeof detail.msg === "string" ? detail.msg : "";
+          if (location && message) return `${location}: ${message}`;
+        }
+        return JSON.stringify(item);
+      });
+      if (messages.length > 0) return messages.join("; ");
+    }
+    if (payload.detail != null) {
+      return JSON.stringify(payload.detail);
+    }
   } catch {
     // Fall back to the HTTP status for non-JSON responses.
   }

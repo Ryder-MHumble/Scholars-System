@@ -173,4 +173,26 @@ describe("scholar resource API", () => {
 
     await expect(fetchScholarNews("missing")).rejects.toThrow("该学者不存在");
   });
+
+  it("formats FastAPI validation details with field paths", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(
+        {
+          detail: [
+            {
+              type: "missing",
+              loc: ["body", "title"],
+              msg: "Field required",
+              input: {},
+            },
+          ],
+        },
+        422,
+      ),
+    );
+
+    await expect(fetchScholarNews("invalid")).rejects.toThrow(
+      "body.title: Field required",
+    );
+  });
 });
