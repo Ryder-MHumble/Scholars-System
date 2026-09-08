@@ -13,7 +13,7 @@ export const PROJECT_CATEGORIES = {
       "科技教育委员会",
       "学术委员会",
       "教学委员会",
-      "学院学生高校导师",
+      "高校导师",
       "全职导师",
       "产业导师",
       "兼职导师",
@@ -34,7 +34,7 @@ export type ProjectSubcategory =
   | "科技教育委员会"
   | "学术委员会"
   | "教学委员会"
-  | "学院学生高校导师"
+  | "高校导师"
   | "全职导师"
   | "产业导师"
   | "兼职导师"
@@ -43,7 +43,8 @@ export type ProjectSubcategory =
 
 const PROJECT_SUBCATEGORY_ALIAS_MAP: Record<string, ProjectSubcategory> = {
   科技育青委员会: "科技教育委员会",
-  学院学生事务导师: "学院学生高校导师",
+  学院学生事务导师: "高校导师",
+  学院学生高校导师: "高校导师",
 };
 
 export function normalizeProjectSubcategoryLabel(
