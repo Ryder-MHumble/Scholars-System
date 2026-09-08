@@ -52,7 +52,7 @@ export function EditNewsModal({ news, onClose, onSubmit }: EditNewsModalProps) {
     <BaseModal
       isOpen
       onClose={onClose}
-      title={news ? "编辑学者 News" : "新增学者 News"}
+      title={news ? "编辑学者活动" : "新增学者活动"}
       maxWidth="lg"
       closeOnBackdropClick={!isSubmitting}
       footer={

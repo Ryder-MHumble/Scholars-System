@@ -7,12 +7,16 @@ import type {
   PatentRecord,
   AwardRecord,
   JointProject,
+  AcademicPositionCreate,
+  OpenSourceProjectCreate,
 } from "@/services/scholarApi";
 import {
   parsePublicationsFromText,
   parsePatentsFromText,
   parseAwardsFromText,
   parseProjectsFromText,
+  parseAcademicPositionsFromText,
+  parseOpenSourceProjectsFromText,
 } from "@/utils/textParsers";
 
 interface EditAchievementsModalProps {
@@ -27,6 +31,10 @@ interface EditAchievementsModalProps {
     awards: AwardRecord[];
     projects: JointProject[];
   }) => void | Promise<void>;
+  onSubmitResources?: (data: {
+    openSourceProjects: OpenSourceProjectCreate[];
+    academicPositions: AcademicPositionCreate[];
+  }) => void | Promise<void>;
 }
 
 type AchievementsTab = "publications" | "patents" | "awards" | "projects";
@@ -38,6 +46,7 @@ export function EditAchievementsModal({
   projects,
   onClose,
   onSubmit,
+  onSubmitResources,
 }: EditAchievementsModalProps) {
   const [activeTab, setActiveTab] = useState<AchievementsTab>("publications");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,6 +65,8 @@ export function EditAchievementsModal({
     patents: "",
     awards: "",
     projects: "",
+    openSourceProjects: "",
+    academicPositions: "",
   });
 
   const parsedBatchItems = useMemo(
@@ -64,6 +75,8 @@ export function EditAchievementsModal({
       patents: parsePatentsFromText(batchInputs.patents),
       awards: parseAwardsFromText(batchInputs.awards),
       projects: parseProjectsFromText(batchInputs.projects),
+      openSourceProjects: parseOpenSourceProjectsFromText(batchInputs.openSourceProjects),
+      academicPositions: parseAcademicPositionsFromText(batchInputs.academicPositions),
     }),
     [batchInputs],
   );
@@ -73,6 +86,8 @@ export function EditAchievementsModal({
       patents: parsedBatchItems.patents.length,
       awards: parsedBatchItems.awards.length,
       projects: parsedBatchItems.projects.length,
+      openSourceProjects: parsedBatchItems.openSourceProjects.length,
+      academicPositions: parsedBatchItems.academicPositions.length,
     }),
     [parsedBatchItems],
   );
@@ -116,6 +131,12 @@ export function EditAchievementsModal({
         awards: finalAwards,
         projects: finalProjects,
       });
+      if (onSubmitResources) {
+        await onSubmitResources({
+          openSourceProjects: parsedBatchItems.openSourceProjects,
+          academicPositions: parsedBatchItems.academicPositions,
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -258,7 +279,7 @@ export function EditAchievementsModal({
       >
         <div className="shrink-0 px-6 py-4 border-b border-gray-100 bg-white">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold text-gray-900">编辑学术成就</h3>
+            <h3 className="text-base font-semibold text-gray-900">编辑学者成就</h3>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -271,7 +292,7 @@ export function EditAchievementsModal({
                 )}
               >
                 <Upload className="w-3.5 h-3.5" />
-                {showBatchPanel ? "收起批量导入" : "批量导入"}
+                {showBatchPanel ? "收起批量识别" : "批量识别"}
               </button>
               <button
                 type="button"
@@ -291,10 +312,10 @@ export function EditAchievementsModal({
             </div>
           </div>
           <p className="mt-2 text-xs text-gray-500">
-            支持同时导入论文、专利、获奖、科研项目，点击顶部"保存全部"后一次性提交四类数据。
+            支持同时识别论文、专利、获奖、科研项目、开源项目和学术兼职，点击顶部"保存全部"后一次性提交。
           </p>
           <p className="mt-1 text-[11px] text-gray-400">
-            无需先点击"批量导入"里的按钮；保存时会自动识别并导入文本框内容。
+            无需 Excel；复制粘贴到批量识别框后，保存时会自动识别并导入文本框内容。
           </p>
         </div>
 
@@ -303,33 +324,51 @@ export function EditAchievementsModal({
             <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-4 space-y-3">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <BatchImportCard
-                  title="论文批量导入"
+                  title="论文批量识别"
                   value={batchInputs.publications}
                   count={parsedBatchCounts.publications}
                   placeholder={"论文标题 | 会议/期刊 | 年份 | 作者 | 链接\n标题：A Better Parser；作者：A Wang；会议/期刊：ICML；年份：2024"}
                   onChange={(v) => handleBatchChange("publications", v)}
                 />
                 <BatchImportCard
-                  title="专利批量导入"
+                  title="专利批量识别"
                   value={batchInputs.patents}
                   count={parsedBatchCounts.patents}
                   placeholder={"专利名称 | 专利号 | 年份 | 发明人 | 类型 | 状态\n专利名称：一种方法；专利号：ZL202511129049.1；年份：2025；发明人：张三、李四；类型：发明专利；状态：已授权"}
                   onChange={(v) => handleBatchChange("patents", v)}
                 />
                 <BatchImportCard
-                  title="奖项批量导入"
+                  title="奖项批量识别"
                   value={batchInputs.awards}
                   count={parsedBatchCounts.awards}
                   placeholder={"奖项名称 | 年份 | 等级 | 颁发单位 | 描述\n奖项名称：自然科学一等奖；年份：2025；等级：一等奖；颁发单位：中国自动化学会；描述：排1"}
                   onChange={(v) => handleBatchChange("awards", v)}
                 />
                 <BatchImportCard
-                  title="科研项目批量导入"
+                  title="科研项目批量识别"
                   value={batchInputs.projects}
                   count={parsedBatchCounts.projects}
                   placeholder={"项目名称 | 年份 | 描述\n项目名称：基于大模型的代码生成；年份：2024；描述：校企联合项目"}
                   onChange={(v) => handleBatchChange("projects", v)}
                 />
+                {onSubmitResources && (
+                  <BatchImportCard
+                    title="开源项目批量识别"
+                    value={batchInputs.openSourceProjects}
+                    count={parsedBatchCounts.openSourceProjects}
+                    placeholder="项目名称 | 仓库 URL | 语言 | Stars | Forks | 平台"
+                    onChange={(v) => handleBatchChange("openSourceProjects", v)}
+                  />
+                )}
+                {onSubmitResources && (
+                  <BatchImportCard
+                    title="学术兼职批量识别"
+                    value={batchInputs.academicPositions}
+                    count={parsedBatchCounts.academicPositions}
+                    placeholder="机构 | 职务 | 开始 | 结束"
+                    onChange={(v) => handleBatchChange("academicPositions", v)}
+                  />
+                )}
               </div>
               <div className="flex items-center justify-end">
                 <p className="text-[11px] text-gray-400">
@@ -800,6 +839,7 @@ function BatchImportCard({
     <div className="rounded-lg border border-blue-100 bg-white p-3 space-y-2">
       <p className="text-xs font-semibold text-gray-600">{title}</p>
       <textarea
+        aria-label={title}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={4}

@@ -768,7 +768,7 @@ export function EditProfileModal({
                         type="text"
                         value={item.role || ""}
                         onChange={(e) => updateRoleItem(index, "role", e.target.value)}
-                        placeholder="输入任职经历"
+                        placeholder="兼职职务"
                         className={INPUT_CLASS}
                       />
                       <input
@@ -796,7 +796,7 @@ export function EditProfileModal({
                         type="button"
                         onClick={() => removeRoleItem(index)}
                         className="p-2 text-red-500 hover:text-red-600"
-                        aria-label="删除任职经历"
+                        aria-label="删除任职记录"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -806,17 +806,17 @@ export function EditProfileModal({
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-3">
-                <p className="text-xs font-medium text-slate-600 mb-2">批量粘贴导入（覆盖当前列表）</p>
+                <p className="text-xs font-medium text-slate-600 mb-2">批量粘贴识别（覆盖当前列表）</p>
                 <textarea
                   value={rolesBatchText}
                   onChange={(e) => handleRolesBatchTextChange(e.target.value)}
                   rows={4}
-                  placeholder={"示例：\n顾问委员会委员\n教学委员会委员"}
+                  placeholder={"示例：\n武汉大学人工智能学院 | 兼职导师 | 2024 | 至今\n职务：顾问委员会委员；机构：北京中关村学院；开始：2025；结束：至今"}
                   className={TEXTAREA_CLASS}
                 />
                 <div className="mt-2">
                   <p className="text-[11px] text-slate-400">
-                    粘贴后会自动识别并预览，保存时会自动提交到任职经历。
+                    支持“职务 | 机构 | 开始 | 结束”和“机构 | 职务 | 开始 | 结束”，保存时自动提交到任职经历。
                   </p>
                 </div>
               </div>

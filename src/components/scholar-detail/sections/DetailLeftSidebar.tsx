@@ -99,9 +99,20 @@ export function DetailLeftSidebar({
     >
       <motion.div
         variants={slideInLeft}
-        className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+        className="overflow-hidden bg-white"
       >
-        <div className="p-6">
+        <div className="relative px-1 pb-4 pt-1">
+          {onEditProfile && (
+            <button
+              type="button"
+              aria-label="编辑基础信息"
+              title="编辑基础信息"
+              onClick={onEditProfile}
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-primary-50 hover:text-primary-700"
+            >
+              <Edit3 className="h-4 w-4" />
+            </button>
+          )}
           <div className="flex items-center gap-4 mb-5">
             <div className="flex-shrink-0 relative">
               <ScholarAvatar
@@ -144,7 +155,7 @@ export function DetailLeftSidebar({
 
           {showMetrics && (
             <>
-              <div className="mt-4 mb-4 rounded-xl border border-gray-100 bg-gray-50/80 overflow-hidden">
+              <div className="mb-3 mt-3 overflow-hidden border-y border-gray-100 bg-gray-50/70">
                 <div className="grid grid-cols-3 divide-x divide-gray-100">
                   {metrics.map((metric) => {
                     const MetricIcon = metric.icon;
@@ -171,7 +182,7 @@ export function DetailLeftSidebar({
             </>
           )}
 
-          <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="mt-4 flex items-center gap-3">
             <div className="min-w-0 flex flex-wrap gap-1.5">
               {scholar.academic_titles.length > 0 && (
                 <>
@@ -193,21 +204,11 @@ export function DetailLeftSidebar({
                 </span>
               )}
             </div>
-            {onEditProfile && (
-              <button
-                type="button"
-                onClick={onEditProfile}
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white transition-colors hover:bg-primary-700"
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                编辑资料
-              </button>
-            )}
           </div>
 
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="border-t border-gray-100 px-1 py-3">
           <SideLabel icon={Mail} title="联系方式" />
           <div className="space-y-2.5">
             {scholar.email && (
@@ -239,7 +240,7 @@ export function DetailLeftSidebar({
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="border-t border-gray-100 px-1 py-3">
           <SideLabel icon={User} title="个人简介" />
           {bioText ? (
             <>
@@ -270,12 +271,12 @@ export function DetailLeftSidebar({
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="border-t border-gray-100 px-1 py-3">
           <SideLabel icon={GraduationCap} title="教育经历" />
           {eduItems.length === 0 ? (
             <p className="text-xs text-gray-300 italic">暂无教育经历</p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {eduItems.map((edu, i) => (
                 <div key={i} className="relative pl-5">
                   <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-primary-500 border-2 border-white shadow-sm" />
@@ -315,7 +316,7 @@ export function DetailLeftSidebar({
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="border-t border-gray-100 px-1 py-3">
           <SideLabel icon={Briefcase} title="任职经历" />
           {scholar.joint_management_roles &&
           scholar.joint_management_roles.length > 0 ? (
@@ -323,7 +324,7 @@ export function DetailLeftSidebar({
               {scholar.joint_management_roles.map((role, i) => (
                 <div key={i} className="relative pl-5">
                   <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
-                  <p className="text-sm text-gray-700">{role.role || "任职经历"}</p>
+                  <p className="text-sm text-gray-700">{role.role || "任职记录"}</p>
                   {role.organization && (
                     <p className="text-xs text-gray-500">{role.organization}</p>
                   )}
@@ -336,11 +337,11 @@ export function DetailLeftSidebar({
               ))}
             </div>
           ) : (
-            <p className="text-xs text-gray-300 italic">暂无任职经历记录</p>
+            <p className="text-xs text-gray-300 italic">暂无任职经历</p>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="border-t border-gray-100 px-1 py-3">
           <SideLabel icon={BookOpen} title="研究方向" />
           {scholar.research_areas && scholar.research_areas.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">

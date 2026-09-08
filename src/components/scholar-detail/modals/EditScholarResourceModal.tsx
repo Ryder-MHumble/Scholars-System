@@ -154,7 +154,7 @@ export function EditScholarResourceModal({ kind, item, onClose, onSubmit }: Prop
         {kind !== "positions" && <Field label={`${kind === "research" ? "项目名称" : "项目名称"} *`} value={form.name} onChange={(value) => update("name", value)} span />}
         {kind === "positions" && (
           <>
-            <Field label="任职机构 *" value={form.organization} onChange={(value) => update("organization", value)} />
+            <Field label="兼职机构 *" value={form.organization} onChange={(value) => update("organization", value)} />
             <Field label="职务 *" value={form.title} onChange={(value) => update("title", value)} />
             <Field label="部门" value={form.department} onChange={(value) => update("department", value)} />
             <Field label="兼职类型" value={form.position_type} onChange={(value) => update("position_type", value)} />
@@ -190,7 +190,7 @@ export function EditScholarResourceModal({ kind, item, onClose, onSubmit }: Prop
         {kind === "positions" && (
           <label className="flex items-center gap-2 text-sm text-gray-700 sm:col-span-2">
             <input type="checkbox" checked={form.is_current} onChange={(event) => update("is_current", event.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary-600" />
-            当前任职
+            当前兼职
           </label>
         )}
         <Field label="来源 URL" type="url" value={form.source_url} onChange={(value) => update("source_url", value)} span />

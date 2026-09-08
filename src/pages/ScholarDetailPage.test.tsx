@@ -38,7 +38,7 @@ vi.mock("@/components/scholar-detail/sections/RightSidebar", () => ({
 }));
 
 describe("ScholarDetailPage responsive layout", () => {
-  it("stacks all detail regions on small screens and restores columns at xl", () => {
+  it("uses a white viewport with three independent hidden-scrollbar columns", () => {
     const { container } = render(
       <MemoryRouter initialEntries={["/scholars/scholar-1"]}>
         <Routes>
@@ -53,15 +53,22 @@ describe("ScholarDetailPage responsive layout", () => {
     const main = screen.getByRole("main");
     const right = screen.getByText("right-sidebar").parentElement;
 
-    expect(page?.className).toContain("min-h-screen");
+    expect(page?.className).toContain("bg-white");
     expect(page?.className).toContain("xl:h-screen");
+    expect(page?.className).toContain("xl:overflow-hidden");
     expect(layout?.className).toContain("flex-col");
     expect(layout?.className).toContain("xl:flex-row");
+    expect(layout?.className).toContain("xl:min-h-0");
     expect(left?.className).toContain("w-full");
     expect(left?.className).toContain("xl:w-[400px]");
+    expect(left?.className).toContain("xl:overflow-y-auto");
+    expect(left?.className).toContain("scrollbar-hide");
     expect(main.className).toContain("w-full");
     expect(main.className).toContain("xl:overflow-y-auto");
+    expect(main.className).toContain("scrollbar-hide");
     expect(right?.className).toContain("w-full");
     expect(right?.className).toContain("xl:w-80");
+    expect(right?.className).toContain("xl:overflow-y-auto");
+    expect(right?.className).toContain("scrollbar-hide");
   });
 });

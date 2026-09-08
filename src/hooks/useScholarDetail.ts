@@ -17,7 +17,13 @@ import {
   type JointProject,
   type ManagementRole,
   type ExchangeRecord,
+  type AcademicPositionCreate,
+  type OpenSourceProjectCreate,
 } from "@/services/scholarApi";
+import {
+  batchAcademicPositions,
+  batchOpenSourceProjects,
+} from "@/services/scholarResourcesApi";
 
 export function useScholarDetail(scholarId: string | undefined) {
   const [scholar, setScholar] = useState<ScholarDetail | null>(null);
@@ -171,6 +177,24 @@ export function useScholarDetail(scholarId: string | undefined) {
     });
   };
 
+  const handleResourceBatchSave = async (data: {
+    openSourceProjects: OpenSourceProjectCreate[];
+    academicPositions: AcademicPositionCreate[];
+  }) => {
+    if (!scholar) return;
+    await Promise.all([
+      data.openSourceProjects.length > 0
+        ? batchOpenSourceProjects(scholar.url_hash, data.openSourceProjects)
+        : Promise.resolve(),
+      data.academicPositions.length > 0
+        ? batchAcademicPositions(scholar.url_hash, data.academicPositions)
+        : Promise.resolve(),
+    ]);
+    window.dispatchEvent(
+      new CustomEvent("scholar-resources-updated", { detail: scholar.url_hash }),
+    );
+  };
+
   // -- Exchange records save --
   const handleSaveExchangeRecords = async (records: ExchangeRecord[]) => {
     await withScholar((urlHash) => patchScholarRelation(urlHash, {
@@ -215,6 +239,7 @@ export function useScholarDetail(scholarId: string | undefined) {
     handleAddUpdate,
     handleDeleteUpdate,
     handleAchievementsSave,
+    handleResourceBatchSave,
     handleSaveExchangeRecords,
     handleSaveManagementRolesInline,
     handleRelationNotesSave,

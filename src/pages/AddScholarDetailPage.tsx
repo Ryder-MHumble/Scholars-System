@@ -179,7 +179,7 @@ export default function AddScholarDetailPage() {
       setShowAchievementsModal(false);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存学术成就失败");
+      setError(err instanceof Error ? err.message : "保存学者成就失败");
     }
   };
 
@@ -365,14 +365,16 @@ export default function AddScholarDetailPage() {
               initial="hidden"
               animate="visible"
             >
-              <ProjectCategorySelector
-                projectTags={scholar.project_tags ?? []}
-                onSave={handleProjectCategorySave}
-              />
-
               <AchievementsDetailCard
                 scholar={scholar}
                 onShowAchievementsModal={() => setShowAchievementsModal(true)}
+                relationSlot={
+                  <ProjectCategorySelector
+                    projectTags={scholar.project_tags ?? []}
+                    onSave={handleProjectCategorySave}
+                    variant="embedded"
+                  />
+                }
               />
             </motion.main>
           </div>

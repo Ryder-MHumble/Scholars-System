@@ -21,6 +21,7 @@ import type { ScholarProjectTag } from "@/services/scholarApi";
 interface ProjectCategorySelectorProps {
   projectTags: ScholarProjectTag[];
   onSave: (projectTags: ScholarProjectTag[]) => Promise<void>;
+  variant?: "card" | "embedded";
 }
 
 function normalizeProjectTags(tags: ScholarProjectTag[]): ScholarProjectTag[] {
@@ -54,6 +55,7 @@ function buildProjectSignature(tags: ScholarProjectTag[]): string {
 export function ProjectCategorySelector({
   projectTags,
   onSave,
+  variant = "card",
 }: ProjectCategorySelectorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedPrimary, setSelectedPrimary] = useState<string>("");
@@ -120,6 +122,7 @@ export function ProjectCategorySelector({
   const originalProjectSignature = buildProjectSignature(projectTags ?? []);
   const hasChanges = projectSignature !== originalProjectSignature;
   const hasAnyCategory = selectedProjectTags.length > 0;
+  const embedded = variant === "embedded";
 
   const selectedProjectTagKeys = useMemo(
     () =>
@@ -135,8 +138,20 @@ export function ProjectCategorySelector({
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-primary-50 via-sky-50 to-cyan-50">
+    <div
+      className={cn(
+        "overflow-hidden border-gray-200",
+        embedded
+          ? "border-b bg-white"
+          : "rounded-2xl bg-white shadow-sm",
+      )}
+    >
+      <div
+        className={cn(
+          "border-b border-gray-100 bg-white",
+          embedded ? "px-4 py-3" : "px-6 py-4",
+        )}
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <FolderKanban className="w-5 h-5 text-primary-700" />
@@ -176,8 +191,8 @@ export function ProjectCategorySelector({
       </div>
 
       {isExpanded && (
-        <div className="p-6">
-          <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+        <div className={embedded ? "p-4" : "p-6"}>
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-4">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               项目分类
             </p>
@@ -266,7 +281,12 @@ export function ProjectCategorySelector({
         </div>
       )}
 
-      <div className="px-6 py-4 border-t border-gray-100 bg-white flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div
+        className={cn(
+          "border-t border-gray-100 flex flex-col gap-3 md:flex-row md:items-center md:justify-between",
+          embedded ? "bg-white/70 px-4 py-3" : "bg-white px-6 py-4",
+        )}
+      >
         <div className="flex items-center gap-2 text-xs text-gray-600 min-h-6">
           <Link2 className="w-3.5 h-3.5 text-gray-400" />
           {hasAnyCategory ? (

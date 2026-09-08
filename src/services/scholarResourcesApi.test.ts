@@ -174,6 +174,14 @@ describe("scholar resource API", () => {
     await expect(fetchScholarNews("missing")).rejects.toThrow("该学者不存在");
   });
 
+  it("does not expose a raw route-level Not Found message", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Not Found" }, 404));
+
+    await expect(fetchAcademicPositions("scholar-1")).rejects.toThrow(
+      "学术兼职接口不存在（404），请检查后端版本与路由配置",
+    );
+  });
+
   it("formats FastAPI validation details with field paths", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       jsonResponse(

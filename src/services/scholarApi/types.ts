@@ -431,6 +431,7 @@ export interface ScholarDetailPatch {
   publications_count?: number;
   h_index?: number;
   citations_count?: number;
+  coauthors?: CoauthorInfo[];
 }
 
 export interface AchievementsPatch {

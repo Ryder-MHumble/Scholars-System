@@ -30,10 +30,27 @@ function itemUrl(scholarRef: string, resource: ResourcePath, itemId: string): st
   return `${collectionUrl(scholarRef, resource)}/${encodeURIComponent(itemId)}`;
 }
 
-async function parseError(response: Response): Promise<string> {
+const RESOURCE_LABELS: Record<ResourcePath, string> = {
+  news: "学者活动",
+  "research-projects": "科研项目",
+  "open-source-projects": "开源项目",
+  "academic-positions": "学术兼职",
+};
+
+function resourceLabelFromUrl(url: string): string {
+  const resource = (Object.keys(RESOURCE_LABELS) as ResourcePath[]).find((path) =>
+    url.includes(`/${path}`),
+  );
+  return resource ? RESOURCE_LABELS[resource] : "资源";
+}
+
+async function parseError(response: Response, url: string): Promise<string> {
   try {
     const payload = (await response.json()) as { detail?: unknown };
     if (typeof payload.detail === "string" && payload.detail.trim()) {
+      if (response.status === 404 && payload.detail.trim() === "Not Found") {
+        return `${resourceLabelFromUrl(url)}接口不存在（404），请检查后端版本与路由配置`;
+      }
       return payload.detail.trim();
     }
     if (Array.isArray(payload.detail)) {
@@ -60,7 +77,7 @@ async function parseError(response: Response): Promise<string> {
 async function requestJson<T>(url: string, options: RequestInit): Promise<T> {
   const response = await fetch(url, options);
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    throw new Error(await parseError(response, url));
   }
   if (response.status === 204) {
     return undefined as T;

@@ -82,13 +82,13 @@ export function EditManagementRolesModal({
 
           {batchMode ? (
             <div className="p-3 border border-blue-200 rounded-lg bg-blue-50/30 space-y-2">
-              <p className="text-xs text-gray-600">每行一条任职经历记录</p>
+              <p className="text-xs text-gray-600">每行一条任职记录，支持“机构 | 职务 | 开始 | 结束”</p>
               <textarea
                 value={batchText}
                 onChange={(e) => setBatchText(e.target.value)}
                 autoFocus
                 rows={6}
-                placeholder={"顾问委员会委员\n教学委员会委员\n学位委员会委员"}
+                placeholder={"武汉大学人工智能学院 | 兼职导师 | 2024 | 至今\n职务：顾问委员会委员；机构：北京中关村学院；开始：2025；结束：至今"}
                 className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none"
               />
               <div className="flex gap-2">
@@ -96,7 +96,7 @@ export function EditManagementRolesModal({
                   onClick={applyBatch}
                   className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
                 >
-                  确认导入 ({parseManagementRolesFromText(batchText).length} 条)
+                  确认识别 ({parseManagementRolesFromText(batchText).length} 条)
                 </button>
                 <button
                   onClick={() => {
@@ -124,7 +124,7 @@ export function EditManagementRolesModal({
                 }}
                 className="flex-1 px-4 py-2 border border-dashed border-blue-300 text-blue-600 rounded-lg text-sm hover:bg-blue-50 transition-colors"
               >
-                批量导入
+                批量识别
               </button>
             </div>
           )}

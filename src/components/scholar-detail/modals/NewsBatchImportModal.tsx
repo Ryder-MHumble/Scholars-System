@@ -1,10 +1,7 @@
 import { useState } from "react";
-import * as XLSX from "xlsx";
 import {
   AlertCircle,
   CheckCircle2,
-  Download,
-  FileSpreadsheet,
   Loader2,
   RefreshCw,
   Upload,
@@ -17,8 +14,7 @@ import type {
   ScholarNewsBatchRow,
 } from "@/services/scholarApi/types";
 import {
-  downloadNewsImportTemplate,
-  parseNewsRows,
+  parseNewsRowsFromText,
   prepareNewsImportRows,
   type NewsImportError,
 } from "@/utils/scholarNewsImport";
@@ -50,22 +46,20 @@ export function NewsBatchImportModal({
   onClose,
   onSuccess,
 }: NewsBatchImportModalProps) {
-  const [fileName, setFileName] = useState("");
+  const [text, setText] = useState("");
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [parseErrors, setParseErrors] = useState<NewsImportError[]>([]);
   const [summary, setSummary] = useState<BatchImportResponse | null>(null);
-  const [isParsing, setIsParsing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestError, setRequestError] = useState("");
 
   const failedRows = previewRows.filter((row) => row.result?.status === "failed");
 
   const reset = () => {
-    setFileName("");
+    setText("");
     setPreviewRows([]);
     setParseErrors([]);
     setSummary(null);
-    setIsParsing(false);
     setIsSubmitting(false);
     setRequestError("");
   };
@@ -75,35 +69,18 @@ export function NewsBatchImportModal({
     onClose();
   };
 
-  const processFile = async (file: File) => {
-    setFileName(file.name);
-    setIsParsing(true);
+  const processText = (value: string) => {
+    setText(value);
     setRequestError("");
     setSummary(null);
-    try {
-      const workbook = XLSX.read(await file.arrayBuffer(), {
-        type: "array",
-        cellDates: true,
-      });
-      const parsed = parseNewsRows(workbook);
-      setPreviewRows(
-        parsed.rows.map((data, index) => ({
-          worksheetRow: parsed.rowNumbers[index],
-          data,
-        })),
-      );
-      setParseErrors(parsed.errors);
-    } catch (error) {
-      setPreviewRows([]);
-      setParseErrors([
-        {
-          row: 0,
-          error: error instanceof Error ? error.message : "Excel 文件解析失败",
-        },
-      ]);
-    } finally {
-      setIsParsing(false);
-    }
+    const parsed = parseNewsRowsFromText(value, scholarRef);
+    setPreviewRows(
+      parsed.rows.map((data, index) => ({
+        worksheetRow: parsed.rowNumbers[index],
+        data,
+      })),
+    );
+    setParseErrors(parsed.errors);
   };
 
   const submit = async (rowsToSubmit: PreviewRow[]) => {
@@ -140,7 +117,7 @@ export function NewsBatchImportModal({
     <BaseModal
       isOpen={isOpen}
       onClose={handleClose}
-      title="批量导入学者 News"
+      title="批量识别学者活动"
       maxWidth="3xl"
       maxHeight="88vh"
       closeOnBackdropClick={!isSubmitting}
@@ -168,7 +145,7 @@ export function NewsBatchImportModal({
           <button
             type="button"
             onClick={() => void submit(previewRows)}
-            disabled={previewRows.length === 0 || isSubmitting || isParsing}
+            disabled={previewRows.length === 0 || isSubmitting}
             className="inline-flex items-center gap-2 rounded-md bg-primary-600 px-3 py-2 text-sm text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? (
@@ -184,46 +161,30 @@ export function NewsBatchImportModal({
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
           <div>
-            <p className="text-sm font-medium text-gray-800">选择 Excel 文件</p>
-            <p className="mt-1 text-xs text-gray-500">支持 .xlsx 和 .xls，上传后先预览再提交</p>
+            <p className="text-sm font-medium text-gray-800">粘贴学者活动文本</p>
+            <p className="mt-1 text-xs text-gray-500">
+              每行一条，支持“标题 | 日期 | 类型 | 摘要 | 来源URL”和“标题：...；日期：...”格式
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={downloadNewsImportTemplate}
-            className="inline-flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            <Download className="h-4 w-4" />
-            下载模板
-          </button>
         </div>
 
-        <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-center hover:border-primary-400 hover:bg-primary-50/30">
-          {isParsing ? (
-            <Loader2 className="mb-2 h-6 w-6 animate-spin text-primary-600" />
-          ) : (
-            <FileSpreadsheet className="mb-2 h-6 w-6 text-gray-400" />
-          )}
-          <span className="text-sm font-medium text-gray-700">
-            {fileName || "点击选择文件"}
-          </span>
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            className="sr-only"
-            disabled={isParsing || isSubmitting}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void processFile(file);
-              event.target.value = "";
-            }}
-          />
-        </label>
+        <textarea
+          aria-label="粘贴学者活动文本"
+          value={text}
+          rows={8}
+          disabled={isSubmitting}
+          onChange={(event) => processText(event.target.value)}
+          placeholder={
+            "论文接收 | 2026-09-08 | 论文动态 | 论文被 NeurIPS 接收 | https://example.com/news\n标题：获奖通知；日期：2026/09/09；类型：获奖；摘要：获得最佳论文奖；来源：https://example.com/award"
+          }
+          className="w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary-400"
+        />
 
         {parseErrors.length > 0 && (
           <div className="rounded-md border border-red-200 bg-red-50 px-3 py-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium text-red-700">
               <AlertCircle className="h-4 w-4" />
-              {parseErrors.length} 条解析错误
+              {parseErrors.length} 条识别错误
             </div>
             <ul className="max-h-28 space-y-1 overflow-y-auto text-xs text-red-700">
               {parseErrors.map((error) => (
@@ -255,6 +216,10 @@ export function NewsBatchImportModal({
             <span className="text-red-700">失败 {summary.failed}</span>
           </div>
         )}
+
+        <div className="text-xs font-medium text-blue-700">
+          自动识别预览 {previewRows.length} 条
+        </div>
 
         {previewRows.length > 0 && (
           <div className="overflow-x-auto rounded-md border border-gray-200">

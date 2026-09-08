@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { parseNewsRows, prepareNewsImportRows } from "./scholarNewsImport";
+import {
+  parseNewsRows,
+  parseNewsRowsFromText,
+  prepareNewsImportRows,
+} from "./scholarNewsImport";
 
 function workbookFromRows(rows: unknown[][]): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
@@ -129,5 +133,39 @@ describe("parseNewsRows", () => {
     ]);
 
     expect(rows[0].published_at).toBe("2026-09-07T00:00:00Z");
+  });
+
+  it("parses pasted scholar activity rows without Excel", () => {
+    const result = parseNewsRowsFromText(
+      [
+        "论文接收 | 2026-09-08 | 论文动态 | 论文被 NeurIPS 接收 | https://example.com/a",
+        "标题：获奖通知；日期：2026/09/09；类型：获奖；摘要：获得最佳论文奖；来源：https://example.com/b",
+      ].join("\n"),
+      "scholar-1",
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toEqual([
+      expect.objectContaining({
+        scholar_id: "scholar-1",
+        title: "论文接收",
+        published_at: "2026-09-08",
+        news_type: "论文动态",
+        summary: "论文被 NeurIPS 接收",
+        source_url: "https://example.com/a",
+        match_status: "matched",
+        match_method: "scholar_id",
+        review_status: "approved",
+      }),
+      expect.objectContaining({
+        scholar_id: "scholar-1",
+        title: "获奖通知",
+        published_at: "2026-09-09",
+        news_type: "获奖",
+        summary: "获得最佳论文奖",
+        source_url: "https://example.com/b",
+      }),
+    ]);
+    expect(result.rowNumbers).toEqual([1, 2]);
   });
 });

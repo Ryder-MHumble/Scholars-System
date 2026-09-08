@@ -25,6 +25,7 @@ export default function ScholarDetailPageDemo() {
     handleFieldSave,
     handleManagementRolesSave,
     handleAchievementsSave,
+    handleResourceBatchSave,
     handleProjectCategorySave,
   } = useScholarDetail(scholarId);
 
@@ -84,6 +85,7 @@ export default function ScholarDetailPageDemo() {
               await handleAchievementsSave(data);
               setShowAchievementsModal(false);
             }}
+            onSubmitResources={handleResourceBatchSave}
           />
         )}
       </AnimatePresence>
@@ -101,9 +103,9 @@ export default function ScholarDetailPageDemo() {
       </AnimatePresence>
       <div
         data-testid="scholar-detail-page"
-        className="min-h-screen bg-gray-50 xl:h-screen xl:overflow-hidden"
+        className="min-h-screen bg-white xl:h-screen xl:overflow-hidden"
       >
-        <div className="max-w-[1600px] mx-auto min-h-screen px-3 py-4 flex flex-col sm:px-4 sm:py-6 xl:h-full xl:min-h-0">
+        <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col px-3 py-4 sm:px-4 xl:h-full xl:min-h-0 xl:py-5">
           {/* Header with breadcrumb and actions */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -120,12 +122,12 @@ export default function ScholarDetailPageDemo() {
             </Link>
           </motion.div>
 
-          {/* Stacked on small screens; fixed sidebars with an independent center scroll on desktop. */}
+          {/* Desktop columns scroll independently while keeping scrollbars visually hidden. */}
           <div
             data-testid="scholar-detail-layout"
-            className="flex flex-col gap-4 xl:flex-1 xl:min-h-0 xl:flex-row xl:gap-5"
+            className="flex flex-col gap-4 xl:min-h-0 xl:flex-1 xl:flex-row xl:overflow-hidden"
           >
-            <div className="w-full xl:w-[400px] xl:shrink-0 xl:overflow-y-auto custom-scrollbar">
+            <div className="scrollbar-hide w-full xl:w-[400px] xl:shrink-0 xl:overflow-y-auto xl:pr-5">
               <DetailLeftSidebar
                 scholar={scholar}
                 onEditProfile={() => setShowProfileModal(true)}
@@ -133,24 +135,26 @@ export default function ScholarDetailPageDemo() {
             </div>
 
             <motion.main
-              className="w-full min-w-0 space-y-4 xl:flex-1 xl:overflow-y-auto xl:pr-1 custom-scrollbar"
+              className="scrollbar-hide w-full min-w-0 space-y-4 xl:flex-1 xl:overflow-y-auto xl:px-5"
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
             >
-              <ProjectCategorySelector
-                projectTags={scholar.project_tags ?? []}
-                onSave={handleProjectCategorySave}
-              />
-
               <AchievementsDetailCard
                 scholar={scholar}
                 onShowAchievementsModal={() => setShowAchievementsModal(true)}
+                relationSlot={
+                  <ProjectCategorySelector
+                    projectTags={scholar.project_tags ?? []}
+                    onSave={handleProjectCategorySave}
+                    variant="embedded"
+                  />
+                }
               />
             </motion.main>
 
             <motion.div
-              className="w-full xl:w-80 xl:shrink-0"
+              className="scrollbar-hide w-full xl:w-80 xl:shrink-0 xl:overflow-y-auto xl:pl-5"
               variants={slideInRight}
               initial="hidden"
               animate="visible"

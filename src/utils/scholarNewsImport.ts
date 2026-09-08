@@ -208,6 +208,107 @@ export function prepareNewsImportRows(
   }));
 }
 
+export function parseNewsRowsFromText(
+  text: string,
+  scholarId: string,
+): ParsedNewsRows {
+  const rows: ScholarNewsBatchRow[] = [];
+  const rowNumbers: number[] = [];
+  const errors: NewsImportError[] = [];
+  const seen = new Set<string>();
+
+  const parseLabeledLine = (line: string): ScholarNewsBatchRow | null => {
+    const parts = line
+      .split(/[；;]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length < 2) return null;
+
+    const mapped: Record<string, string> = {};
+    for (const part of parts) {
+      const match = part.match(/^([^:：]+)[:：]\s*(.+)$/);
+      if (!match) continue;
+      const key = match[1].trim().toLocaleLowerCase();
+      const value = match[2].trim();
+      if (/^(标题|活动|活动标题|名称|title)$/.test(key)) mapped.title = value;
+      if (/^(日期|发布时间|发布日期|published_at|date)$/.test(key)) mapped.published_at = value;
+      if (/^(类型|活动类型|动态类型|news_type|type)$/.test(key)) mapped.news_type = value;
+      if (/^(摘要|简介|内容摘要|summary)$/.test(key)) mapped.summary = value;
+      if (/^(正文|内容|content)$/.test(key)) mapped.content = value;
+      if (/^(来源|来源url|链接|source_url|url)$/.test(key)) mapped.source_url = value;
+    }
+    if (!mapped.title) return null;
+    return buildTextRow(mapped);
+  };
+
+  const buildRowError = (rowNumber: number, row: ScholarNewsBatchRow) => {
+    const rowErrors: string[] = [];
+    if (!row.title) rowErrors.push("标题不能为空");
+    if (!normalizeDate(row.published_at)) rowErrors.push("发布日期格式无效");
+    if (!isHttpUrl(row.source_url ?? "")) rowErrors.push("来源 URL 必须使用 http 或 https");
+    return rowErrors.length > 0
+      ? { row: rowNumber, error: rowErrors.join("；") }
+      : null;
+  };
+
+  function buildTextRow(mapped: Record<string, string>): ScholarNewsBatchRow {
+    const publishedAt = normalizeDate(mapped.published_at) ?? "";
+    const row: ScholarNewsBatchRow = {
+      scholar_id: scholarId,
+      title: cleanText(mapped.title),
+      published_at: publishedAt,
+      match_status: "matched",
+      match_method: "scholar_id",
+      review_status: "approved",
+      added_by: "user",
+    };
+    if (mapped.news_type) row.news_type = cleanText(mapped.news_type);
+    if (mapped.summary) row.summary = cleanText(mapped.summary);
+    if (mapped.content) row.content = cleanText(mapped.content);
+    if (mapped.source_url) row.source_url = cleanText(mapped.source_url);
+    return row;
+  }
+
+  text
+    .split("\n")
+    .map((line) => line.replace(/^\s*\[\d+\]\s*/, "").replace(/^\s*\d+[.)、]\s*/, "").trim())
+    .filter(Boolean)
+    .forEach((line, index) => {
+      const rowNumber = index + 1;
+      const labeled = parseLabeledLine(line);
+      const row =
+        labeled ??
+        (() => {
+          const parts = line.split(/[|｜\t]/).map((part) => part.trim());
+          return buildTextRow({
+            title: parts[0] ?? "",
+            published_at: parts[1] ?? "",
+            news_type: parts[2] ?? "",
+            summary: parts[3] ?? "",
+            source_url: parts[4] ?? "",
+            content: parts[5] ?? "",
+          });
+        })();
+
+      const error = buildRowError(rowNumber, row);
+      if (error) {
+        errors.push(error);
+        return;
+      }
+
+      const key = duplicateKey(row);
+      if (seen.has(key)) {
+        errors.push({ row: rowNumber, error: "与粘贴内容中的上一条活动重复" });
+        return;
+      }
+      seen.add(key);
+      rows.push(row);
+      rowNumbers.push(rowNumber);
+    });
+
+  return { rows, rowNumbers, errors };
+}
+
 export function downloadNewsImportTemplate(): void {
   const worksheet = XLSX.utils.aoa_to_sheet([
     NEWS_IMPORT_COLUMNS.map((column) => column.label),
