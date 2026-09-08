@@ -62,6 +62,7 @@ describe("ScholarDetailPage responsive layout", () => {
     expect(left?.className).toContain("w-full");
     expect(left?.className).toContain("xl:w-[400px]");
     expect(left?.className).toContain("xl:overflow-y-auto");
+    expect(left?.className).toContain("xl:pl-2");
     expect(left?.className).toContain("scrollbar-hide");
     expect(main.className).toContain("w-full");
     expect(main.className).toContain("xl:overflow-y-auto");
@@ -69,6 +70,7 @@ describe("ScholarDetailPage responsive layout", () => {
     expect(right?.className).toContain("w-full");
     expect(right?.className).toContain("xl:w-80");
     expect(right?.className).toContain("xl:overflow-y-auto");
+    expect(right?.className).toContain("xl:pr-2");
     expect(right?.className).toContain("scrollbar-hide");
   });
 });

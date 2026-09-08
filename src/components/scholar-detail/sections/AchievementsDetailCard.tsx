@@ -288,25 +288,6 @@ export function AchievementsDetailCard({
       variants={slideInUp}
       className="bg-white"
     >
-      {/* Title */}
-      <div className="mb-4 flex items-center gap-2 border-b border-gray-200 pb-3">
-        <Trophy className="w-5 h-5 text-primary-600" />
-        <h3 className="text-lg font-semibold text-gray-900">学者成就</h3>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="编辑学者成就"
-            onClick={() => {
-              onShowAchievementsModal();
-            }}
-            title="编辑学者成就"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-primary-50 hover:text-primary-700"
-          >
-            <Edit3 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
       {relationSlot && <div className="mb-5">{relationSlot}</div>}
 
       <section
@@ -359,6 +340,20 @@ export function AchievementsDetailCard({
           </ResourceState>
         </div>}
       </section>
+
+      <div className="mb-3 flex items-center gap-2">
+        <Trophy className="h-5 w-5 text-primary-600" />
+        <h3 className="text-lg font-semibold text-gray-900">学术成果</h3>
+        <button
+          type="button"
+          aria-label="编辑学术成果"
+          title="编辑学术成果"
+          onClick={onShowAchievementsModal}
+          className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-primary-50 hover:text-primary-700"
+        >
+          <Edit3 className="h-4 w-4" />
+        </button>
+      </div>
 
       {(achievementTags.length > 0 || hasTwoInstitutesPapers) && (
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2">

@@ -35,12 +35,15 @@ const scholar = {
   joint_research_projects: [{ title: "Legacy project" }],
 } as unknown as ScholarDetail;
 
-function renderCard(relationSlot?: React.ReactNode) {
+function renderCard(
+  relationSlot?: React.ReactNode,
+  onShowAchievementsModal = vi.fn(),
+) {
   return render(
     <MemoryRouter>
       <AchievementsDetailCard
         scholar={scholar}
-        onShowAchievementsModal={vi.fn()}
+        onShowAchievementsModal={onShowAchievementsModal}
         relationSlot={relationSlot}
       />
     </MemoryRouter>,
@@ -102,7 +105,7 @@ describe("AchievementsDetailCard", () => {
   it("renders academic positions as an independent module instead of an achievement tab", async () => {
     renderCard();
 
-    expect(screen.getByText("学者成就")).toBeTruthy();
+    expect(screen.getByText("学术成果")).toBeTruthy();
     for (const label of [
       "代表论文",
       "专利",
@@ -169,6 +172,27 @@ describe("AchievementsDetailCard", () => {
     expect(relationModule.compareDocumentPosition(tabs)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
+  });
+
+  it("places the sole achievement editor beside the academic outcomes heading", async () => {
+    const onShowAchievementsModal = vi.fn();
+    renderCard(undefined, onShowAchievementsModal);
+
+    const positions = await screen.findByTestId("scholar-academic-positions-module");
+    const heading = screen.getByRole("heading", { name: "学术成果" });
+    const tabs = screen.getByTestId("scholar-achievement-tabs");
+
+    expect(screen.queryByText("学者成就")).toBeNull();
+    expect(positions.compareDocumentPosition(heading)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(heading.compareDocumentPosition(tabs)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(screen.getAllByRole("button", { name: "编辑学术成果" })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "编辑学术成果" }));
+    expect(onShowAchievementsModal).toHaveBeenCalledOnce();
   });
 
   it("shows collection errors explicitly and allows retry", async () => {

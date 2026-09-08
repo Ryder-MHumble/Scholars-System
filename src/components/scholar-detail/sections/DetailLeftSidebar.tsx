@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -99,7 +100,7 @@ export function DetailLeftSidebar({
     >
       <motion.div
         variants={slideInLeft}
-        className="overflow-hidden bg-white"
+        className="bg-white"
       >
         <div className="relative px-1 pb-4 pt-1">
           {onEditProfile && (
@@ -465,6 +466,11 @@ function ProfileLinkIcons({
 }: {
   profileLinks: ReturnType<typeof resolveProfileLinks>;
 }) {
+  const [tooltip, setTooltip] = useState<{
+    label: string;
+    left: number;
+    top: number;
+  } | null>(null);
   const links = [
     {
       label: "个人主页",
@@ -546,28 +552,52 @@ function ProfileLinkIcons({
     return null;
   }
 
+  const showTooltip = (anchor: HTMLElement, label: string) => {
+    const rect = anchor.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || rect.right + 144;
+    const left = Math.min(
+      Math.max(rect.left + rect.width / 2, 72),
+      Math.max(72, viewportWidth - 72),
+    );
+    setTooltip({ label, left, top: rect.bottom + 8 });
+  };
+
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-start gap-2">
-      {links.map((link) => {
-        const Icon = link.Icon;
-        return (
-          <a
-            key={`${link.label}-${link.value}`}
-            href={"href" in link && link.href ? link.href : link.value}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={link.label}
-            aria-label={link.label}
-            className={`group/link relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors ${link.className}`}
+    <>
+      <div className="mb-5 flex flex-wrap items-center justify-start gap-2">
+        {links.map((link) => {
+          const Icon = link.Icon;
+          return (
+            <a
+              key={`${link.label}-${link.value}`}
+              href={"href" in link && link.href ? link.href : link.value}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={link.label}
+              onMouseEnter={(event) => showTooltip(event.currentTarget, link.label)}
+              onMouseLeave={() => setTooltip(null)}
+              onFocus={(event) => showTooltip(event.currentTarget, link.label)}
+              onBlur={() => setTooltip(null)}
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors ${link.className}`}
+            >
+              <Icon className="h-4.5 w-4.5" />
+            </a>
+          );
+        })}
+      </div>
+      {tooltip &&
+        createPortal(
+          <span
+            role="tooltip"
+            aria-label={tooltip.label}
+            style={{ left: tooltip.left, top: tooltip.top }}
+            className="pointer-events-none fixed z-[100] -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg"
           >
-            <Icon className="h-4.5 w-4.5" />
-            <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover/link:opacity-100 group-focus-visible/link:opacity-100">
-              {link.label}
-              <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-gray-900" />
-            </span>
-          </a>
-        );
-      })}
-    </div>
+            <span className="absolute bottom-full left-1/2 h-2 w-2 -translate-x-1/2 translate-y-1/2 rotate-45 bg-gray-900" />
+            {tooltip.label}
+          </span>,
+          document.body,
+        )}
+    </>
   );
 }

@@ -7,6 +7,7 @@ const scholar = {
   url_hash: "scholar-1",
   name: "测试学者",
   name_en: "Test Scholar",
+  profile_url: "https://example.com/scholar",
   academic_titles: [],
   education: [],
   research_areas: [],
@@ -40,5 +41,18 @@ describe("DetailLeftSidebar", () => {
     expect(button.textContent).toBe("");
     fireEvent.click(button);
     expect(onEditProfile).toHaveBeenCalledOnce();
+  });
+
+  it("renders profile link tooltips outside the sidebar clipping boundary", () => {
+    const { container } = render(<DetailLeftSidebar scholar={scholar} />);
+
+    const sidebarContent = container.querySelector("aside > div");
+    const homepageLink = screen.getByRole("link", { name: "个人主页" });
+    expect(sidebarContent?.className).not.toContain("overflow-hidden");
+
+    fireEvent.mouseEnter(homepageLink);
+
+    const tooltip = screen.getByRole("tooltip", { name: "个人主页" });
+    expect(tooltip.parentElement).toBe(document.body);
   });
 });

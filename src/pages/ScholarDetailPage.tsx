@@ -127,7 +127,7 @@ export default function ScholarDetailPageDemo() {
             data-testid="scholar-detail-layout"
             className="flex flex-col gap-4 xl:min-h-0 xl:flex-1 xl:flex-row xl:overflow-hidden"
           >
-            <div className="scrollbar-hide w-full xl:w-[400px] xl:shrink-0 xl:overflow-y-auto xl:pr-5">
+            <div className="scrollbar-hide w-full xl:w-[400px] xl:shrink-0 xl:overflow-y-auto xl:pl-2 xl:pr-5">
               <DetailLeftSidebar
                 scholar={scholar}
                 onEditProfile={() => setShowProfileModal(true)}
@@ -154,7 +154,7 @@ export default function ScholarDetailPageDemo() {
             </motion.main>
 
             <motion.div
-              className="scrollbar-hide w-full xl:w-80 xl:shrink-0 xl:overflow-y-auto xl:pl-5"
+              className="scrollbar-hide w-full xl:w-80 xl:shrink-0 xl:overflow-y-auto xl:pl-5 xl:pr-2"
               variants={slideInRight}
               initial="hidden"
               animate="visible"
