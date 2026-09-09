@@ -107,7 +107,7 @@ export const NAV_TREE: NavNode[] = [
           { id: "sci_edu_comm", label: "科技教育委员会", tab: "projects", subtab: "sci_edu_committee" },
           { id: "acad_comm", label: "学术委员会", tab: "projects", subtab: "academic_committee" },
           { id: "teach_comm", label: "教学委员会", tab: "projects", subtab: "teaching_committee" },
-          { id: "student_mentor", label: "高校导师", tab: "projects", subtab: "student_mentor" },
+          { id: "student_mentor", label: "学院学生高校导师", tab: "projects", subtab: "student_mentor" },
           { id: "fulltime_mentor", label: "全职导师", tab: "projects", subtab: "fulltime_mentor" },
           { id: "industry_mentor", label: "产业导师", tab: "projects", subtab: "industry_mentor" },
           { id: "parttime_mentor", label: "兼职导师", tab: "projects", subtab: "parttime_mentor" },

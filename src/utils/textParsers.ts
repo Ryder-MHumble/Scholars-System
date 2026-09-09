@@ -6,7 +6,12 @@ import type {
   ManagementRole,
   JointProject,
 } from "@/services/scholarApi";
+import type { ActivityCreateRequest } from "@/services/activityApi";
 import { DOMAIN_MAP } from "@/utils/institutionLogoUtils";
+import {
+  mergeAcademicAffiliations as mergeAcademicAffiliationsCore,
+  parseAcademicAffiliationsFromText as parseAcademicAffiliationsFromTextCore,
+} from "@/utils/academicAffiliationParser";
 
 // ─── Publication Parser ──────────────────────────────────────────────────────
 //
@@ -617,24 +622,246 @@ export function parseEducationFromText(text: string): EducationRecord[] {
     .filter((r) => r.degree || r.institution || r.year);
 }
 
+function stripListPrefix(line: string): string {
+  return line
+    .replace(/^\s*\[\d+\]\s*/, "")
+    .replace(/^\s*\d{1,3}[.)、]\s*/, "")
+    .replace(/^[•·]\s*/, "")
+    .trim();
+}
+
+function extractYearToken(input: string): string {
+  const match = input.match(/(?:19|20)\d{2}|至今|present|now/i);
+  if (!match) return "";
+  const value = match[0];
+  return /^(present|now)$/i.test(value) ? "至今" : value;
+}
+
 // ─── Management Role Parser ──────────────────────────────────────────────────
 //
-// Parses each non-empty line as a plain string role entry.
+// Supports:
+//   1. "职务 | 机构 | 开始 | 结束"
+//   2. "机构 | 职务 | 开始 | 结束" when the first column looks like an org
+//   3. "机构 职务 2023-至今"
+//   4. "职务：...；机构：...；开始：...；结束：..."
 //
 export function parseManagementRolesFromText(text: string): ManagementRole[] {
+  const parseLabeledFields = (value: string): ManagementRole | null => {
+    const pairs = value
+      .split(/[；;]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (pairs.length < 2) return null;
+
+    const mapped: Record<string, string> = {};
+    for (const pair of pairs) {
+      const match = pair.match(/^([^:：]+)[:：]\s*(.+)$/);
+      if (!match) continue;
+      const key = match[1].trim().toLowerCase();
+      const val = match[2].trim();
+      if (/^(职务|兼职|岗位|角色|role|position|title)$/.test(key)) mapped.role = val;
+      if (/^(机构|兼职机构|单位|组织|organization|institution|org)$/.test(key)) mapped.organization = val;
+      if (/^(开始|开始年份|起始|start|start_year)$/.test(key)) mapped.start_year = val;
+      if (/^(结束|结束年份|终止|end|end_year)$/.test(key)) mapped.end_year = val;
+    }
+
+    if (!mapped.role && !mapped.organization) return null;
+    return {
+      role: mapped.role || "",
+      organization: mapped.organization || "",
+      start_year: mapped.start_year || "",
+      end_year: mapped.end_year || "",
+    };
+  };
+
+  const looksLikeOrganization = (value: string): boolean =>
+    /(大学|学院|研究院|实验室|中心|协会|学会|委员会|University|Institute|College|School|Lab|Center|Association|Society)/i.test(value);
+
   return text
+    .replace(/\r/g, "")
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      // A pasted homepage paragraph often separates appointments with semicolons.
+      // Keep labeled rows intact, but split plain rows into independent records.
+      const candidates = /[:：]/.test(line)
+        ? [line]
+        : line.split(/[；;]/).map((item) => item.trim()).filter(Boolean);
+      return candidates.map((l) => {
+      const raw = stripListPrefix(l);
+      const labeled = parseLabeledFields(raw);
+      if (labeled) return labeled;
+
+      const parts = raw
+        .split(/[|｜\t]|\s{2,}/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.length >= 2) {
+        const firstIsOrg = looksLikeOrganization(parts[0]);
+        return {
+          role: firstIsOrg ? parts[1] || "" : parts[0] || "",
+          organization: firstIsOrg ? parts[0] || "" : parts[1] || "",
+          start_year: parts[2] || "",
+          end_year: parts[3] || "",
+        };
+      }
+
+      const rangeMatch = raw.match(
+        /((?:19|20)\d{2}(?:[./-]\d{1,2})?|至今|present|now)\s*(?:-|—|–|~|～|至|到)\s*((?:19|20)\d{2}(?:[./-]\d{1,2})?|至今|present|now)/i,
+      );
+      const start_year = rangeMatch ? extractYearToken(rangeMatch[1]) : "";
+      const end_year = rangeMatch ? extractYearToken(rangeMatch[2]) : "";
+      const withoutRange = rangeMatch
+        ? raw.replace(rangeMatch[0], "").replace(/[，,；;()（）]+/g, " ").trim()
+        : raw;
+      const orgMatch = withoutRange.match(
+        /^(.+?(?:大学|学院|研究院|实验室|中心|协会|学会|委员会|University|Institute|College|School|Lab|Center|Association|Society))\s+(.+)$/i,
+      );
+      if (orgMatch) {
+        return {
+          organization: orgMatch[1].trim(),
+          role: orgMatch[2].trim(),
+          start_year,
+          end_year,
+        };
+      }
+
+      return {
+        role: withoutRange || raw,
+        organization: "",
+        start_year,
+        end_year,
+      };
+      });
+    })
+    .filter((item) => item.role || item.organization);
+}
+
+/** Academic-service aliases share the same tolerant parser but stay out of employment fields. */
+export function parseAcademicAffiliationsFromText(text: string): ManagementRole[] {
+  return parseAcademicAffiliationsFromTextCore(text);
+}
+
+export function mergeAcademicAffiliations(
+  existing: ManagementRole[],
+  incoming: ManagementRole[],
+): ManagementRole[] {
+  return mergeAcademicAffiliationsCore(existing, incoming);
+}
+
+// ─── Scholar Activity Parser ─────────────────────────────────────────────────
+//
+// Supports:
+//   1. "标题 | 日期 | 类型 | 分类 | 地点 | 摘要"
+//   2. "标题：...；日期：2026-09-08；类型：讲座；分类：学术活动；地点：..."
+//   3. "2026-09-08 标题 地点"
+//
+export function parseScholarActivitiesFromText(
+  text: string,
+): ActivityCreateRequest[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const extractDate = (input: string): string => {
+    const iso = input.match(/\b((?:19|20)\d{2})[-/.年](\d{1,2})(?:[-/.月](\d{1,2})日?)?\b/);
+    if (!iso) return today;
+    const year = iso[1];
+    const month = String(Number(iso[2])).padStart(2, "0");
+    const day = String(Number(iso[3] || "1")).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const extractTime = (input: string): string | undefined => {
+    const match = input.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+    if (!match) return undefined;
+    return `${match[1].padStart(2, "0")}:${match[2]}`;
+  };
+
+  const buildActivity = (data: Partial<ActivityCreateRequest>): ActivityCreateRequest => ({
+    title: data.title?.trim() || "未命名学者活动",
+    event_date: data.event_date?.trim() || today,
+    event_time: data.event_time?.trim() || undefined,
+    event_type: data.event_type?.trim() || "学者活动",
+    category: data.category?.trim() || "学者活动",
+    location: data.location?.trim() || "待定",
+    abstract: data.abstract?.trim() || undefined,
+    scholar_ids: data.scholar_ids,
+  });
+
+  const parseLabeledFields = (value: string): ActivityCreateRequest | null => {
+    const pairs = value
+      .split(/[；;]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (pairs.length < 2) return null;
+
+    const mapped: Partial<ActivityCreateRequest> = {};
+    for (const pair of pairs) {
+      const match = pair.match(/^([^:：]+)[:：]\s*(.+)$/);
+      if (!match) continue;
+      const key = match[1].trim().toLowerCase();
+      const val = match[2].trim();
+      if (/^(标题|活动|活动标题|名称|title)$/.test(key)) mapped.title = val;
+      if (/^(日期|活动日期|时间|date|event_date)$/.test(key)) {
+        mapped.event_date = extractDate(val);
+        mapped.event_time = extractTime(val);
+      }
+      if (/^(类型|活动类型|type|event_type)$/.test(key)) mapped.event_type = val;
+      if (/^(分类|类别|category)$/.test(key)) mapped.category = val;
+      if (/^(地点|位置|location|venue)$/.test(key)) mapped.location = val;
+      if (/^(摘要|简介|内容|描述|abstract|description)$/.test(key)) mapped.abstract = val;
+    }
+
+    if (!mapped.title && !mapped.abstract) return null;
+    return buildActivity(mapped);
+  };
+
+  const parsed = text
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean)
-    .map((l) => {
-      const parts = l.split(/[|｜]/).map((s) => s.trim());
-      return {
-        role: parts[0] || "",
-        organization: parts[1] || "",
-        start_year: parts[2] || "",
-        end_year: parts[3] || "",
-      };
-    });
+    .map((line): ActivityCreateRequest => {
+      const raw = stripListPrefix(line);
+      const labeled = parseLabeledFields(raw);
+      if (labeled) return labeled;
+
+      const parts = raw.split(/[|｜\t]/).map((s) => s.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        return buildActivity({
+          title: parts[0],
+          event_date: extractDate(parts[1]),
+          event_time: extractTime(parts[1]),
+          event_type: parts[2],
+          category: parts[3],
+          location: parts[4],
+          abstract: parts[5],
+        });
+      }
+
+      const date = extractDate(raw);
+      const time = extractTime(raw);
+      const dateMatch = raw.match(/(?:19|20)\d{2}[-/.年]\d{1,2}(?:[-/.月]\d{1,2}日?)?/);
+      const title = raw
+        .replace(dateMatch?.[0] ?? "", "")
+        .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/, "")
+        .replace(/^[-–—•·\s]+|[-–—•·\s]+$/g, "")
+        .replace(/[，,；;]+$/, "")
+        .trim();
+
+      return buildActivity({
+        title: title || raw,
+        event_date: date,
+        event_time: time,
+      });
+    })
+    .filter((item) => item.title || item.abstract);
+
+  const seen = new Set<string>();
+  return parsed.filter((item) => {
+    const key = `${item.title.trim().toLocaleLowerCase()}|${item.event_date.trim()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ─── Patent Parser ───────────────────────────────────────────────────────────

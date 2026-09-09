@@ -10,6 +10,7 @@ import { ContactModal } from "@/components/scholar-detail/modals/ContactModal";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
 import { ProjectCategorySelector } from "@/components/scholar-detail/sections/ProjectCategorySelector";
 import { AchievementsDetailCard } from "@/components/scholar-detail/sections/AchievementsDetailCard";
+import { AcademicAdjunctCard } from "@/components/scholar-detail/sections/AcademicAdjunctCard";
 import { RightSidebar } from "@/components/scholar-detail/sections/RightSidebar";
 import { slideInRight, staggerContainer } from "@/utils/animations";
 
@@ -24,6 +25,7 @@ export default function ScholarDetailPageDemo() {
     editableAchievements,
     handleFieldSave,
     handleManagementRolesSave,
+    handleAcademicPositionsSave,
     handleAchievementsSave,
     handleProjectCategorySave,
   } = useScholarDetail(scholarId);
@@ -95,11 +97,11 @@ export default function ScholarDetailPageDemo() {
             onSubmit={async (patch) => {
               await handleFieldSave(patch);
             }}
-            onSubmitManagementRoles={handleManagementRolesSave}
+            onSubmitAcademicPositions={handleAcademicPositionsSave}
           />
         )}
       </AnimatePresence>
-      <div className="h-screen bg-gray-50 overflow-hidden">
+      <div className="h-screen bg-white overflow-hidden">
         <div className="max-w-[1600px] mx-auto px-4 py-6 h-full flex flex-col">
           {/* Header with breadcrumb and actions */}
           <motion.div
@@ -118,9 +120,9 @@ export default function ScholarDetailPageDemo() {
           </motion.div>
 
           {/* Three Column Layout — left/right fixed, center scrolls */}
-          <div className="flex gap-5 flex-1 min-h-0">
+          <div className="flex gap-5 flex-1 min-h-0 overflow-hidden">
             {/* Left Sidebar — fixed */}
-            <div className="shrink-0 overflow-y-auto custom-scrollbar" style={{ position: "sticky", top: 0 }}>
+            <div className="h-full min-h-0 shrink-0 overflow-y-auto scrollbar-hide" style={{ position: "sticky", top: 0 }}>
             <DetailLeftSidebar
               scholar={scholar}
               onEditProfile={() => setShowProfileModal(true)}
@@ -129,7 +131,7 @@ export default function ScholarDetailPageDemo() {
 
             {/* Center Content — scrollable */}
             <motion.main
-              className="flex-1 min-w-0 space-y-4 overflow-y-auto custom-scrollbar pr-1"
+              className="h-full min-h-0 flex-1 min-w-0 space-y-4 overflow-y-auto scrollbar-hide pr-1"
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
@@ -137,6 +139,11 @@ export default function ScholarDetailPageDemo() {
               <ProjectCategorySelector
                 projectTags={scholar.project_tags ?? []}
                 onSave={handleProjectCategorySave}
+              />
+
+              <AcademicAdjunctCard
+                scholar={scholar}
+                onSave={handleManagementRolesSave}
               />
 
               <AchievementsDetailCard
@@ -147,7 +154,7 @@ export default function ScholarDetailPageDemo() {
 
             {/* Right Sidebar — fixed */}
             <motion.div
-              className="shrink-0"
+              className="h-full min-h-0 shrink-0 overflow-y-auto scrollbar-hide"
               variants={slideInRight}
               initial="hidden"
               animate="visible"

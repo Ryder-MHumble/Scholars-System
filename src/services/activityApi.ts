@@ -540,6 +540,17 @@ const scholarActivityCache = new Map<
 >();
 const scholarActivityInFlight = new Map<string, Promise<ActivityEvent[]>>();
 
+export function invalidateScholarActivityCache(scholarUrlHash?: string): void {
+  if (!scholarUrlHash) {
+    scholarActivityCache.clear();
+    scholarActivityInFlight.clear();
+    return;
+  }
+  const key = normalizeScholarKey(scholarUrlHash);
+  scholarActivityCache.delete(key);
+  scholarActivityInFlight.delete(key);
+}
+
 function normalizeScholarKey(raw: unknown): string {
   return String(raw ?? "").trim().toLowerCase();
 }

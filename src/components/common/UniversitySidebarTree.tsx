@@ -29,6 +29,8 @@ export interface DeptNode {
 export interface UniNode {
   id?: string;
   name: string;
+  region?: string | null;
+  orgType?: string | null;
   departments: DeptNode[];
   count: number;
   departmentCount?: number;
@@ -117,8 +119,8 @@ export function UniversitySidebarTree({
     const groups: Record<string, CategoryGroup> = {};
 
     for (const uni of uniNodes) {
-      const type = classifyInstitutionType(uni.name);
-      const region = classifyInstitutionRegion(uni.name);
+      const type = classifyInstitutionType(uni.name, uni.orgType);
+      const region = uni.region === "国内" ? INSTITUTION_REGIONS.DOMESTIC : uni.region === "国际" ? INSTITUTION_REGIONS.INTERNATIONAL : classifyInstitutionRegion(uni.name);
       const typeLabel = getInstitutionTypeLabel(type);
       const regionLabel = getInstitutionRegionLabel(region);
       const categoryLabel = `${regionLabel} - ${typeLabel}`;

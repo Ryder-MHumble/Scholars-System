@@ -476,7 +476,7 @@ export function buildRelationPayload(data: RelationPatch): Record<string, unknow
     payload.event_tags = eventTags;
   }
 
-  if (payload.is_cobuild_scholar === undefined) {
+  if (payload.is_cobuild_scholar === undefined && "project_tags" in payload) {
     const hasProjectTags =
       Array.isArray(payload.project_tags) && payload.project_tags.length > 0;
     payload.is_cobuild_scholar = hasProjectTags;

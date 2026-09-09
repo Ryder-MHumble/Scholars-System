@@ -12,11 +12,9 @@ import type {
 import {
   buildLegacyProfileLinkFields,
   createScholar,
-  patchScholarAchievements,
-  patchScholarRelation,
   resolveProfileLinks,
 } from "@/services/scholarApi";
-import type { ScholarDetailPatch, ManagementRole, JointProject } from "@/services/scholarApi";
+import type { ScholarDetailPatch, JointProject, AcademicPositionRecord } from "@/services/scholarApi";
 import { DetailLeftSidebar } from "@/components/scholar-detail/sections/DetailLeftSidebar";
 import { ProjectCategorySelector } from "@/components/scholar-detail/sections/ProjectCategorySelector";
 import { AchievementsDetailCard } from "@/components/scholar-detail/sections/AchievementsDetailCard";
@@ -50,6 +48,7 @@ const emptyScholar: ScholarDetail = {
     aminer: "",
     other: [],
   },
+  custom_fields: {},
   profile_url: "",
   joint_research_projects: [],
   is_potential_recruit: false,
@@ -78,11 +77,15 @@ const emptyScholar: ScholarDetail = {
   metrics_updated_at: "",
   supervised_students: [],
   joint_management_roles: [],
+  academic_positions: [],
   academic_exchange_records: [],
   institute_relation_notes: "",
   relation_updated_by: "",
   relation_updated_at: "",
   recent_updates: [],
+  news: [],
+  research_projects: [],
+  open_source_projects: [],
   representative_publications: [],
   patents: [],
   awards: [],
@@ -151,14 +154,8 @@ export default function AddScholarDetailPage() {
     }
   };
 
-  // Management roles save handlers
-  const handleManagementRolesSave = async (records: ManagementRole[]) => {
-    try {
-      setScholar((prev) => ({ ...prev, joint_management_roles: records }));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "保存管理角色失败");
-    }
+  const handleAcademicPositionsSave = async (records: AcademicPositionRecord[]) => {
+    setScholar((prev) => ({ ...prev, academic_positions: records }));
   };
 
   // Achievements save handler
@@ -179,7 +176,7 @@ export default function AddScholarDetailPage() {
       setShowAchievementsModal(false);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存学术成就失败");
+      setError(err instanceof Error ? err.message : "保存学者成就失败");
     }
   };
 
@@ -218,49 +215,42 @@ export default function AddScholarDetailPage() {
         position: scholar.position || undefined,
         university: scholar.university,
         department: scholar.department || undefined,
+        gender: scholar.gender || undefined,
         email: scholar.email || undefined,
         phone: scholar.phone || undefined,
+        office: scholar.office || undefined,
         profile_links: profileLinks,
         ...legacyProfileFields,
         research_areas: scholar.research_areas || [],
+        keywords: scholar.keywords || [],
         academic_titles: scholar.academic_titles || [],
         education: scholar.education || [],
+        bio_en: scholar.bio_en || undefined,
+        custom_fields: scholar.custom_fields || {},
         joint_research_projects: scholar.joint_research_projects || [],
+        joint_management_roles: scholar.joint_management_roles || [],
+        academic_exchange_records: scholar.academic_exchange_records || [],
+        is_advisor_committee: scholar.is_advisor_committee,
+        is_potential_recruit: scholar.is_potential_recruit,
+        institute_relation_notes: scholar.institute_relation_notes || undefined,
+        supervised_students: scholar.supervised_students || [],
+        adjunct_supervisor: scholar.adjunct_supervisor,
         publications_count: scholar.publications_count,
         h_index: scholar.h_index,
         citations_count: scholar.citations_count,
+        representative_publications: scholar.representative_publications || [],
+        patents: scholar.patents || [],
+        awards: scholar.awards || [],
+        coauthors: scholar.coauthors || [],
         bio: scholar.bio || undefined,
         project_tags: scholar.project_tags || [],
+        event_tags: scholar.event_tags || [],
+        participated_event_ids: scholar.participated_event_ids || [],
         is_cobuild_scholar: (scholar.project_tags?.length ?? 0) > 0,
         added_by: "user",
       };
 
-      const created = await createScholar(submitData);
-
-      const publications = scholar.representative_publications || [];
-      const patents = scholar.patents || [];
-      const awards = scholar.awards || [];
-      const hasAchievements =
-        publications.length > 0 || patents.length > 0 || awards.length > 0;
-
-      if (hasAchievements) {
-        await patchScholarAchievements(created.url_hash, {
-          representative_publications: publications,
-          patents,
-          awards,
-          updated_by: "user",
-        });
-      }
-
-      if (
-        (scholar.joint_research_projects?.length ?? 0) > 0 ||
-        (scholar.joint_management_roles?.length ?? 0) > 0
-      ) {
-        await patchScholarRelation(created.url_hash, {
-          joint_research_projects: scholar.joint_research_projects,
-          joint_management_roles: scholar.joint_management_roles,
-        });
-      }
+      await createScholar(submitData);
 
       navigate(returnTo);
     } catch (err) {
@@ -294,9 +284,7 @@ export default function AddScholarDetailPage() {
               await handleFieldSave(patch);
               setShowProfileModal(false);
             }}
-            onSubmitManagementRoles={async (roles) => {
-              await handleManagementRolesSave(roles);
-            }}
+            onSubmitAcademicPositions={handleAcademicPositionsSave}
           />
         )}
       </AnimatePresence>
@@ -367,6 +355,13 @@ export default function AddScholarDetailPage() {
             >
               <ProjectCategorySelector
                 projectTags={scholar.project_tags ?? []}
+                onChange={(projectTags) =>
+                  setScholar((prev) => ({
+                    ...prev,
+                    project_tags: projectTags,
+                    is_cobuild_scholar: projectTags.length > 0,
+                  }))
+                }
                 onSave={handleProjectCategorySave}
               />
 

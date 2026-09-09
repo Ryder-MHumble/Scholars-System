@@ -62,7 +62,7 @@ const PROJECT_SUBTAB_FILTER: Record<
   sci_edu_committee: { category: "教育培养", subcategory: "科技教育委员会" },
   academic_committee: { category: "教育培养", subcategory: "学术委员会" },
   teaching_committee: { category: "教育培养", subcategory: "教学委员会" },
-  student_mentor: { category: "教育培养", subcategory: "高校导师" },
+  student_mentor: { category: "教育培养", subcategory: "学院学生高校导师" },
   fulltime_mentor: { category: "教育培养", subcategory: "全职导师" },
   industry_mentor: { category: "教育培养", subcategory: "产业导师" },
   parttime_mentor: { category: "教育培养", subcategory: "兼职导师" },
@@ -326,6 +326,8 @@ export function useScholarList(options: UseScholarListOptions = {}) {
     return universities.map((uni) => ({
       name: uni.name,
       id: uni.institutionId,
+      region: uni.region,
+      orgType: uni.orgType,
       departments: uni.departments.map((dept) => ({
         name: dept.name,
         count: dept.scholar_count,

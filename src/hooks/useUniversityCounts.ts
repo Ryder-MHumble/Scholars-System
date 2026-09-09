@@ -13,6 +13,8 @@ export interface UniversityData {
   id: string;
   institutionId?: string;
   name: string;
+  region?: string | null;
+  orgType?: string | null;
   count: number;
   scholarCount: number;
   departmentCount: number;
@@ -63,6 +65,8 @@ export function useUniversityCounts(filters?: {
             id: item.university,
             institutionId: item.institution_id,
             name: item.university,
+            region: item.region,
+            orgType: item.org_type,
             count: item.scholar_count,
             scholarCount: item.scholar_count,
             departmentCount: item.department_count ?? item.departments.length,

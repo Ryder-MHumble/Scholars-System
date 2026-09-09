@@ -92,6 +92,7 @@ export function generateScholarTemplate(
         作者: pub.authors || "",
         论文链接: pub.url || "",
         引用数: pub.citation_count || "",
+        标签: (pub.achievement_tags || []).join(";"),
       }),
     );
 
@@ -103,6 +104,7 @@ export function generateScholarTemplate(
         作者: "",
         论文链接: "",
         引用数: "",
+        标签: "",
       });
     }
 

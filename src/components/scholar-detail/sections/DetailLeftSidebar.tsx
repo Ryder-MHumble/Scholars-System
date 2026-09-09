@@ -73,7 +73,7 @@ export function DetailLeftSidebar({
       iconClassName: "text-violet-500",
     },
   ];
-  const metricsUpdatedAt = formatMetricDate(scholar.metrics_updated_at);
+  const academicPositions = scholar.academic_positions ?? [];
 
   const eduItems =
     scholar.education && scholar.education.length > 0
@@ -140,6 +140,19 @@ export function DetailLeftSidebar({
             </div>
           </div>
 
+          {onEditProfile && (
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={onEditProfile}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                编辑资料
+              </button>
+            </div>
+          )}
+
           <ProfileLinkIcons profileLinks={profileLinks} />
 
           {showMetrics && (
@@ -163,16 +176,11 @@ export function DetailLeftSidebar({
                 </div>
               </div>
 
-              {metricsUpdatedAt && (
-                <p className="mb-4 text-[11px] text-gray-400">
-                  指标更新时间：{metricsUpdatedAt}
-                </p>
-              )}
             </>
           )}
 
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <div className="min-w-0 flex flex-wrap gap-1.5">
+          <div className="mt-3 flex items-start gap-3">
+            <div className="min-w-0 flex flex-1 flex-wrap gap-1.5">
               {scholar.academic_titles.length > 0 && (
                 <>
                   {scholar.academic_titles.slice(0, 3).map((t) => (
@@ -193,16 +201,6 @@ export function DetailLeftSidebar({
                 </span>
               )}
             </div>
-            {onEditProfile && (
-              <button
-                type="button"
-                onClick={onEditProfile}
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white transition-colors hover:bg-primary-700"
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                编辑资料
-              </button>
-            )}
           </div>
 
         </div>
@@ -316,20 +314,17 @@ export function DetailLeftSidebar({
         </div>
 
         <div className="px-5 py-4 border-t border-gray-100">
-          <SideLabel icon={Briefcase} title="任职经历" />
-          {scholar.joint_management_roles &&
-          scholar.joint_management_roles.length > 0 ? (
-            <div className="space-y-2">
-              {scholar.joint_management_roles.map((role, i) => (
-                <div key={i} className="relative pl-5">
-                  <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
-                  <p className="text-sm text-gray-700">{role.role || "任职经历"}</p>
-                  {role.organization && (
-                    <p className="text-xs text-gray-500">{role.organization}</p>
-                  )}
-                  {(role.start_year || role.end_year) && (
+          <SideLabel icon={Briefcase} title={`任职经历${academicPositions.length ? ` ${academicPositions.length}` : ""}`} />
+          {academicPositions.length > 0 ? (
+            <div className="space-y-3">
+              {academicPositions.map((item, index) => (
+                <div key={item.id || `${item.organization}-${item.title}-${index}`} className="relative pl-5">
+                  <div className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm" />
+                  <p className="text-sm font-medium leading-snug text-gray-700">{item.title}</p>
+                  <p className="text-xs text-gray-500">{item.organization}</p>
+                  {(item.start_date || item.end_date || item.is_current) && (
                     <p className="text-[11px] text-gray-400">
-                      {formatRoleYears(role)}
+                      {formatPositionDates(item.start_date, item.end_date, item.is_current)}
                     </p>
                   )}
                 </div>
@@ -367,7 +362,7 @@ function buildOrcidHref(orcid: string): string {
 }
 
 function formatMetricValue(value: number | null | undefined): string {
-  if (typeof value !== "number" || value < 0) return "—";
+  if (typeof value !== "number" || value <= 0) return "—";
   return value.toLocaleString("zh-CN");
 }
 
@@ -380,20 +375,11 @@ function formatEducationYears(
   return start || end || "";
 }
 
-function formatRoleYears(
-  role: NonNullable<ScholarDetail["joint_management_roles"]>[number],
-): string {
-  const start = String(role.start_year || "").trim();
-  const end = String(role.end_year || "").trim();
-  if (start && end) return `${start}-${end}`;
-  return start || end || "";
-}
-
-function formatMetricDate(dateStr: string): string {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("zh-CN");
+function formatPositionDates(start?: string | null, end?: string | null, isCurrent?: boolean): string {
+  const startText = String(start || "").slice(0, 10);
+  const endText = isCurrent ? "至今" : String(end || "").slice(0, 10);
+  if (startText && endText) return `${startText}-${endText}`;
+  return startText || endText;
 }
 
 function ScholarAvatar({

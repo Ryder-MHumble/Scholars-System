@@ -16,7 +16,11 @@ import {
   type ScholarProjectTag,
   type JointProject,
   type ManagementRole,
+  type AcademicPositionRecord,
   type ExchangeRecord,
+  createAcademicPosition,
+  updateAcademicPosition,
+  deleteAcademicPosition,
 } from "@/services/scholarApi";
 
 export function useScholarDetail(scholarId: string | undefined) {
@@ -120,6 +124,42 @@ export function useScholarDetail(scholarId: string | undefined) {
     }));
   };
 
+  // Normalized employment history is stored in scholar_academic_positions.
+  // Existing rows are updated by id; new rows are created and removed rows are deleted.
+  const handleAcademicPositionsSave = async (records: AcademicPositionRecord[]) => {
+    if (!scholar) return;
+    const current = scholar.academic_positions ?? [];
+    const next = records.filter((item) => item.organization?.trim() && item.title?.trim());
+    const nextIds = new Set(next.map((item) => item.id).filter(Boolean));
+
+    await Promise.all(
+      current
+        .filter((item) => item.id && !nextIds.has(item.id))
+        .map((item) => deleteAcademicPosition(scholar.url_hash, item.id!)),
+    );
+    await Promise.all(
+      next.map((item) => {
+        const payload = {
+          organization: item.organization.trim(),
+          department: item.department || undefined,
+          title: item.title.trim(),
+          position_type: item.position_type || undefined,
+          start_date: item.start_date || undefined,
+          end_date: item.end_date || undefined,
+          is_current: Boolean(item.is_current),
+          description: item.description || undefined,
+          source_url: item.source_url || undefined,
+          source_type: item.source_type || "manual",
+          added_by: item.added_by || "user",
+        };
+        return item.id
+          ? updateAcademicPosition(scholar.url_hash, item.id, payload)
+          : createAcademicPosition(scholar.url_hash, payload);
+      }),
+    );
+    await loadScholar();
+  };
+
   // -- Relation toggle --
   const handleRelationToggle = async (
     field: "is_advisor_committee" | "is_potential_recruit",
@@ -211,6 +251,7 @@ export function useScholarDetail(scholarId: string | undefined) {
     handleFieldSave,
     handleEducationSave,
     handleManagementRolesSave,
+    handleAcademicPositionsSave,
     handleRelationToggle,
     handleAddUpdate,
     handleDeleteUpdate,

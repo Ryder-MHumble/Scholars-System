@@ -54,7 +54,7 @@ export function ManagementRoleFormModal({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            placeholder="如：顾问委员会委员、教学委员会委员…"
+            placeholder="如：教授、顾问委员会委员…"
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
           />
         </div>

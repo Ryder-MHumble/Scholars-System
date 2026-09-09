@@ -1,4 +1,8 @@
 export const VENUE_ACHIEVEMENT_TAG_OPTIONS = [
+  "Nature",
+  "Science",
+  "Cell",
+  "PNAS",
   "JMLR",
   "JAIR",
   "TMLR",
@@ -16,6 +20,8 @@ export const VENUE_ACHIEVEMENT_TAG_OPTIONS = [
 
 export const COMPETITION_ACHIEVEMENT_TAG_OPTIONS = [] as const;
 
+export const TWO_INSTITUTES_ACHIEVEMENT_TAG = "两院成果";
+
 export const ACHIEVEMENT_TAG_OPTIONS = [
   ...VENUE_ACHIEVEMENT_TAG_OPTIONS,
   ...COMPETITION_ACHIEVEMENT_TAG_OPTIONS,
@@ -27,6 +33,10 @@ export type AchievementTagFilter = "全部" | AchievementTag;
 export type AchievementTagKind = "venue" | "competition";
 
 export const ACHIEVEMENT_TAG_YEARS: Record<AchievementTag, readonly number[]> = {
+  Nature: [2022, 2023, 2024, 2025, 2026],
+  Science: [2022, 2023, 2024, 2025, 2026],
+  Cell: [2022, 2023, 2024, 2025, 2026],
+  PNAS: [2022, 2023, 2024, 2025, 2026],
   JMLR: [2023, 2024, 2025],
   JAIR: [2023, 2024, 2025],
   TMLR: [2023, 2024, 2025],
@@ -51,6 +61,8 @@ type PublicationLike = {
   booktitle?: unknown;
   title?: unknown;
   year?: unknown;
+  achievement_tags?: unknown;
+  added_by?: unknown;
 };
 
 type AwardLike = {
@@ -67,7 +79,37 @@ export interface AchievementTagSource {
   awards?: AwardLike[];
 }
 
+export function hasTwoInstitutesAchievement(source: AchievementTagSource): boolean {
+  return (source.representative_publications ?? []).some((publication) =>
+    isTwoInstitutesPublication(publication),
+  );
+}
+
+export function isTwoInstitutesPublication(publication: PublicationLike): boolean {
+  return (
+    (Array.isArray(publication.achievement_tags) &&
+      publication.achievement_tags.includes(TWO_INSTITUTES_ACHIEVEMENT_TAG)) ||
+    String(publication.added_by ?? "").trim() === "two_institutes_workbook_2026"
+  );
+}
+
 const TAG_MATCHERS: Array<{ tag: AchievementTag; patterns: RegExp[] }> = [
+  {
+    tag: "Nature",
+    patterns: [/\bNATURE\b/],
+  },
+  {
+    tag: "Science",
+    patterns: [/\bSCIENCE\b/],
+  },
+  {
+    tag: "Cell",
+    patterns: [/\bCELL\b/],
+  },
+  {
+    tag: "PNAS",
+    patterns: [/\bPNAS\b/, /PROCEEDINGS OF THE NATIONAL ACADEMY OF SCIENCES/],
+  },
   {
     tag: "JMLR",
     patterns: [/\bJMLR\b/, /JOURNAL OF MACHINE LEARNING RESEARCH/],

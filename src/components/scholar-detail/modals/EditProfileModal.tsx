@@ -6,7 +6,7 @@ import type {
   ScholarDetail,
   ScholarDetailPatch,
   EducationRecord,
-  ManagementRole,
+  AcademicPositionRecord,
 } from "@/services/scholarApi";
 import {
   buildLegacyProfileLinkFields,
@@ -29,7 +29,7 @@ interface EditProfileModalProps {
   scholar: ScholarDetail;
   onClose: () => void;
   onSubmit: (patch: ScholarDetailPatch) => Promise<void>;
-  onSubmitManagementRoles?: (roles: ManagementRole[]) => Promise<void>;
+  onSubmitAcademicPositions?: (positions: AcademicPositionRecord[]) => Promise<void>;
 }
 
 type ProfileTab =
@@ -59,7 +59,7 @@ export function EditProfileModal({
   scholar,
   onClose,
   onSubmit,
-  onSubmitManagementRoles,
+  onSubmitAcademicPositions,
 }: EditProfileModalProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("basic");
   const [isSaving, setIsSaving] = useState(false);
@@ -69,8 +69,8 @@ export function EditProfileModal({
   const [editedEducation, setEditedEducation] = useState<EducationRecord[]>(
     scholar.education ?? [],
   );
-  const [editedManagementRoles, setEditedManagementRoles] = useState<ManagementRole[]>(
-    scholar.joint_management_roles ?? [],
+  const [editedAcademicPositions, setEditedAcademicPositions] = useState<AcademicPositionRecord[]>(
+    scholar.academic_positions ?? [],
   );
   const initialProfileLinks = resolveProfileLinks(scholar);
   const initialChineseIdentity = readProfileFlag(scholar.custom_fields, "is_chinese");
@@ -137,21 +137,24 @@ export function EditProfileModal({
   };
 
   const addRoleItem = () => {
-    setEditedManagementRoles((prev) => [...prev, { role: "", organization: "", start_year: "", end_year: "" }]);
+    setEditedAcademicPositions((prev) => [
+      ...prev,
+      { organization: "", title: "", start_date: "", end_date: "", is_current: false },
+    ]);
   };
 
   const updateRoleItem = (
     index: number,
-    key: keyof ManagementRole,
+    key: keyof AcademicPositionRecord,
     value: string,
   ) => {
-    setEditedManagementRoles((prev) =>
+    setEditedAcademicPositions((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [key]: value } : item)),
     );
   };
 
   const removeRoleItem = (index: number) => {
-    setEditedManagementRoles((prev) => prev.filter((_, i) => i !== index));
+    setEditedAcademicPositions((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleEducationBatchTextChange = (value: string) => {
@@ -170,7 +173,15 @@ export function EditProfileModal({
     if (!trimmed) return;
     const parsed = parseManagementRolesFromText(trimmed);
     if (parsed.length > 0) {
-      setEditedManagementRoles(parsed);
+      setEditedAcademicPositions(
+        parsed.map((item) => ({
+          organization: item.organization || "",
+          title: item.role || "",
+          start_date: String(item.start_year || ""),
+          end_date: String(item.end_year || ""),
+          is_current: item.end_year === "至今",
+        })),
+      );
     }
   };
 
@@ -288,16 +299,16 @@ export function EditProfileModal({
     // Always trust the current edited state. Batch text is parsed on input change,
     // and users may further manually adjust parsed rows before saving.
     const finalEducation = editedEducation;
-    const finalManagementRoles = editedManagementRoles;
+    const finalAcademicPositions = editedAcademicPositions;
 
     const patch = buildPatch(finalEducation);
-    const normalizedRoles = finalManagementRoles
-      .filter((item) => item.role?.trim());
-    const managementRolesChanged =
-      JSON.stringify(normalizedRoles) !==
-      JSON.stringify(scholar.joint_management_roles ?? []);
+    const normalizedPositions = finalAcademicPositions
+      .filter((item) => item.organization?.trim() && item.title?.trim());
+    const academicPositionsChanged =
+      JSON.stringify(normalizedPositions) !==
+      JSON.stringify(scholar.academic_positions ?? []);
 
-    if (Object.keys(patch).length === 0 && !managementRolesChanged) {
+    if (Object.keys(patch).length === 0 && !academicPositionsChanged) {
       onClose();
       return;
     }
@@ -307,8 +318,8 @@ export function EditProfileModal({
       if (Object.keys(patch).length > 0) {
         await onSubmit(patch);
       }
-      if (managementRolesChanged && onSubmitManagementRoles) {
-        await onSubmitManagementRoles(normalizedRoles);
+      if (academicPositionsChanged && onSubmitAcademicPositions) {
+        await onSubmitAcademicPositions(normalizedPositions);
       }
       onClose();
     } catch {
@@ -744,7 +755,7 @@ export function EditProfileModal({
           {activeTab === "roles" && (
             <Section title="任职经历">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-slate-500">当前 {editedManagementRoles.length} 条</p>
+                <p className="text-xs text-slate-500">当前 {editedAcademicPositions.length} 条</p>
                 <button
                   type="button"
                   onClick={addRoleItem}
@@ -756,19 +767,19 @@ export function EditProfileModal({
               </div>
 
               <div className="space-y-2">
-                {editedManagementRoles.length === 0 ? (
+                {editedAcademicPositions.length === 0 ? (
                   <p className="text-xs text-slate-400 italic">暂无任职经历</p>
                 ) : (
-                  editedManagementRoles.map((item, index) => (
+                  editedAcademicPositions.map((item, index) => (
                     <div
                       key={`role-${index}`}
                       className="rounded-xl border border-slate-200 bg-white p-2 grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_5rem_5rem_auto] items-center gap-2"
                     >
                       <input
                         type="text"
-                        value={item.role || ""}
-                        onChange={(e) => updateRoleItem(index, "role", e.target.value)}
-                        placeholder="输入任职经历"
+                        value={item.title || ""}
+                        onChange={(e) => updateRoleItem(index, "title", e.target.value)}
+                        placeholder="职务/职称"
                         className={INPUT_CLASS}
                       />
                       <input
@@ -780,15 +791,15 @@ export function EditProfileModal({
                       />
                       <input
                         type="text"
-                        value={item.start_year || ""}
-                        onChange={(e) => updateRoleItem(index, "start_year", e.target.value)}
+                        value={item.start_date || ""}
+                        onChange={(e) => updateRoleItem(index, "start_date", e.target.value)}
                         placeholder="开始"
                         className={INPUT_CLASS}
                       />
                       <input
                         type="text"
-                        value={item.end_year || ""}
-                        onChange={(e) => updateRoleItem(index, "end_year", e.target.value)}
+                        value={item.end_date || ""}
+                        onChange={(e) => updateRoleItem(index, "end_date", e.target.value)}
                         placeholder="结束"
                         className={INPUT_CLASS}
                       />
@@ -806,17 +817,17 @@ export function EditProfileModal({
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-3">
-                <p className="text-xs font-medium text-slate-600 mb-2">批量粘贴导入（覆盖当前列表）</p>
+                <p className="text-xs font-medium text-slate-600 mb-2">批量粘贴识别（覆盖当前列表）</p>
                 <textarea
                   value={rolesBatchText}
                   onChange={(e) => handleRolesBatchTextChange(e.target.value)}
                   rows={4}
-                  placeholder={"示例：\n顾问委员会委员\n教学委员会委员"}
+                  placeholder={"示例：\n2020-至今 | 武汉大学人工智能学院 | 教授\n职务：教授；机构：北京中关村学院；开始：2025；结束：至今"}
                   className={TEXTAREA_CLASS}
                 />
                 <div className="mt-2">
                   <p className="text-[11px] text-slate-400">
-                    粘贴后会自动识别并预览，保存时会自动提交到任职经历。
+                    支持教育经历式日期、管道分隔、标签字段和主页段落；保存到规范化任职经历。
                   </p>
                 </div>
               </div>

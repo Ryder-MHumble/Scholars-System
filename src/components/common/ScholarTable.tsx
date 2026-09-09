@@ -12,8 +12,9 @@ import {
 
 const SUBCATEGORY_ALIAS_MAP: Record<string, string> = {
   科技育青委员会: "科技教育委员会",
-  学院学生事务导师: "高校导师",
-  学院学生高校导师: "高校导师",
+  高校导师: "学院学生高校导师",
+  学院学生事务导师: "学院学生高校导师",
+  学院导师: "学院学生高校导师",
 };
 
 function getMentorTypes(scholar: ScholarListItem): string[] {

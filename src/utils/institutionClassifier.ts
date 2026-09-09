@@ -26,6 +26,75 @@ export type InstitutionType =
 export type InstitutionRegion =
   (typeof INSTITUTION_REGIONS)[keyof typeof INSTITUTION_REGIONS];
 
+const MAINLAND_INSTITUTION_MARKERS = [
+  "北京工商大学Stevens Institute of Technology",
+  "温州医科大学阿尔伯塔学院",
+  "深圳北京大学香港科技大学医学中心",
+  "上海悉尼工商学院",
+  "广东以色列理工学院",
+  "福建教育学院台湾基础教育研究所",
+  "上海纽约大学",
+  "香港中文大学-北京大学",
+  "香港中文大学（深圳）",
+  "香港中文大学(深圳)",
+  "香港科技大学（广州）",
+  "香港科技大学(广州)",
+  "香港大学深圳医院",
+  "北师香港浸会大学",
+];
+
+const INTERNATIONAL_INSTITUTION_MARKERS = [
+  "香港",
+  "澳门",
+  "台湾",
+  "新加坡",
+  "日本",
+  "韩国",
+  "澳大利亚",
+  "加拿大",
+  "法国",
+  "德国",
+  "英国",
+  "荷兰",
+  "瑞士",
+  "瑞典",
+  "芬兰",
+  "意大利",
+  "美国",
+  "阿联酋",
+  "阿布扎比",
+  "印度",
+  "以色列",
+  "俄罗斯",
+  "白俄罗斯",
+  "加州大学",
+  "斯坦福",
+  "哈佛",
+  "牛津",
+  "剑桥",
+  "普林斯顿",
+  "芝加哥",
+  "佐治亚理工",
+  "爱丁堡",
+  "洛桑",
+  "麦吉尔",
+  "蒙特利尔",
+  "东京",
+  "京都",
+  "北海道",
+  "阿尔托",
+  "不列颠哥伦比亚",
+  "南洋理工",
+  "中央研究院",
+  "理化学研究所",
+  "KTH",
+  "NHK",
+  "RMIT",
+  "Carleton",
+  "Lomonosov",
+  "Stevens Institute",
+];
+
 /**
  * 根据机构名称判断类型
  */
@@ -111,12 +180,19 @@ export function classifyInstitutionType(
  * 根据机构名称判断地区
  */
 export function classifyInstitutionRegion(name: string): string {
-  // Chinese characters indicate domestic
+  if (MAINLAND_INSTITUTION_MARKERS.some((marker) => name.includes(marker))) {
+    return INSTITUTION_REGIONS.DOMESTIC;
+  }
+
+  if (INTERNATIONAL_INSTITUTION_MARKERS.some((marker) => name.includes(marker))) {
+    return INSTITUTION_REGIONS.INTERNATIONAL;
+  }
+
+  // Chinese names are domestic unless an explicit international marker exists.
   if (/[\u4e00-\u9fff]/.test(name)) {
     return INSTITUTION_REGIONS.DOMESTIC;
   }
 
-  // If no Chinese characters, it's international
   return INSTITUTION_REGIONS.INTERNATIONAL;
 }
 

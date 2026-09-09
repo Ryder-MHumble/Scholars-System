@@ -67,7 +67,7 @@ deterministic source ID. Never repurpose an unrelated same-name AMiner record.
 | Source field | Target | Rule |
 | --- | --- | --- |
 | 姓名 | `scholars.name` | Required identity field |
-| 性别 | `scholars.gender` | Normalize to existing enum; fill empty only |
+| 性别 | provenance metadata | Live PostgreSQL has no physical `scholars.gender` column |
 | 所在单位 | `scholars.university` | Resolve to a first-level institution |
 | 所在院系/部门 | `scholars.department` | Write only a verified second-level organization |
 | 职称 | `scholars.position` | Fill empty only for existing scholars |

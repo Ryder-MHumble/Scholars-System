@@ -20,6 +20,7 @@ import type { ScholarProjectTag } from "@/services/scholarApi";
 
 interface ProjectCategorySelectorProps {
   projectTags: ScholarProjectTag[];
+  onChange?: (projectTags: ScholarProjectTag[]) => void;
   onSave: (projectTags: ScholarProjectTag[]) => Promise<void>;
 }
 
@@ -53,6 +54,7 @@ function buildProjectSignature(tags: ScholarProjectTag[]): string {
 
 export function ProjectCategorySelector({
   projectTags,
+  onChange,
   onSave,
 }: ProjectCategorySelectorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -73,38 +75,40 @@ export function ProjectCategorySelector({
     setSelectedPrimary(primary);
   };
 
+  const commitProjectTags = (next: ScholarProjectTag[]) => {
+    setSelectedProjectTags(next);
+    onChange?.(next);
+  };
+
   const handleSubToggle = (sub: ProjectSubcategory) => {
     const primary = getPrimaryCategoryForSubcategory(sub);
     const resolvedPrimary = primary ?? selectedPrimary;
     if (!resolvedPrimary) return;
     setSelectedPrimary(resolvedPrimary);
 
-    setSelectedProjectTags((prev) => {
-      const normalizedPrev = normalizeProjectTags(prev);
-      const exists = normalizedPrev.some(
-        (tag) => tag.category === resolvedPrimary && tag.subcategory === sub,
-      );
-      if (exists) {
-        return normalizedPrev.filter(
-          (tag) =>
-            !(tag.category === resolvedPrimary && tag.subcategory === sub),
-        );
-      }
-      return [...normalizedPrev, { category: resolvedPrimary, subcategory: sub }];
-    });
+    const normalizedPrev = normalizeProjectTags(selectedProjectTags);
+    const exists = normalizedPrev.some(
+      (tag) => tag.category === resolvedPrimary && tag.subcategory === sub,
+    );
+    const next = exists
+      ? normalizedPrev.filter(
+        (tag) =>
+          !(tag.category === resolvedPrimary && tag.subcategory === sub),
+      )
+      : [...normalizedPrev, { category: resolvedPrimary, subcategory: sub }];
+    commitProjectTags(next);
   };
 
   const handleRemoveProjectTag = (tag: ScholarProjectTag) => {
-    setSelectedProjectTags((prev) =>
-      prev.filter(
-        (item) =>
-          !(
-            item.category === tag.category &&
-            normalizeProjectSubcategoryLabel(item.subcategory) ===
-              normalizeProjectSubcategoryLabel(tag.subcategory)
-          ),
-      ),
+    const next = selectedProjectTags.filter(
+      (item) =>
+        !(
+          item.category === tag.category &&
+          normalizeProjectSubcategoryLabel(item.subcategory) ===
+            normalizeProjectSubcategoryLabel(tag.subcategory)
+        ),
     );
+    commitProjectTags(next);
   };
 
   const handleSave = async () => {
@@ -256,7 +260,7 @@ export function ProjectCategorySelector({
             <button
               onClick={() => {
                 setSelectedPrimary("");
-                setSelectedProjectTags([]);
+                commitProjectTags([]);
               }}
               className="mt-4 text-xs text-gray-500 hover:text-gray-700"
             >

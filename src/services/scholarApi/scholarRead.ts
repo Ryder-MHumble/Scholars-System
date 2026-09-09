@@ -74,6 +74,8 @@ export async function fetchScholarUniversities(filters?: {
     const transformed = organizations.map((inst) => ({
       institution_id: String(inst.id ?? "").trim() || undefined,
       university: String(inst.name ?? "").trim(),
+      region: inst.region ?? null,
+      org_type: inst.org_type ?? null,
       scholar_count: inst.scholar_count || 0,
       department_count: inst.department_count ?? inst.departments?.length ?? 0,
       departments: (inst.departments ?? []).map((dept) => ({

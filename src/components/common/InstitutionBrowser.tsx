@@ -25,6 +25,8 @@ import {
 } from "@/constants/institutionBrowserSubtabs";
 interface BrowserInstitution {
   name: string;
+  region?: string | null;
+  orgType?: string | null;
   scholarCount: number;
   departments: { name: string; scholar_count: number }[];
 }
@@ -69,8 +71,8 @@ export function InstitutionBrowser({
 
     return universities
       .filter((uni) => {
-        const region = classifyInstitutionRegion(uni.name);
-        const type = classifyInstitutionType(uni.name);
+        const region = uni.region === "国内" ? "domestic" : uni.region === "国际" ? "international" : classifyInstitutionRegion(uni.name);
+        const type = classifyInstitutionType(uni.name, uni.orgType);
         if (filter.region && region !== filter.region) return false;
         if (filter.type && type !== filter.type) return false;
         if (q) {
@@ -144,7 +146,7 @@ export function InstitutionBrowser({
       ) : (
         <div className="space-y-2">
           {filtered.map((uni, i) => {
-            const type = classifyInstitutionType(uni.name);
+            const type = classifyInstitutionType(uni.name, uni.orgType);
             const TypeIcon = getTypeIcon(type);
             const isExpanded = expandedUnis.has(uni.name);
 

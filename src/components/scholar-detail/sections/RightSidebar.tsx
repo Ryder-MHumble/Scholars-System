@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -12,6 +12,9 @@ import {
   ClipboardList,
   ArrowUpRight,
   Users,
+  Upload,
+  X,
+  Save,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import {
@@ -24,8 +27,15 @@ import {
   type StudentPatch,
   type ScholarDetail,
 } from "@/services/scholarApi";
-import { fetchScholarActivities, type ActivityEvent } from "@/services/activityApi";
+import {
+  createActivity,
+  fetchScholarActivities,
+  invalidateScholarActivityCache,
+  type ActivityCreateRequest,
+  type ActivityEvent,
+} from "@/services/activityApi";
 import { SelectInput } from "@/components/ui/SelectInput";
+import { parseScholarActivitiesFromText } from "@/utils/textParsers";
 
 interface Props {
   scholar: ScholarDetail;
@@ -85,6 +95,8 @@ export function RightSidebar({ scholar }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [scholarActivities, setScholarActivities] = useState<ActivityEvent[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [showActivityImport, setShowActivityImport] = useState(false);
   const [activeTab, setActiveTab] = useState<"coauthors" | "activities">(
     "coauthors",
   );
@@ -95,26 +107,29 @@ export function RightSidebar({ scholar }: Props) {
     (a, b) => b.weight - a.weight,
   );
 
+  const loadScholarActivities = useCallback(async (isActive: () => boolean = () => true) => {
+    setIsActivityLoading(true);
+    setActivityError(null);
+    try {
+      const items = await fetchScholarActivities(scholar.url_hash);
+      if (!isActive()) return;
+      setScholarActivities(items);
+    } catch {
+      if (!isActive()) return;
+      setScholarActivities([]);
+      setActivityError("学者活动加载失败");
+    } finally {
+      if (isActive()) setIsActivityLoading(false);
+    }
+  }, [scholar.url_hash]);
+
   useEffect(() => {
     let isActive = true;
-    setIsActivityLoading(true);
-    fetchScholarActivities(scholar.url_hash)
-      .then((items) => {
-        if (!isActive) return;
-        setScholarActivities(items);
-      })
-      .catch(() => {
-        if (!isActive) return;
-        setScholarActivities([]);
-      })
-      .finally(() => {
-        if (!isActive) return;
-        setIsActivityLoading(false);
-      });
+    void loadScholarActivities(() => isActive);
     return () => {
       isActive = false;
     };
-  }, [scholar.url_hash]);
+  }, [loadScholarActivities]);
 
   useEffect(() => {
     if (!isAdjunctSupervisor) {
@@ -199,6 +214,35 @@ export function RightSidebar({ scholar }: Props) {
     }
   };
 
+  const handleImportActivities = async (activities: ActivityCreateRequest[]) => {
+    const normalize = (value: string) => value.trim().toLocaleLowerCase();
+    const existingKeys = new Set(
+      scholarActivities.map(
+        (item) => `${normalize(item.title)}|${String(item.event_date ?? "").slice(0, 10)}`,
+      ),
+    );
+    const rows = activities
+      .map((item) => ({
+        ...item,
+        scholar_ids: [scholar.url_hash],
+      }))
+      .filter((item) => {
+        if (!item.title.trim()) return false;
+        const key = `${normalize(item.title)}|${String(item.event_date ?? "").slice(0, 10)}`;
+        if (existingKeys.has(key)) return false;
+        existingKeys.add(key);
+        return true;
+      });
+    if (rows.length === 0) return;
+
+    for (const row of rows) {
+      await createActivity(row);
+    }
+    invalidateScholarActivityCache(scholar.url_hash);
+    await loadScholarActivities();
+    setActiveTab("activities");
+  };
+
   return (
     <aside className="w-80 shrink-0 space-y-4">
       {/* Scholar Activities Card */}
@@ -216,6 +260,17 @@ export function RightSidebar({ scholar }: Props) {
               ? `${coauthors.length} 人`
               : `${scholarActivities.length} 条`}
           </span>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("activities");
+              setShowActivityImport(true);
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 rounded-full transition-colors"
+          >
+            <Upload className="w-3 h-3" />
+            批量识别
+          </button>
         </div>
 
         <div className="px-5 pt-2 border-b border-gray-100">
@@ -249,7 +304,7 @@ export function RightSidebar({ scholar }: Props) {
           </div>
         </div>
 
-        <div className="px-5 py-3 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar">
+        <div className="px-5 py-3 max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-hide">
           {activeTab === "coauthors" ? (
             coauthors.length > 0 ? (
               <div className="space-y-3">
@@ -331,6 +386,18 @@ export function RightSidebar({ scholar }: Props) {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
             </div>
+          ) : activityError ? (
+            <div className="flex flex-col items-center gap-2 py-8">
+              <ClipboardList className="w-8 h-8 text-red-100" />
+              <p className="text-sm text-red-500">{activityError}</p>
+              <button
+                type="button"
+                onClick={() => loadScholarActivities()}
+                className="text-xs text-primary-600 hover:underline"
+              >
+                重新加载
+              </button>
+            </div>
           ) : scholarActivities.length > 0 ? (
             <div className="space-y-3">
               {scholarActivities.map((activity) => (
@@ -409,7 +476,7 @@ export function RightSidebar({ scholar }: Props) {
             )}
           </div>
 
-          <div className="px-5 py-3 max-h-[540px] overflow-y-auto custom-scrollbar">
+          <div className="px-5 py-3 max-h-[540px] overflow-y-auto scrollbar-hide">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
@@ -496,7 +563,147 @@ export function RightSidebar({ scholar }: Props) {
           </div>
         </motion.div>
       )}
+      {showActivityImport && (
+        <ScholarActivityPasteImportModal
+          onClose={() => setShowActivityImport(false)}
+          onSubmit={async (items) => {
+            await handleImportActivities(items);
+            setShowActivityImport(false);
+          }}
+        />
+      )}
     </aside>
+  );
+}
+
+function ScholarActivityPasteImportModal({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (items: ActivityCreateRequest[]) => Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const parsedItems = useMemo(() => parseScholarActivitiesFromText(text), [text]);
+
+  const handleSubmit = async () => {
+    if (parsedItems.length === 0) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit(parsedItems);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        className="mx-4 flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="shrink-0 border-b border-slate-100 px-6 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">
+                批量识别学者活动
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                直接复制粘贴多行活动文本，系统会自动识别标题、日期、类型、分类和地点。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <textarea
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            autoFocus
+            rows={8}
+            placeholder={
+              "示例：\n学者活动标题 | 2026-09-08 14:00 | 学术报告 | 学者活动 | 武汉大学 | 活动摘要\n标题：AI for Science Seminar；日期：2026-09-09；类型：讲座；分类：学者活动；地点：线上；摘要：分享最新研究进展"
+            }
+            className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+          />
+
+          <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-medium text-blue-700">
+                自动识别预览 {parsedItems.length} 条
+              </p>
+              <p className="text-[11px] text-slate-400">
+                导入后会自动绑定当前学者
+              </p>
+            </div>
+            {parsedItems.length === 0 ? (
+              <p className="py-4 text-center text-xs text-slate-400">
+                粘贴活动文本后在这里预览
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {parsedItems.map((item, index) => (
+                  <div
+                    key={`${item.title}-${index}`}
+                    className="rounded-lg border border-blue-100 bg-white px-3 py-2"
+                  >
+                    <p className="text-sm font-medium text-slate-800">
+                      {item.title}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {[item.event_date, item.event_time, item.event_type, item.category, item.location]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    {item.abstract && (
+                      <p className="mt-1 line-clamp-2 text-xs text-slate-400">
+                        {item.abstract}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 gap-3 border-t border-slate-100 bg-white px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 flex-1 rounded-xl border border-slate-200 px-4 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting || parsedItems.length === 0}
+            className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {isSubmitting ? "导入中..." : `导入 ${parsedItems.length} 条`}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

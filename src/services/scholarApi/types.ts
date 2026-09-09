@@ -114,11 +114,15 @@ export interface ScholarDetail extends ScholarListItem {
   supervised_students_count: number;
   joint_research_projects: JointProject[];
   joint_management_roles: ManagementRole[];
+  academic_positions: AcademicPositionRecord[];
   academic_exchange_records: ExchangeRecord[];
   institute_relation_notes: string;
   relation_updated_by: string;
   relation_updated_at: string;
   recent_updates: ScholarUpdate[];
+  news: ScholarNewsRecord[];
+  research_projects: ResearchProjectRecord[];
+  open_source_projects: OpenSourceProjectRecord[];
   representative_publications: PublicationRecord[];
   patents: PatentRecord[];
   awards: AwardRecord[];
@@ -156,6 +160,63 @@ export interface ManagementRole {
   end_year?: number | string;
 }
 
+/** Normalized employment/appointment history from scholar_academic_positions. */
+export interface AcademicPositionRecord {
+  id?: string;
+  scholar_id?: string;
+  organization: string;
+  department?: string | null;
+  title: string;
+  position_type?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current?: boolean;
+  description?: string | null;
+  source_url?: string | null;
+  source_type?: string | null;
+  source_record_id?: string | null;
+  evidence?: Record<string, unknown>;
+  added_by?: string;
+}
+
+export interface ScholarNewsRecord {
+  id?: string;
+  title: string;
+  summary?: string | null;
+  content?: string | null;
+  news_type?: string | null;
+  published_at?: string | null;
+  source_url?: string | null;
+  source_type?: string | null;
+  source_record_id?: string | null;
+  review_status?: string;
+}
+
+export interface ResearchProjectRecord {
+  id?: string;
+  name: string;
+  role?: string | null;
+  organization?: string | null;
+  project_type?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status?: string | null;
+  description?: string | null;
+}
+
+export interface OpenSourceProjectRecord {
+  id?: string;
+  name: string;
+  repository_url?: string | null;
+  homepage_url?: string | null;
+  platform?: string | null;
+  role?: string | null;
+  stars?: number | null;
+  forks?: number | null;
+  status?: string | null;
+  description?: string | null;
+}
+
 export interface ExchangeRecord {
   date?: string;
   type?: string;
@@ -179,6 +240,7 @@ export interface PublicationRecord {
   venue?: string;
   year?: string;
   authors?: string;
+  affiliations?: unknown[];
   url?: string;
   doi?: string;
   abstract?: string;
@@ -187,6 +249,12 @@ export interface PublicationRecord {
   source_type?: string;
   citation_count?: number;
   is_corresponding?: boolean;
+  is_first_author?: boolean;
+  achievement_tags?: string[];
+  academic_division?: string;
+  match_confidence?: string;
+  match_method?: string;
+  source_sheet?: string;
   added_by?: string;
 }
 
@@ -374,6 +442,8 @@ export interface StudentPatch {
 export interface ScholarUniversityItem {
   institution_id?: string;
   university: string;
+  region?: string | null;
+  org_type?: string | null;
   scholar_count: number;
   department_count?: number;
   departments: { id?: string; name: string; scholar_count: number }[];
@@ -388,6 +458,8 @@ export interface BackendInstitutionDepartment {
 export interface BackendInstitutionItem {
   id?: string;
   name?: string;
+  region?: string | null;
+  org_type?: string | null;
   scholar_count?: number;
   department_count?: number;
   departments?: BackendInstitutionDepartment[];
@@ -451,7 +523,18 @@ export interface ScholarCreate {
   phd_institution?: string;
   phd_year?: string;
   education?: EducationRecord[];
+  is_advisor_committee?: boolean;
+  adjunct_supervisor?: AdjunctSupervisorInfo;
+  is_potential_recruit?: boolean;
+  institute_relation_notes?: string;
+  supervised_students?: string[];
   joint_research_projects?: JointProject[];
+  joint_management_roles?: ManagementRole[];
+  academic_exchange_records?: ExchangeRecord[];
+  representative_publications?: PublicationRecord[];
+  patents?: PatentRecord[];
+  awards?: AwardRecord[];
+  coauthors?: CoauthorInfo[];
   publications_count?: number;
   h_index?: number;
   citations_count?: number;
@@ -459,6 +542,10 @@ export interface ScholarCreate {
   event_tags?: ScholarEventTag[];
   participated_event_ids?: string[];
   is_cobuild_scholar?: boolean;
+  project_category?: string;
+  project_subcategory?: string;
+  tags?: string[];
+  custom_fields?: Record<string, unknown>;
   added_by?: string;
 }
 
