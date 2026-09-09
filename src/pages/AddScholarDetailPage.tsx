@@ -22,6 +22,8 @@ import { ProjectCategorySelector } from "@/components/scholar-detail/sections/Pr
 import { AchievementsDetailCard } from "@/components/scholar-detail/sections/AchievementsDetailCard";
 import { EditAchievementsModal } from "@/components/scholar-detail/modals/EditAchievementsModal";
 import { EditProfileModal } from "@/components/scholar-detail/modals/EditProfileModal";
+import type { AcademicPositionDraft } from "@/components/scholar-detail/modals/EditProfileModal";
+import { batchAcademicPositions } from "@/services/scholarResourcesApi";
 import { staggerContainer, slideInLeft } from "@/utils/animations";
 import { cn } from "@/utils/cn";
 
@@ -86,6 +88,7 @@ const emptyScholar: ScholarDetail = {
   representative_publications: [],
   patents: [],
   awards: [],
+  academic_positions: [],
   url: "",
   content: "",
   project_tags: [],
@@ -114,6 +117,9 @@ export default function AddScholarDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [academicPositionDrafts, setAcademicPositionDrafts] = useState<
+    AcademicPositionDraft[]
+  >([]);
 
   const returnTo =
     ((location.state as { from?: { pathname?: string; search?: string } } | null)
@@ -262,6 +268,10 @@ export default function AddScholarDetailPage() {
         });
       }
 
+      if (academicPositionDrafts.length > 0) {
+        await batchAcademicPositions(created.url_hash, academicPositionDrafts);
+      }
+
       navigate(returnTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存学者失败，请重试");
@@ -289,13 +299,14 @@ export default function AddScholarDetailPage() {
         {showProfileModal && (
           <EditProfileModal
             scholar={scholar}
+            academicPositions={academicPositionDrafts}
             onClose={() => setShowProfileModal(false)}
             onSubmit={async (patch: ScholarDetailPatch) => {
               await handleFieldSave(patch);
               setShowProfileModal(false);
             }}
-            onSubmitManagementRoles={async (roles) => {
-              await handleManagementRolesSave(roles);
+            onSubmitAcademicPositions={async (positions) => {
+              setAcademicPositionDrafts(positions);
             }}
           />
         )}
@@ -368,6 +379,7 @@ export default function AddScholarDetailPage() {
               <AchievementsDetailCard
                 scholar={scholar}
                 onShowAchievementsModal={() => setShowAchievementsModal(true)}
+                onSaveManagementRoles={handleManagementRolesSave}
                 relationSlot={
                   <ProjectCategorySelector
                     projectTags={scholar.project_tags ?? []}

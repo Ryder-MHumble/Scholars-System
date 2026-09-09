@@ -5,8 +5,6 @@ import {
   Award,
   BookOpen,
   BriefcaseBusiness,
-  ChevronDown,
-  ChevronUp,
   Edit3,
   ExternalLink,
   FileText,
@@ -20,8 +18,6 @@ import {
   Trophy,
 } from "lucide-react";
 import type {
-  AcademicPosition,
-  AcademicPositionCreate,
   OpenSourceProject,
   OpenSourceProjectCreate,
   ResearchProject,
@@ -30,22 +26,18 @@ import type {
   AwardRecord,
 } from "@/services/scholarApi";
 import {
-  batchAcademicPositions,
   batchOpenSourceProjects,
-  createAcademicPosition,
   createOpenSourceProject,
   createResearchProject,
-  deleteAcademicPosition,
   deleteOpenSourceProject,
   deleteResearchProject,
-  fetchAcademicPositions,
   fetchOpenSourceProjects,
   fetchResearchProjects,
-  updateAcademicPosition,
   updateOpenSourceProject,
   updateResearchProject,
 } from "@/services/scholarResourcesApi";
 import { BaseModal } from "@/components/common/BaseModal";
+import { EditManagementRolesModal } from "@/components/scholar-detail/modals/EditManagementRolesModal";
 import {
   EditScholarResourceModal,
   type EditableScholarResource,
@@ -54,10 +46,7 @@ import {
 } from "@/components/scholar-detail/modals/EditScholarResourceModal";
 import { cn } from "@/utils/cn";
 import { slideInUp } from "@/utils/animations";
-import {
-  parseAcademicPositionsFromText,
-  parseOpenSourceProjectsFromText,
-} from "@/utils/textParsers";
+import { parseOpenSourceProjectsFromText } from "@/utils/textParsers";
 import {
   extractAchievementTags,
   getAchievementTagKind,
@@ -70,12 +59,16 @@ import {
 interface AchievementsDetailCardProps {
   scholar: ScholarDetail;
   onShowAchievementsModal: () => void;
+  onSaveManagementRoles: (
+    roles: ScholarDetail["joint_management_roles"],
+  ) => void | Promise<void>;
   relationSlot?: ReactNode;
 }
 
 export function AchievementsDetailCard({
   scholar,
   onShowAchievementsModal,
+  onSaveManagementRoles,
   relationSlot,
 }: AchievementsDetailCardProps) {
   const [activeTab, setActiveTab] = useState<
@@ -87,24 +80,20 @@ export function AchievementsDetailCard({
   >("publications");
   const [researchProjects, setResearchProjects] = useState<ResearchProject[]>([]);
   const [openSourceProjects, setOpenSourceProjects] = useState<OpenSourceProject[]>([]);
-  const [academicPositions, setAcademicPositions] = useState<AcademicPosition[]>([]);
   const [loading, setLoading] = useState({
     research: true,
     openSource: true,
-    positions: true,
   });
   const [resourceErrors, setResourceErrors] = useState({
     research: "",
     openSource: "",
-    positions: "",
   });
   const [resourceEditor, setResourceEditor] = useState<{
     kind: ScholarResourceKind;
     item?: EditableScholarResource;
   } | null>(null);
-  const [showPositionsBatch, setShowPositionsBatch] = useState(false);
+  const [showManagementRolesEditor, setShowManagementRolesEditor] = useState(false);
   const [showOpenSourceBatch, setShowOpenSourceBatch] = useState(false);
-  const [positionsExpanded, setPositionsExpanded] = useState(false);
   const achievementTags = extractAchievementTags(scholar);
   const venueTags = achievementTags.filter(
     (tag) => getAchievementTagKind(tag) === "venue",
@@ -145,36 +134,19 @@ export function AchievementsDetailCard({
     }
   }, [scholar.url_hash]);
 
-  const loadAcademicPositions = useCallback(async () => {
-    setLoading((current) => ({ ...current, positions: true }));
-    setResourceErrors((current) => ({ ...current, positions: "" }));
-    try {
-      setAcademicPositions(await fetchAcademicPositions(scholar.url_hash));
-    } catch (error) {
-      setResourceErrors((current) => ({
-        ...current,
-        positions: error instanceof Error ? error.message : "学术兼职加载失败",
-      }));
-    } finally {
-      setLoading((current) => ({ ...current, positions: false }));
-    }
-  }, [scholar.url_hash]);
-
   useEffect(() => {
     void loadResearchProjects();
     void loadOpenSourceProjects();
-    void loadAcademicPositions();
-  }, [loadAcademicPositions, loadOpenSourceProjects, loadResearchProjects]);
+  }, [loadOpenSourceProjects, loadResearchProjects]);
 
   useEffect(() => {
     const refresh = (event: Event) => {
       if ((event as CustomEvent<string>).detail !== scholar.url_hash) return;
       void loadOpenSourceProjects();
-      void loadAcademicPositions();
     };
     window.addEventListener("scholar-resources-updated", refresh);
     return () => window.removeEventListener("scholar-resources-updated", refresh);
-  }, [loadAcademicPositions, loadOpenSourceProjects, scholar.url_hash]);
+  }, [loadOpenSourceProjects, scholar.url_hash]);
 
   const tabs = [
     {
@@ -233,23 +205,7 @@ export function AchievementsDetailCard({
         await createOpenSourceProject(scholar.url_hash, payload as OpenSourceProjectCreate);
       }
       await loadOpenSourceProjects();
-    } else {
-      if (item) {
-        await updateAcademicPosition(
-          scholar.url_hash,
-          item.id,
-          payload as AcademicPositionCreate,
-        );
-      } else {
-        await createAcademicPosition(scholar.url_hash, payload as AcademicPositionCreate);
-      }
-      await loadAcademicPositions();
     }
-  };
-
-  const batchSaveAcademicPositions = async (rows: AcademicPositionCreate[]) => {
-    await batchAcademicPositions(scholar.url_hash, rows);
-    await loadAcademicPositions();
   };
 
   const batchSaveOpenSourceProjects = async (rows: OpenSourceProjectCreate[]) => {
@@ -270,9 +226,6 @@ export function AchievementsDetailCard({
       } else if (kind === "openSource") {
         await deleteOpenSourceProject(scholar.url_hash, item.id);
         await loadOpenSourceProjects();
-      } else {
-        await deleteAcademicPosition(scholar.url_hash, item.id);
-        await loadAcademicPositions();
       }
     } catch (error) {
       setResourceErrors((current) => ({
@@ -291,54 +244,42 @@ export function AchievementsDetailCard({
       {relationSlot && <div className="mb-5">{relationSlot}</div>}
 
       <section
-        data-testid="scholar-academic-positions-module"
+        data-testid="scholar-academic-adjuncts-module"
         className="mb-5 border-b border-gray-200 bg-white"
       >
         <div className="flex items-center gap-2 py-3">
+          <BriefcaseBusiness className="h-5 w-5 text-primary-600" />
+          <h3 className="text-lg font-semibold text-gray-900">学术兼职</h3>
+          <span className="text-xs text-gray-400">
+            {scholar.joint_management_roles?.length ?? 0}
+          </span>
           <button
             type="button"
-            aria-label={positionsExpanded ? "收起学术兼职" : "展开学术兼职"}
-            aria-expanded={positionsExpanded}
-            onClick={() => setPositionsExpanded((current) => !current)}
-            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            aria-label="编辑学术兼职"
+            title="编辑学术兼职"
+            onClick={() => setShowManagementRolesEditor(true)}
+            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-primary-50 hover:text-primary-700"
           >
-            <BriefcaseBusiness className="h-4 w-4 text-primary-600" />
-            <span className="text-sm font-semibold text-gray-900">学术兼职</span>
-            <span className="text-xs text-gray-400">{academicPositions.length}</span>
-            {positionsExpanded ? (
-              <ChevronUp className="ml-1 h-4 w-4 text-gray-400" />
-            ) : (
-              <ChevronDown className="ml-1 h-4 w-4 text-gray-400" />
-            )}
+            <Edit3 className="h-4 w-4" />
           </button>
-          <div className="ml-auto">
-            <button
-              type="button"
-              aria-label="编辑学术兼职"
-              title="编辑学术兼职"
-              onClick={() => setResourceEditor({ kind: "positions" })}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-primary-50 hover:text-primary-700"
-            >
-              <Edit3 className="h-4 w-4" />
-            </button>
-          </div>
         </div>
-        {positionsExpanded && <div className="pb-4">
-          <ResourceState
-            loading={loading.positions}
-            error={resourceErrors.positions}
-            retryLabel="重试学术兼职"
-            onRetry={loadAcademicPositions}
-          >
-            <AcademicPositionsSection
-              positions={academicPositions}
-              onEdit={(item) => setResourceEditor({ kind: "positions", item })}
-              onDelete={(item) =>
-                void deleteResource("positions", item, `${item.organization} ${item.title}`)
-              }
-            />
-          </ResourceState>
-        </div>}
+        <div className="flex flex-wrap gap-2 pb-4">
+          {(scholar.joint_management_roles ?? []).length > 0 ? (
+            scholar.joint_management_roles.map((role, index) => (
+              <span
+                key={`${role.organization}-${role.role}-${index}`}
+                className="inline-flex max-w-full items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-700"
+              >
+                <span className="truncate">
+                  {[role.organization, role.role].filter(Boolean).join(" · ") ||
+                    "学术兼职"}
+                </span>
+              </span>
+            ))
+          ) : (
+            <p className="text-sm text-gray-400">暂无学术兼职数据</p>
+          )}
+        </div>
       </section>
 
       <div className="mb-3 flex items-center gap-2">
@@ -429,12 +370,13 @@ export function AchievementsDetailCard({
           onSubmit={saveResource}
         />
       )}
-      {showPositionsBatch && (
-        <AcademicPositionsBatchModal
-          onClose={() => setShowPositionsBatch(false)}
-          onSubmit={async (rows) => {
-            await batchSaveAcademicPositions(rows);
-            setShowPositionsBatch(false);
+      {showManagementRolesEditor && (
+        <EditManagementRolesModal
+          roles={scholar.joint_management_roles ?? []}
+          onClose={() => setShowManagementRolesEditor(false)}
+          onSubmit={async (roles) => {
+            await onSaveManagementRoles(roles);
+            setShowManagementRolesEditor(false);
           }}
         />
       )}
@@ -448,102 +390,6 @@ export function AchievementsDetailCard({
         />
       )}
     </motion.div>
-  );
-}
-
-function AcademicPositionsBatchModal({
-  onClose,
-  onSubmit,
-}: {
-  onClose: () => void;
-  onSubmit: (rows: AcademicPositionCreate[]) => Promise<void>;
-}) {
-  const [text, setText] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const rows = useMemo(() => parseAcademicPositionsFromText(text), [text]);
-
-  const submit = async () => {
-    if (rows.length === 0) return;
-    setIsSubmitting(true);
-    setError("");
-    try {
-      await onSubmit(rows);
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "学术兼职批量导入失败");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <BaseModal
-      isOpen
-      onClose={onClose}
-      title="批量识别学术兼职"
-      maxWidth="2xl"
-      closeOnBackdropClick={!isSubmitting}
-      footer={
-        <>
-          <button type="button" onClick={onClose} disabled={isSubmitting} className="rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
-            取消
-          </button>
-          <button type="button" onClick={() => void submit()} disabled={rows.length === 0 || isSubmitting} className="inline-flex items-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700 disabled:opacity-50">
-            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            提交 {rows.length > 0 ? `${rows.length} 条` : ""}
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div>
-          <p className="text-sm font-medium text-gray-800">粘贴学术兼职文本</p>
-          <p className="mt-1 text-xs text-gray-500">
-            每行一条，支持“机构 | 职务 | 开始 | 结束”和“职务：...；机构：...”格式。
-          </p>
-        </div>
-        <textarea
-          aria-label="粘贴学术兼职文本"
-          value={text}
-          rows={7}
-          disabled={isSubmitting}
-          onChange={(event) => setText(event.target.value)}
-          placeholder={"武汉大学人工智能学院 | 兼职导师 | 2024-01 | 至今\n职务：顾问委员会委员；机构：北京中关村学院；开始：2025-09-01；结束：2026-09-01；类型：委员会"}
-          className="w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary-400"
-        />
-        {error && (
-          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-        <div className="rounded-md border border-blue-100 bg-blue-50/30 p-3">
-          <p className="mb-2 text-xs font-medium text-blue-700">
-            自动识别预览 {rows.length} 条
-          </p>
-          {rows.length === 0 ? (
-            <p className="py-3 text-center text-xs text-gray-400">
-              粘贴内容后在这里预览
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {rows.map((row, index) => (
-                <div key={`${row.organization}-${row.title}-${index}`} className="rounded border border-blue-100 bg-white px-3 py-2">
-                  <p className="text-sm font-medium text-gray-800">
-                    {row.organization} · {row.title}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {[row.position_type, row.start_date, row.is_current ? "至今" : row.end_date]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </BaseModal>
   );
 }
 
@@ -1119,48 +965,6 @@ function formatRepositoryHost(url: string): string {
   } catch {
     return url;
   }
-}
-
-function AcademicPositionsSection({
-  positions,
-  onEdit,
-  onDelete,
-}: {
-  positions: AcademicPosition[];
-  onEdit: (item: AcademicPosition) => void;
-  onDelete: (item: AcademicPosition) => void;
-}) {
-  return (
-    <div className="mb-1">
-      {positions.length > 0 ? (
-        <div className="space-y-3">
-          {positions.map((position) => (
-            <div key={position.id} className="border-b border-gray-100 py-3 transition-colors last:border-0 hover:bg-gray-50/60">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800">{position.organization}</p>
-                  <p className="mt-0.5 text-xs text-gray-600">
-                    {[position.department, position.title].filter(Boolean).join(" · ")}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {position.is_current ? (
-                    <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700">当前兼职</span>
-                  ) : (
-                    <span className="text-xs text-gray-400">{formatPeriod(position.start_date, position.end_date)}</span>
-                  )}
-                  <ResourceActions label="学术兼职" name={`${position.organization} ${position.title}`} onEdit={() => onEdit(position)} onDelete={() => onDelete(position)} />
-                </div>
-              </div>
-              {position.description && <p className="mt-2 text-xs leading-relaxed text-gray-500">{position.description}</p>}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="py-6 text-center text-sm text-gray-400">暂无学术兼职数据</p>
-      )}
-    </div>
-  );
 }
 
 function formatPeriod(start?: string | null, end?: string | null): string {

@@ -17,13 +17,19 @@ import {
   type JointProject,
   type ManagementRole,
   type ExchangeRecord,
-  type AcademicPositionCreate,
-  type OpenSourceProjectCreate,
+    type AcademicPositionCreate,
+    type OpenSourceProjectCreate,
 } from "@/services/scholarApi";
 import {
   batchAcademicPositions,
   batchOpenSourceProjects,
+  deleteAcademicPosition,
+  updateAcademicPosition,
 } from "@/services/scholarResourcesApi";
+import {
+  buildAcademicPositionSyncPlan,
+  type AcademicPositionDraft,
+} from "@/utils/academicPositionSync";
 
 export function useScholarDetail(scholarId: string | undefined) {
   const [scholar, setScholar] = useState<ScholarDetail | null>(null);
@@ -195,6 +201,29 @@ export function useScholarDetail(scholarId: string | undefined) {
     );
   };
 
+  const handleAcademicPositionsSave = async (
+    records: AcademicPositionDraft[],
+  ) => {
+    if (!scholar) return;
+    const plan = buildAcademicPositionSyncPlan(
+      scholar.academic_positions ?? [],
+      records,
+    );
+    await Promise.all([
+      ...plan.removeIds.map((id) =>
+        deleteAcademicPosition(scholar.url_hash, id),
+      ),
+      ...plan.updates.map(({ id, payload }) =>
+        updateAcademicPosition(scholar.url_hash, id, payload),
+      ),
+      plan.creates.length > 0
+        ? batchAcademicPositions(scholar.url_hash, plan.creates)
+        : Promise.resolve(),
+    ]);
+    const updated = await fetchScholarDetail(scholar.url_hash);
+    setScholar(updated);
+  };
+
   // -- Exchange records save --
   const handleSaveExchangeRecords = async (records: ExchangeRecord[]) => {
     await withScholar((urlHash) => patchScholarRelation(urlHash, {
@@ -240,6 +269,7 @@ export function useScholarDetail(scholarId: string | undefined) {
     handleDeleteUpdate,
     handleAchievementsSave,
     handleResourceBatchSave,
+    handleAcademicPositionsSave,
     handleSaveExchangeRecords,
     handleSaveManagementRolesInline,
     handleRelationNotesSave,

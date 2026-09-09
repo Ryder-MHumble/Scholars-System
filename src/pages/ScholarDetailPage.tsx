@@ -26,6 +26,7 @@ export default function ScholarDetailPageDemo() {
     handleManagementRolesSave,
     handleAchievementsSave,
     handleResourceBatchSave,
+    handleAcademicPositionsSave,
     handleProjectCategorySave,
   } = useScholarDetail(scholarId);
 
@@ -97,7 +98,7 @@ export default function ScholarDetailPageDemo() {
             onSubmit={async (patch) => {
               await handleFieldSave(patch);
             }}
-            onSubmitManagementRoles={handleManagementRolesSave}
+            onSubmitAcademicPositions={handleAcademicPositionsSave}
           />
         )}
       </AnimatePresence>
@@ -143,6 +144,7 @@ export default function ScholarDetailPageDemo() {
               <AchievementsDetailCard
                 scholar={scholar}
                 onShowAchievementsModal={() => setShowAchievementsModal(true)}
+                onSaveManagementRoles={handleManagementRolesSave}
                 relationSlot={
                   <ProjectCategorySelector
                     projectTags={scholar.project_tags ?? []}

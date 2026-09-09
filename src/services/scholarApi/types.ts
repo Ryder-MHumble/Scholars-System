@@ -122,6 +122,7 @@ export interface ScholarDetail extends ScholarListItem {
   representative_publications: PublicationRecord[];
   patents: PatentRecord[];
   awards: AwardRecord[];
+  academic_positions: AcademicPosition[];
   coauthors?: CoauthorInfo[];
   custom_fields?: Record<string, unknown>;
 }

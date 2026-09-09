@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseAcademicPositionsFromText,
+  parseManagementRolesFromText,
   parseOpenSourceProjectsFromText,
 } from "./textParsers";
 
@@ -17,7 +18,7 @@ describe("parseAcademicPositionsFromText", () => {
       expect.objectContaining({
         organization: "武汉大学人工智能学院",
         title: "兼职导师",
-        start_date: "2024-01",
+        start_date: "2024-01-01",
         end_date: null,
         is_current: true,
       }),
@@ -29,6 +30,53 @@ describe("parseAcademicPositionsFromText", () => {
         end_date: "2026-09-01",
         is_current: false,
         description: "参与学术咨询",
+      }),
+    ]);
+  });
+
+  it("parses date-first employment history with organization and department", () => {
+    expect(
+      parseAcademicPositionsFromText(
+        [
+          "2021-至今  上海交通大学  人工智能学院  教授",
+          "2017-2021  北京大学  计算机学院  副教授",
+        ].join("\n"),
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        organization: "上海交通大学",
+        department: "人工智能学院",
+        title: "教授",
+        start_date: "2021-01-01",
+        end_date: null,
+        is_current: true,
+      }),
+      expect.objectContaining({
+        organization: "北京大学",
+        department: "计算机学院",
+        title: "副教授",
+        start_date: "2017-01-01",
+        end_date: "2021-01-01",
+        is_current: false,
+      }),
+    ]);
+  });
+});
+
+describe("parseManagementRolesFromText", () => {
+  it("splits multiple academic adjuncts and keeps them out of employment records", () => {
+    expect(
+      parseManagementRolesFromText(
+        "天津市人工智能学会理事长，城市智能与数字治理教育部工程研究中心主任",
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        organization: "天津市人工智能学会",
+        role: "理事长",
+      }),
+      expect.objectContaining({
+        organization: "城市智能与数字治理教育部工程研究中心",
+        role: "主任",
       }),
     ]);
   });

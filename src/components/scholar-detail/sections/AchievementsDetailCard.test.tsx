@@ -7,18 +7,13 @@ import { AchievementsDetailCard } from "./AchievementsDetailCard";
 const mocks = vi.hoisted(() => ({
   fetchResearchProjects: vi.fn(),
   fetchOpenSourceProjects: vi.fn(),
-  fetchAcademicPositions: vi.fn(),
   createResearchProject: vi.fn(),
-    createOpenSourceProject: vi.fn(),
-    createAcademicPosition: vi.fn(),
-    batchOpenSourceProjects: vi.fn(),
-    batchAcademicPositions: vi.fn(),
+  createOpenSourceProject: vi.fn(),
+  batchOpenSourceProjects: vi.fn(),
   updateResearchProject: vi.fn(),
   updateOpenSourceProject: vi.fn(),
-  updateAcademicPosition: vi.fn(),
   deleteResearchProject: vi.fn(),
   deleteOpenSourceProject: vi.fn(),
-  deleteAcademicPosition: vi.fn(),
 }));
 
 vi.mock("@/services/scholarResourcesApi", async (importOriginal) => ({
@@ -33,17 +28,23 @@ const scholar = {
   patents: [],
   awards: [],
   joint_research_projects: [{ title: "Legacy project" }],
+  joint_management_roles: [
+    { organization: "中国计算机学会", role: "高级会员" },
+    { organization: "IEEE TCC", role: "期刊编委" },
+  ],
 } as unknown as ScholarDetail;
 
 function renderCard(
   relationSlot?: React.ReactNode,
   onShowAchievementsModal = vi.fn(),
+  onSaveManagementRoles = vi.fn(),
 ) {
   return render(
     <MemoryRouter>
       <AchievementsDetailCard
         scholar={scholar}
         onShowAchievementsModal={onShowAchievementsModal}
+        onSaveManagementRoles={onSaveManagementRoles}
         relationSlot={relationSlot}
       />
     </MemoryRouter>,
@@ -65,17 +66,8 @@ describe("AchievementsDetailCard", () => {
         stars: 128,
       },
     ]);
-    mocks.fetchAcademicPositions.mockResolvedValue([
-      {
-        id: "position-1",
-        organization: "中国计算机学会",
-        title: "高级会员",
-        is_current: true,
-      },
-    ]);
     mocks.createResearchProject.mockResolvedValue({ id: "research-new" });
     mocks.createOpenSourceProject.mockResolvedValue({ id: "oss-new" });
-    mocks.createAcademicPosition.mockResolvedValue({ id: "position-new" });
     mocks.batchOpenSourceProjects.mockResolvedValue({
       total: 1,
       created: 1,
@@ -85,24 +77,11 @@ describe("AchievementsDetailCard", () => {
       failed: 0,
       rows: [{ row: 1, status: "created", item_id: "oss-2", error: "" }],
     });
-    mocks.batchAcademicPositions.mockResolvedValue({
-      total: 2,
-      created: 2,
-      updated: 0,
-      skipped: 0,
-      pending_match: 0,
-      failed: 0,
-      rows: [
-        { row: 1, status: "created", item_id: "position-2", error: "" },
-        { row: 2, status: "created", item_id: "position-3", error: "" },
-      ],
-    });
     mocks.updateResearchProject.mockResolvedValue({ id: "research-1" });
     mocks.updateOpenSourceProject.mockResolvedValue({ id: "oss-1" });
-    mocks.updateAcademicPosition.mockResolvedValue({ id: "position-1" });
   });
 
-  it("renders academic positions as an independent module instead of an achievement tab", async () => {
+  it("renders academic adjuncts as visible tags instead of an achievement tab", async () => {
     renderCard();
 
     expect(screen.getByText("学术成果")).toBeTruthy();
@@ -127,24 +106,25 @@ describe("AchievementsDetailCard", () => {
     );
 
     expect(screen.queryByTestId("scholar-achievement-tab-positions")).toBeNull();
-    const positionsModule = await screen.findByTestId("scholar-academic-positions-module");
-    expect(screen.queryByText("中国计算机学会")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "展开学术兼职" }));
-    expect(positionsModule.textContent).toContain("中国计算机学会");
-    expect(screen.getByText("当前兼职")).toBeTruthy();
+    const adjunctModule = screen.getByTestId("scholar-academic-adjuncts-module");
+    expect(adjunctModule.textContent).toContain("中国计算机学会 · 高级会员");
+    expect(adjunctModule.textContent).toContain("IEEE TCC · 期刊编委");
+    expect(screen.queryByRole("button", { name: /展开学术兼职|收起学术兼职/ })).toBeNull();
   });
 
-  it("uses cardless first-level modules and one academic-position edit entry", async () => {
+  it("uses cardless first-level modules and matching section headings", () => {
     renderCard();
 
     const card = screen.getByTestId("scholar-achievements-card");
-    const positions = await screen.findByTestId("scholar-academic-positions-module");
+    const adjuncts = screen.getByTestId("scholar-academic-adjuncts-module");
+    const adjunctHeading = screen.getByRole("heading", { name: "学术兼职" });
+    const achievementHeading = screen.getByRole("heading", { name: "学术成果" });
     expect(card.className).not.toContain("rounded-xl");
     expect(card.className).not.toContain("shadow-sm");
-    expect(positions.className).not.toContain("rounded-lg");
+    expect(adjuncts.className).not.toContain("rounded-lg");
+    expect(adjunctHeading.className).toContain("text-lg");
+    expect(achievementHeading.className).toContain("text-lg");
     expect(screen.getAllByRole("button", { name: "编辑学术兼职" })).toHaveLength(1);
-    expect(screen.queryByRole("button", { name: "批量识别学术兼职" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "新增学术兼职" })).toBeNull();
   });
 
   it("does not repeat the active tab label as a section subtitle", async () => {
@@ -178,12 +158,12 @@ describe("AchievementsDetailCard", () => {
     const onShowAchievementsModal = vi.fn();
     renderCard(undefined, onShowAchievementsModal);
 
-    const positions = await screen.findByTestId("scholar-academic-positions-module");
+    const adjuncts = screen.getByTestId("scholar-academic-adjuncts-module");
     const heading = screen.getByRole("heading", { name: "学术成果" });
     const tabs = screen.getByTestId("scholar-achievement-tabs");
 
     expect(screen.queryByText("学者成就")).toBeNull();
-    expect(positions.compareDocumentPosition(heading)).toBe(
+    expect(adjuncts.compareDocumentPosition(heading)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(heading.compareDocumentPosition(tabs)).toBe(
@@ -228,7 +208,6 @@ describe("AchievementsDetailCard", () => {
     );
     await waitFor(() => expect(mocks.fetchResearchProjects).toHaveBeenCalledTimes(2));
     expect(mocks.fetchOpenSourceProjects).toHaveBeenCalledTimes(1);
-    expect(mocks.fetchAcademicPositions).toHaveBeenCalledTimes(1);
   });
 
   it("presents open-source projects as ranked assets without per-item editing", async () => {

@@ -630,7 +630,23 @@ function stripListPrefix(line: string): string {
 function normalizeOpenEndDate(value: string | undefined): string | null {
   const trimmed = String(value ?? "").trim();
   if (!trimmed) return null;
-  return /^(至今|现在|present|now|current)$/i.test(trimmed) ? null : trimmed;
+  if (/^(至今|现在|present|now|current)$/i.test(trimmed)) return null;
+  return normalizeAcademicPositionDate(trimmed);
+}
+
+function normalizeAcademicPositionDate(value: string | undefined): string | null {
+  const trimmed = String(value ?? "").trim().replace(/[./]/g, "-");
+  if (!trimmed) return null;
+  if (/^(?:19|20)\d{2}$/.test(trimmed)) return `${trimmed}-01-01`;
+  if (/^(?:19|20)\d{2}-\d{1,2}$/.test(trimmed)) {
+    const [year, month] = trimmed.split("-");
+    return `${year}-${month.padStart(2, "0")}-01`;
+  }
+  const fullDate = trimmed.match(/^((?:19|20)\d{2})-(\d{1,2})-(\d{1,2})$/);
+  if (fullDate) {
+    return `${fullDate[1]}-${fullDate[2].padStart(2, "0")}-${fullDate[3].padStart(2, "0")}`;
+  }
+  return trimmed;
 }
 
 function isCurrentEndDate(value: string | undefined): boolean {
@@ -638,7 +654,7 @@ function isCurrentEndDate(value: string | undefined): boolean {
 }
 
 function looksLikeAcademicOrganization(value: string): boolean {
-  return /(大学|学院|研究院|实验室|中心|协会|学会|委员会|University|Institute|College|School|Lab|Center|Association|Society)/i.test(value);
+  return /(大学|学院|研究院|研究所|实验室|专委会|委员会|中心|协会|学会|University|Institute|College|School|Lab|Center|Association|Society)/i.test(value);
 }
 
 // ─── Management Role Parser ──────────────────────────────────────────────────
@@ -677,9 +693,29 @@ export function parseManagementRolesFromText(text: string): ManagementRole[] {
   };
 
   return text
-    .split("\n")
+    .replace(/\r/g, "")
+    .split(/\n+/)
     .map((l) => l.trim())
     .filter(Boolean)
+    .flatMap((line) => {
+      if (/(?:职务|兼职|岗位|角色|机构|单位|组织|开始|结束|role|position|title|organization|institution)\s*[:：]/i.test(line)) {
+        return [line];
+      }
+      return line
+        .split(/[；;]/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .flatMap((part) => {
+          const commaParts = part
+            .split(/[，,、]/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+          return commaParts.length > 1 &&
+            commaParts.every(looksLikeAcademicOrganization)
+            ? commaParts
+            : [part];
+        });
+    })
     .map((l) => {
       const raw = stripListPrefix(l);
       const labeled = parseLabeledFields(raw);
@@ -696,12 +732,22 @@ export function parseManagementRolesFromText(text: string): ManagementRole[] {
         };
       }
 
-      return {
-        role: raw,
-        organization: "",
-        start_year: "",
-        end_year: "",
-      };
+      const orgMatch = raw.match(
+        /^(.+?(?:大学|学院|研究院|研究所|实验室|专委会|委员会|中心|协会|学会|University|Institute|College|School|Lab|Center|Association|Society))\s*(.+)$/i,
+      );
+      return orgMatch
+        ? {
+            role: orgMatch[2].trim(),
+            organization: orgMatch[1].trim(),
+            start_year: "",
+            end_year: "",
+          }
+        : {
+            role: raw,
+            organization: "",
+            start_year: "",
+            end_year: "",
+          };
     })
     .filter((item) => item.role || item.organization);
 }
@@ -745,7 +791,7 @@ export function parseAcademicPositionsFromText(
       department: mapped.department || null,
       title: mapped.title,
       position_type: mapped.position_type || null,
-      start_date: mapped.start_date || null,
+      start_date: normalizeAcademicPositionDate(mapped.start_date),
       end_date: normalizeOpenEndDate(mapped.end_date),
       is_current: isCurrentEndDate(mapped.end_date),
       description: mapped.description || null,
@@ -761,6 +807,37 @@ export function parseAcademicPositionsFromText(
       const labeled = parseLabeledFields(raw);
       if (labeled) return labeled;
 
+      const dateRange = raw.match(
+        /((?:19|20)\d{2}(?:[./-]\d{1,2})?)\s*(?:-|—|–|~|～|至|到)\s*((?:19|20)\d{2}(?:[./-]\d{1,2})?|至今|现在|present|now|current)/i,
+      );
+      if (dateRange) {
+        const contentParts = raw
+          .replace(dateRange[0], "")
+          .replace(/^[|｜\t\s]+|[|｜\t\s]+$/g, "")
+          .split(/[|｜\t]|\s{2,}/)
+          .map((part) => part.trim())
+          .filter(Boolean);
+        if (
+          contentParts.length >= 2 &&
+          looksLikeAcademicOrganization(contentParts[0])
+        ) {
+          return {
+            organization: contentParts[0],
+            department:
+              contentParts.length > 2
+                ? contentParts.slice(1, -1).join(" ")
+                : null,
+            title: contentParts[contentParts.length - 1],
+            position_type: null,
+            start_date: normalizeAcademicPositionDate(dateRange[1]),
+            end_date: normalizeOpenEndDate(dateRange[2]),
+            is_current: isCurrentEndDate(dateRange[2]),
+            description: null,
+            source_url: null,
+          };
+        }
+      }
+
       const parts = raw.split(/[|｜\t]/).map((s) => s.trim()).filter(Boolean);
       if (parts.length >= 2) {
         const firstIsOrg = looksLikeAcademicOrganization(parts[0]);
@@ -770,7 +847,7 @@ export function parseAcademicPositionsFromText(
         return {
           organization,
           title,
-          start_date: parts[2] || null,
+          start_date: normalizeAcademicPositionDate(parts[2]),
           end_date: endDate,
           is_current: isCurrentEndDate(parts[3]),
           department: null,

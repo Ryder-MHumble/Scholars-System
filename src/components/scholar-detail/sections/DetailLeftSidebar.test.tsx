@@ -11,10 +11,24 @@ const scholar = {
   academic_titles: [],
   education: [],
   research_areas: [],
+  academic_positions: [
+    {
+      id: "position-1",
+      scholar_id: "scholar-id-1",
+      organization: "示例科技公司",
+      department: "人工智能研究院",
+      title: "研究科学家",
+      start_date: "2021-01-01",
+      end_date: "2024-12-31",
+      is_current: false,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    },
+  ],
   joint_management_roles: [
     {
-      role: "研究科学家",
-      organization: "示例研究院",
+      role: "理事",
+      organization: "示例人工智能学会",
       start_year: "2021",
       end_year: "2024",
     },
@@ -23,12 +37,24 @@ const scholar = {
 } as unknown as ScholarDetail;
 
 describe("DetailLeftSidebar", () => {
-  it("labels legacy management roles as employment history", () => {
+  it("renders normalized academic positions as employment history", () => {
     render(<DetailLeftSidebar scholar={scholar} />);
 
     expect(screen.getByText("任职经历")).toBeTruthy();
     expect(screen.queryByText("学术兼职")).toBeNull();
     expect(screen.getByText("研究科学家")).toBeTruthy();
+    expect(screen.getByText(/示例科技公司/)).toBeTruthy();
+    expect(screen.queryByText("示例人工智能学会")).toBeNull();
+  });
+
+  it("does not render the metric update caption", () => {
+    render(
+      <DetailLeftSidebar
+        scholar={{ ...scholar, metrics_updated_at: "2026-09-09" }}
+      />,
+    );
+
+    expect(screen.queryByText(/指标更新时间/)).toBeNull();
   });
 
   it("uses a compact icon button for profile editing", () => {
