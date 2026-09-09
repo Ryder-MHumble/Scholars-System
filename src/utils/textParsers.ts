@@ -5,13 +5,10 @@ import type {
   AwardRecord,
   ManagementRole,
   JointProject,
+  AcademicPositionCreate,
+  OpenSourceProjectCreate,
 } from "@/services/scholarApi";
-import type { ActivityCreateRequest } from "@/services/activityApi";
 import { DOMAIN_MAP } from "@/utils/institutionLogoUtils";
-import {
-  mergeAcademicAffiliations as mergeAcademicAffiliationsCore,
-  parseAcademicAffiliationsFromText as parseAcademicAffiliationsFromTextCore,
-} from "@/utils/academicAffiliationParser";
 
 // ─── Publication Parser ──────────────────────────────────────────────────────
 //
@@ -630,11 +627,34 @@ function stripListPrefix(line: string): string {
     .trim();
 }
 
-function extractYearToken(input: string): string {
-  const match = input.match(/(?:19|20)\d{2}|至今|present|now/i);
-  if (!match) return "";
-  const value = match[0];
-  return /^(present|now)$/i.test(value) ? "至今" : value;
+function normalizeOpenEndDate(value: string | undefined): string | null {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+  if (/^(至今|现在|present|now|current)$/i.test(trimmed)) return null;
+  return normalizeAcademicPositionDate(trimmed);
+}
+
+function normalizeAcademicPositionDate(value: string | undefined): string | null {
+  const trimmed = String(value ?? "").trim().replace(/[./]/g, "-");
+  if (!trimmed) return null;
+  if (/^(?:19|20)\d{2}$/.test(trimmed)) return `${trimmed}-01-01`;
+  if (/^(?:19|20)\d{2}-\d{1,2}$/.test(trimmed)) {
+    const [year, month] = trimmed.split("-");
+    return `${year}-${month.padStart(2, "0")}-01`;
+  }
+  const fullDate = trimmed.match(/^((?:19|20)\d{2})-(\d{1,2})-(\d{1,2})$/);
+  if (fullDate) {
+    return `${fullDate[1]}-${fullDate[2].padStart(2, "0")}-${fullDate[3].padStart(2, "0")}`;
+  }
+  return trimmed;
+}
+
+function isCurrentEndDate(value: string | undefined): boolean {
+  return /^(至今|现在|present|now|current)$/i.test(String(value ?? "").trim());
+}
+
+function looksLikeAcademicOrganization(value: string): boolean {
+  return /(大学|学院|研究院|研究所|实验室|专委会|委员会|中心|协会|学会|University|Institute|College|School|Lab|Center|Association|Society)/i.test(value);
 }
 
 // ─── Management Role Parser ──────────────────────────────────────────────────
@@ -642,8 +662,7 @@ function extractYearToken(input: string): string {
 // Supports:
 //   1. "职务 | 机构 | 开始 | 结束"
 //   2. "机构 | 职务 | 开始 | 结束" when the first column looks like an org
-//   3. "机构 职务 2023-至今"
-//   4. "职务：...；机构：...；开始：...；结束：..."
+//   3. "职务：...；机构：...；开始：...；结束：..."
 //
 export function parseManagementRolesFromText(text: string): ManagementRole[] {
   const parseLabeledFields = (value: string): ManagementRole | null => {
@@ -664,7 +683,6 @@ export function parseManagementRolesFromText(text: string): ManagementRole[] {
       if (/^(开始|开始年份|起始|start|start_year)$/.test(key)) mapped.start_year = val;
       if (/^(结束|结束年份|终止|end|end_year)$/.test(key)) mapped.end_year = val;
     }
-
     if (!mapped.role && !mapped.organization) return null;
     return {
       role: mapped.role || "",
@@ -674,31 +692,38 @@ export function parseManagementRolesFromText(text: string): ManagementRole[] {
     };
   };
 
-  const looksLikeOrganization = (value: string): boolean =>
-    /(大学|学院|研究院|实验室|中心|协会|学会|委员会|University|Institute|College|School|Lab|Center|Association|Society)/i.test(value);
-
   return text
     .replace(/\r/g, "")
     .split(/\n+/)
     .map((l) => l.trim())
     .filter(Boolean)
     .flatMap((line) => {
-      // A pasted homepage paragraph often separates appointments with semicolons.
-      // Keep labeled rows intact, but split plain rows into independent records.
-      const candidates = /[:：]/.test(line)
-        ? [line]
-        : line.split(/[；;]/).map((item) => item.trim()).filter(Boolean);
-      return candidates.map((l) => {
+      if (/(?:职务|兼职|岗位|角色|机构|单位|组织|开始|结束|role|position|title|organization|institution)\s*[:：]/i.test(line)) {
+        return [line];
+      }
+      return line
+        .split(/[；;]/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .flatMap((part) => {
+          const commaParts = part
+            .split(/[，,、]/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+          return commaParts.length > 1 &&
+            commaParts.every(looksLikeAcademicOrganization)
+            ? commaParts
+            : [part];
+        });
+    })
+    .map((l) => {
       const raw = stripListPrefix(l);
       const labeled = parseLabeledFields(raw);
       if (labeled) return labeled;
 
-      const parts = raw
-        .split(/[|｜\t]|\s{2,}/)
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const parts = raw.split(/[|｜\t]/).map((s) => s.trim()).filter(Boolean);
       if (parts.length >= 2) {
-        const firstIsOrg = looksLikeOrganization(parts[0]);
+        const firstIsOrg = looksLikeAcademicOrganization(parts[0]);
         return {
           role: firstIsOrg ? parts[1] || "" : parts[0] || "",
           organization: firstIsOrg ? parts[0] || "" : parts[1] || "",
@@ -707,161 +732,183 @@ export function parseManagementRolesFromText(text: string): ManagementRole[] {
         };
       }
 
-      const rangeMatch = raw.match(
-        /((?:19|20)\d{2}(?:[./-]\d{1,2})?|至今|present|now)\s*(?:-|—|–|~|～|至|到)\s*((?:19|20)\d{2}(?:[./-]\d{1,2})?|至今|present|now)/i,
+      const orgMatch = raw.match(
+        /^(.+?(?:大学|学院|研究院|研究所|实验室|专委会|委员会|中心|协会|学会|University|Institute|College|School|Lab|Center|Association|Society))\s*(.+)$/i,
       );
-      const start_year = rangeMatch ? extractYearToken(rangeMatch[1]) : "";
-      const end_year = rangeMatch ? extractYearToken(rangeMatch[2]) : "";
-      const withoutRange = rangeMatch
-        ? raw.replace(rangeMatch[0], "").replace(/[，,；;()（）]+/g, " ").trim()
-        : raw;
-      const orgMatch = withoutRange.match(
-        /^(.+?(?:大学|学院|研究院|实验室|中心|协会|学会|委员会|University|Institute|College|School|Lab|Center|Association|Society))\s+(.+)$/i,
-      );
-      if (orgMatch) {
-        return {
-          organization: orgMatch[1].trim(),
-          role: orgMatch[2].trim(),
-          start_year,
-          end_year,
-        };
-      }
-
-      return {
-        role: withoutRange || raw,
-        organization: "",
-        start_year,
-        end_year,
-      };
-      });
+      return orgMatch
+        ? {
+            role: orgMatch[2].trim(),
+            organization: orgMatch[1].trim(),
+            start_year: "",
+            end_year: "",
+          }
+        : {
+            role: raw,
+            organization: "",
+            start_year: "",
+            end_year: "",
+          };
     })
     .filter((item) => item.role || item.organization);
 }
 
-/** Academic-service aliases share the same tolerant parser but stay out of employment fields. */
-export function parseAcademicAffiliationsFromText(text: string): ManagementRole[] {
-  return parseAcademicAffiliationsFromTextCore(text);
-}
-
-export function mergeAcademicAffiliations(
-  existing: ManagementRole[],
-  incoming: ManagementRole[],
-): ManagementRole[] {
-  return mergeAcademicAffiliationsCore(existing, incoming);
-}
-
-// ─── Scholar Activity Parser ─────────────────────────────────────────────────
+// ─── Academic Position Parser ────────────────────────────────────────────────
 //
 // Supports:
-//   1. "标题 | 日期 | 类型 | 分类 | 地点 | 摘要"
-//   2. "标题：...；日期：2026-09-08；类型：讲座；分类：学术活动；地点：..."
-//   3. "2026-09-08 标题 地点"
+//   1. "机构 | 职务 | 开始 | 结束"
+//   2. "职务 | 机构 | 开始 | 结束" when the second column looks like an org
+//   3. "职务：...；机构：...；开始：...；结束：..."
 //
-export function parseScholarActivitiesFromText(
+export function parseAcademicPositionsFromText(
   text: string,
-): ActivityCreateRequest[] {
-  const today = new Date().toISOString().slice(0, 10);
-  const extractDate = (input: string): string => {
-    const iso = input.match(/\b((?:19|20)\d{2})[-/.年](\d{1,2})(?:[-/.月](\d{1,2})日?)?\b/);
-    if (!iso) return today;
-    const year = iso[1];
-    const month = String(Number(iso[2])).padStart(2, "0");
-    const day = String(Number(iso[3] || "1")).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const extractTime = (input: string): string | undefined => {
-    const match = input.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
-    if (!match) return undefined;
-    return `${match[1].padStart(2, "0")}:${match[2]}`;
-  };
-
-  const buildActivity = (data: Partial<ActivityCreateRequest>): ActivityCreateRequest => ({
-    title: data.title?.trim() || "未命名学者活动",
-    event_date: data.event_date?.trim() || today,
-    event_time: data.event_time?.trim() || undefined,
-    event_type: data.event_type?.trim() || "学者活动",
-    category: data.category?.trim() || "学者活动",
-    location: data.location?.trim() || "待定",
-    abstract: data.abstract?.trim() || undefined,
-    scholar_ids: data.scholar_ids,
-  });
-
-  const parseLabeledFields = (value: string): ActivityCreateRequest | null => {
+): AcademicPositionCreate[] {
+  const parseLabeledFields = (value: string): AcademicPositionCreate | null => {
     const pairs = value
       .split(/[；;]/)
       .map((part) => part.trim())
       .filter(Boolean);
     if (pairs.length < 2) return null;
 
-    const mapped: Partial<ActivityCreateRequest> = {};
+    const mapped: Record<string, string> = {};
     for (const pair of pairs) {
       const match = pair.match(/^([^:：]+)[:：]\s*(.+)$/);
       if (!match) continue;
       const key = match[1].trim().toLowerCase();
       const val = match[2].trim();
-      if (/^(标题|活动|活动标题|名称|title)$/.test(key)) mapped.title = val;
-      if (/^(日期|活动日期|时间|date|event_date)$/.test(key)) {
-        mapped.event_date = extractDate(val);
-        mapped.event_time = extractTime(val);
-      }
-      if (/^(类型|活动类型|type|event_type)$/.test(key)) mapped.event_type = val;
-      if (/^(分类|类别|category)$/.test(key)) mapped.category = val;
-      if (/^(地点|位置|location|venue)$/.test(key)) mapped.location = val;
-      if (/^(摘要|简介|内容|描述|abstract|description)$/.test(key)) mapped.abstract = val;
+      if (/^(职务|兼职|岗位|角色|title|position|role)$/.test(key)) mapped.title = val;
+      if (/^(机构|兼职机构|单位|组织|organization|institution|org)$/.test(key)) mapped.organization = val;
+      if (/^(部门|院系|department)$/.test(key)) mapped.department = val;
+      if (/^(类型|兼职类型|position_type|type)$/.test(key)) mapped.position_type = val;
+      if (/^(开始|开始日期|开始年份|起始|start|start_date)$/.test(key)) mapped.start_date = val;
+      if (/^(结束|结束日期|结束年份|终止|end|end_date)$/.test(key)) mapped.end_date = val;
+      if (/^(描述|说明|备注|description|note)$/.test(key)) mapped.description = val;
+      if (/^(来源|来源url|source_url|url)$/.test(key)) mapped.source_url = val;
     }
 
-    if (!mapped.title && !mapped.abstract) return null;
-    return buildActivity(mapped);
+    if (!mapped.organization || !mapped.title) return null;
+    return {
+      organization: mapped.organization,
+      department: mapped.department || null,
+      title: mapped.title,
+      position_type: mapped.position_type || null,
+      start_date: normalizeAcademicPositionDate(mapped.start_date),
+      end_date: normalizeOpenEndDate(mapped.end_date),
+      is_current: isCurrentEndDate(mapped.end_date),
+      description: mapped.description || null,
+      source_url: mapped.source_url || null,
+    };
   };
 
-  const parsed = text
+  return text
     .split("\n")
-    .map((l) => l.trim())
+    .map((line) => stripListPrefix(line))
     .filter(Boolean)
-    .map((line): ActivityCreateRequest => {
-      const raw = stripListPrefix(line);
+    .map((raw): AcademicPositionCreate | null => {
       const labeled = parseLabeledFields(raw);
       if (labeled) return labeled;
 
-      const parts = raw.split(/[|｜\t]/).map((s) => s.trim()).filter(Boolean);
-      if (parts.length >= 2) {
-        return buildActivity({
-          title: parts[0],
-          event_date: extractDate(parts[1]),
-          event_time: extractTime(parts[1]),
-          event_type: parts[2],
-          category: parts[3],
-          location: parts[4],
-          abstract: parts[5],
-        });
+      const dateRange = raw.match(
+        /((?:19|20)\d{2}(?:[./-]\d{1,2})?)\s*(?:-|—|–|~|～|至|到)\s*((?:19|20)\d{2}(?:[./-]\d{1,2})?|至今|现在|present|now|current)/i,
+      );
+      if (dateRange) {
+        const contentParts = raw
+          .replace(dateRange[0], "")
+          .replace(/^[|｜\t\s]+|[|｜\t\s]+$/g, "")
+          .split(/[|｜\t]|\s{2,}/)
+          .map((part) => part.trim())
+          .filter(Boolean);
+        if (
+          contentParts.length >= 2 &&
+          looksLikeAcademicOrganization(contentParts[0])
+        ) {
+          return {
+            organization: contentParts[0],
+            department:
+              contentParts.length > 2
+                ? contentParts.slice(1, -1).join(" ")
+                : null,
+            title: contentParts[contentParts.length - 1],
+            position_type: null,
+            start_date: normalizeAcademicPositionDate(dateRange[1]),
+            end_date: normalizeOpenEndDate(dateRange[2]),
+            is_current: isCurrentEndDate(dateRange[2]),
+            description: null,
+            source_url: null,
+          };
+        }
       }
 
-      const date = extractDate(raw);
-      const time = extractTime(raw);
-      const dateMatch = raw.match(/(?:19|20)\d{2}[-/.年]\d{1,2}(?:[-/.月]\d{1,2}日?)?/);
-      const title = raw
-        .replace(dateMatch?.[0] ?? "", "")
-        .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/, "")
-        .replace(/^[-–—•·\s]+|[-–—•·\s]+$/g, "")
-        .replace(/[，,；;]+$/, "")
-        .trim();
+      const parts = raw.split(/[|｜\t]/).map((s) => s.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        const firstIsOrg = looksLikeAcademicOrganization(parts[0]);
+        const organization = firstIsOrg ? parts[0] : parts[1];
+        const title = firstIsOrg ? parts[1] : parts[0];
+        const endDate = normalizeOpenEndDate(parts[3]);
+        return {
+          organization,
+          title,
+          start_date: normalizeAcademicPositionDate(parts[2]),
+          end_date: endDate,
+          is_current: isCurrentEndDate(parts[3]),
+          department: null,
+          position_type: null,
+          description: parts[4] || null,
+          source_url: parts[5] || null,
+        };
+      }
 
-      return buildActivity({
-        title: title || raw,
-        event_date: date,
-        event_time: time,
-      });
+      const orgMatch = raw.match(
+        /^(.+?(?:大学|学院|研究院|实验室|中心|协会|学会|委员会|University|Institute|College|School|Lab|Center|Association|Society))\s+(.+)$/i,
+      );
+      if (!orgMatch) return null;
+      return {
+        organization: orgMatch[1].trim(),
+        title: orgMatch[2].trim(),
+        start_date: null,
+        end_date: null,
+        is_current: false,
+        department: null,
+        position_type: null,
+        description: null,
+        source_url: null,
+      };
     })
-    .filter((item) => item.title || item.abstract);
+    .filter((item): item is AcademicPositionCreate =>
+      Boolean(item?.organization && item.title),
+    );
+}
 
-  const seen = new Set<string>();
-  return parsed.filter((item) => {
-    const key = `${item.title.trim().toLocaleLowerCase()}|${item.event_date.trim()}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+// ─── Open Source Project Parser ──────────────────────────────────────────────
+//
+// Supports: "项目名称 | 仓库 URL | 语言 | Stars | Forks | 平台"
+//
+export function parseOpenSourceProjectsFromText(
+  text: string,
+): OpenSourceProjectCreate[] {
+  return text
+    .split("\n")
+    .map((line) => stripListPrefix(line))
+    .filter(Boolean)
+    .map((raw): OpenSourceProjectCreate | null => {
+      const parts = raw.split(/[|｜\t]/).map((part) => part.trim());
+      const name = parts[0] || "";
+      if (!name) return null;
+
+      const toNumber = (value: string | undefined): number | null => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+      };
+
+      return {
+        name,
+        repository_url: parts[1] || null,
+        language: parts[2] || null,
+        stars: toNumber(parts[3]),
+        forks: toNumber(parts[4]),
+        platform: parts[5] || null,
+      };
+    })
+    .filter((item): item is OpenSourceProjectCreate => Boolean(item));
 }
 
 // ─── Patent Parser ───────────────────────────────────────────────────────────

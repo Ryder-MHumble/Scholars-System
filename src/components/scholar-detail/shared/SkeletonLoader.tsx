@@ -54,7 +54,7 @@ export function ContentCardSkeleton() {
 
 export function StatsSidebarSkeleton() {
   return (
-    <aside className="w-80 shrink-0 space-y-4">
+    <aside className="w-full space-y-4 xl:w-80 xl:shrink-0">
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <div className="h-5 bg-gray-200 rounded animate-pulse w-24 mb-4" />
         <div className="h-48 bg-gray-200 rounded animate-pulse mb-4" />
@@ -88,12 +88,12 @@ export function StatsSidebarSkeleton() {
 export function PageSkeleton() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-[1600px] mx-auto px-4 py-6">
+      <div className="max-w-[1600px] mx-auto px-3 py-4 sm:px-4 sm:py-6">
         <div className="h-6 bg-gray-200 rounded animate-pulse w-24 mb-6" />
 
-        <div className="flex gap-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:gap-5">
           {/* Left Sidebar */}
-          <aside className="w-[400px] shrink-0 space-y-4">
+          <aside className="w-full space-y-4 xl:w-[400px] xl:shrink-0">
             <ProfileCardSkeleton />
             <SidebarSectionSkeleton />
             <SidebarSectionSkeleton />

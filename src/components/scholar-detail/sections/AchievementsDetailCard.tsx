@@ -1,13 +1,52 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { BookOpen, Award, Trophy, ExternalLink, Edit3, FileText } from "lucide-react";
+import {
+  AlertCircle,
+  Award,
+  BookOpen,
+  BriefcaseBusiness,
+  Edit3,
+  ExternalLink,
+  FileText,
+  FolderGit2,
+  GitFork,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Star,
+  Trash2,
+  Trophy,
+} from "lucide-react";
 import type {
+  OpenSourceProject,
+  OpenSourceProjectCreate,
+  ResearchProject,
+  ResearchProjectCreate,
   ScholarDetail,
   AwardRecord,
-  JointProject,
 } from "@/services/scholarApi";
+import {
+  batchOpenSourceProjects,
+  createOpenSourceProject,
+  createResearchProject,
+  deleteOpenSourceProject,
+  deleteResearchProject,
+  fetchOpenSourceProjects,
+  fetchResearchProjects,
+  updateOpenSourceProject,
+  updateResearchProject,
+} from "@/services/scholarResourcesApi";
+import { BaseModal } from "@/components/common/BaseModal";
+import { EditManagementRolesModal } from "@/components/scholar-detail/modals/EditManagementRolesModal";
+import {
+  EditScholarResourceModal,
+  type EditableScholarResource,
+  type ScholarResourceKind,
+  type ScholarResourcePayload,
+} from "@/components/scholar-detail/modals/EditScholarResourceModal";
 import { cn } from "@/utils/cn";
 import { slideInUp } from "@/utils/animations";
+import { parseOpenSourceProjectsFromText } from "@/utils/textParsers";
 import {
   extractAchievementTags,
   getAchievementTagKind,
@@ -20,15 +59,41 @@ import {
 interface AchievementsDetailCardProps {
   scholar: ScholarDetail;
   onShowAchievementsModal: () => void;
+  onSaveManagementRoles: (
+    roles: ScholarDetail["joint_management_roles"],
+  ) => void | Promise<void>;
+  relationSlot?: ReactNode;
 }
 
 export function AchievementsDetailCard({
   scholar,
   onShowAchievementsModal,
+  onSaveManagementRoles,
+  relationSlot,
 }: AchievementsDetailCardProps) {
   const [activeTab, setActiveTab] = useState<
-    "publications" | "patents" | "awards" | "grants"
+    | "publications"
+    | "patents"
+    | "awards"
+    | "research"
+    | "openSource"
   >("publications");
+  const [researchProjects, setResearchProjects] = useState<ResearchProject[]>([]);
+  const [openSourceProjects, setOpenSourceProjects] = useState<OpenSourceProject[]>([]);
+  const [loading, setLoading] = useState({
+    research: true,
+    openSource: true,
+  });
+  const [resourceErrors, setResourceErrors] = useState({
+    research: "",
+    openSource: "",
+  });
+  const [resourceEditor, setResourceEditor] = useState<{
+    kind: ScholarResourceKind;
+    item?: EditableScholarResource;
+  } | null>(null);
+  const [showManagementRolesEditor, setShowManagementRolesEditor] = useState(false);
+  const [showOpenSourceBatch, setShowOpenSourceBatch] = useState(false);
   const achievementTags = extractAchievementTags(scholar);
   const venueTags = achievementTags.filter(
     (tag) => getAchievementTagKind(tag) === "venue",
@@ -39,7 +104,50 @@ export function AchievementsDetailCard({
   const hasTwoInstitutesPapers = hasTwoInstitutesAchievement(scholar);
   const allAwards = scholar.awards ?? [];
   const awardsOnly = allAwards.filter((a) => a.level !== "Grant");
-  const projects = scholar.joint_research_projects ?? [];
+  const loadResearchProjects = useCallback(async () => {
+    setLoading((current) => ({ ...current, research: true }));
+    setResourceErrors((current) => ({ ...current, research: "" }));
+    try {
+      setResearchProjects(await fetchResearchProjects(scholar.url_hash));
+    } catch (error) {
+      setResourceErrors((current) => ({
+        ...current,
+        research: error instanceof Error ? error.message : "科研项目加载失败",
+      }));
+    } finally {
+      setLoading((current) => ({ ...current, research: false }));
+    }
+  }, [scholar.url_hash]);
+
+  const loadOpenSourceProjects = useCallback(async () => {
+    setLoading((current) => ({ ...current, openSource: true }));
+    setResourceErrors((current) => ({ ...current, openSource: "" }));
+    try {
+      setOpenSourceProjects(await fetchOpenSourceProjects(scholar.url_hash));
+    } catch (error) {
+      setResourceErrors((current) => ({
+        ...current,
+        openSource: error instanceof Error ? error.message : "开源项目加载失败",
+      }));
+    } finally {
+      setLoading((current) => ({ ...current, openSource: false }));
+    }
+  }, [scholar.url_hash]);
+
+  useEffect(() => {
+    void loadResearchProjects();
+    void loadOpenSourceProjects();
+  }, [loadOpenSourceProjects, loadResearchProjects]);
+
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== scholar.url_hash) return;
+      void loadOpenSourceProjects();
+    };
+    window.addEventListener("scholar-resources-updated", refresh);
+    return () => window.removeEventListener("scholar-resources-updated", refresh);
+  }, [loadOpenSourceProjects, scholar.url_hash]);
+
   const tabs = [
     {
       key: "publications" as const,
@@ -60,28 +168,131 @@ export function AchievementsDetailCard({
       icon: Trophy,
     },
     {
-      key: "grants" as const,
+      key: "research" as const,
       label: "科研项目",
-      count: projects.length,
+      count: researchProjects.length,
       icon: FileText,
     },
+    {
+      key: "openSource" as const,
+      label: "开源项目",
+      count: openSourceProjects.length,
+      icon: FolderGit2,
+    },
   ];
+  const saveResource = async (payload: ScholarResourcePayload) => {
+    if (!resourceEditor) return;
+    const { kind, item } = resourceEditor;
+    if (kind === "research") {
+      if (item) {
+        await updateResearchProject(
+          scholar.url_hash,
+          item.id,
+          payload as ResearchProjectCreate,
+        );
+      } else {
+        await createResearchProject(scholar.url_hash, payload as ResearchProjectCreate);
+      }
+      await loadResearchProjects();
+    } else if (kind === "openSource") {
+      if (item) {
+        await updateOpenSourceProject(
+          scholar.url_hash,
+          item.id,
+          payload as OpenSourceProjectCreate,
+        );
+      } else {
+        await createOpenSourceProject(scholar.url_hash, payload as OpenSourceProjectCreate);
+      }
+      await loadOpenSourceProjects();
+    }
+  };
+
+  const batchSaveOpenSourceProjects = async (rows: OpenSourceProjectCreate[]) => {
+    await batchOpenSourceProjects(scholar.url_hash, rows);
+    await loadOpenSourceProjects();
+  };
+
+  const deleteResource = async (
+    kind: ScholarResourceKind,
+    item: EditableScholarResource,
+    itemLabel: string,
+  ) => {
+    if (!window.confirm(`确认删除“${itemLabel}”？`)) return;
+    try {
+      if (kind === "research") {
+        await deleteResearchProject(scholar.url_hash, item.id);
+        await loadResearchProjects();
+      } else if (kind === "openSource") {
+        await deleteOpenSourceProject(scholar.url_hash, item.id);
+        await loadOpenSourceProjects();
+      }
+    } catch (error) {
+      setResourceErrors((current) => ({
+        ...current,
+        [kind]: error instanceof Error ? error.message : "删除失败",
+      }));
+    }
+  };
 
   return (
     <motion.div
+      data-testid="scholar-achievements-card"
       variants={slideInUp}
-      className="bg-white rounded-xl border border-gray-200 shadow-sm p-6"
+      className="bg-white"
     >
-      {/* Title */}
-      <div className="flex items-center gap-2 mb-5">
-        <Trophy className="w-5 h-5 text-primary-600" />
-        <h3 className="text-lg font-semibold text-gray-900">学者成就</h3>
+      {relationSlot && <div className="mb-5">{relationSlot}</div>}
+
+      <section
+        data-testid="scholar-academic-adjuncts-module"
+        className="mb-5 border-b border-gray-200 bg-white"
+      >
+        <div className="flex items-center gap-2 py-3">
+          <BriefcaseBusiness className="h-5 w-5 text-primary-600" />
+          <h3 className="text-lg font-semibold text-gray-900">学术兼职</h3>
+          <span className="text-xs text-gray-400">
+            {scholar.joint_management_roles?.length ?? 0}
+          </span>
+          <button
+            type="button"
+            aria-label="编辑学术兼职"
+            title="编辑学术兼职"
+            onClick={() => setShowManagementRolesEditor(true)}
+            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-primary-50 hover:text-primary-700"
+          >
+            <Edit3 className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2 pb-4">
+          {(scholar.joint_management_roles ?? []).length > 0 ? (
+            scholar.joint_management_roles.map((role, index) => (
+              <span
+                key={`${role.organization}-${role.role}-${index}`}
+                className="inline-flex max-w-full items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-700"
+              >
+                <span className="truncate">
+                  {[role.organization, role.role].filter(Boolean).join(" · ") ||
+                    "学术兼职"}
+                </span>
+              </span>
+            ))
+          ) : (
+            <p className="text-sm text-gray-400">暂无学术兼职数据</p>
+          )}
+        </div>
+      </section>
+
+      <div className="mb-3 flex items-center gap-2">
+        <Trophy className="h-5 w-5 text-primary-600" />
+        <h3 className="text-lg font-semibold text-gray-900">学术成果</h3>
         <button
+          type="button"
+          aria-label="编辑学术成果"
+          title="编辑学术成果"
           onClick={onShowAchievementsModal}
-          className="ml-auto flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-100 text-primary-600 hover:bg-primary-200 rounded-full transition-colors"
+          className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-primary-50 hover:text-primary-700"
         >
-          <Edit3 className="w-3 h-3" />
-          编辑
+          <Edit3 className="h-4 w-4" />
         </button>
       </div>
 
@@ -98,15 +309,15 @@ export function AchievementsDetailCard({
         </div>
       )}
 
-      <div className="mb-4 border-b border-gray-100">
-        <div className="flex items-center gap-2">
+      <div data-testid="scholar-achievement-tabs" className="mb-4 border-b border-gray-100">
+        <div className="grid grid-cols-2 gap-x-1 sm:flex sm:flex-wrap sm:items-center">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-lg border-b-2 transition-colors",
+                "inline-flex min-w-0 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-xs transition-colors sm:justify-start sm:px-3 sm:text-sm",
                 activeTab === tab.key
                   ? "text-primary-700 border-primary-600 bg-primary-50/40"
                   : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
@@ -123,8 +334,132 @@ export function AchievementsDetailCard({
       {activeTab === "publications" && <PublicationsSection scholar={scholar} />}
       {activeTab === "patents" && <PatentsSection scholar={scholar} />}
       {activeTab === "awards" && <AwardsSection awards={awardsOnly} />}
-      {activeTab === "grants" && <GrantsSection grants={projects} />}
+      {activeTab === "research" && (
+        <ResourceState
+          loading={loading.research}
+          error={resourceErrors.research}
+          retryLabel="重试科研项目"
+          onRetry={loadResearchProjects}
+        >
+          <ResearchProjectsSection
+            projects={researchProjects}
+            onAdd={() => setResourceEditor({ kind: "research" })}
+            onEdit={(item) => setResourceEditor({ kind: "research", item })}
+            onDelete={(item) => void deleteResource("research", item, item.name)}
+          />
+        </ResourceState>
+      )}
+      {activeTab === "openSource" && (
+        <ResourceState
+          loading={loading.openSource}
+          error={resourceErrors.openSource}
+          retryLabel="重试开源项目"
+          onRetry={loadOpenSourceProjects}
+        >
+          <OpenSourceProjectsSection
+            projects={openSourceProjects}
+            onDelete={(item) => void deleteResource("openSource", item, item.name)}
+          />
+        </ResourceState>
+      )}
+      {resourceEditor && (
+        <EditScholarResourceModal
+          kind={resourceEditor.kind}
+          item={resourceEditor.item}
+          onClose={() => setResourceEditor(null)}
+          onSubmit={saveResource}
+        />
+      )}
+      {showManagementRolesEditor && (
+        <EditManagementRolesModal
+          roles={scholar.joint_management_roles ?? []}
+          onClose={() => setShowManagementRolesEditor(false)}
+          onSubmit={async (roles) => {
+            await onSaveManagementRoles(roles);
+            setShowManagementRolesEditor(false);
+          }}
+        />
+      )}
+      {showOpenSourceBatch && (
+        <OpenSourceProjectsBatchModal
+          onClose={() => setShowOpenSourceBatch(false)}
+          onSubmit={async (rows) => {
+            await batchSaveOpenSourceProjects(rows);
+            setShowOpenSourceBatch(false);
+          }}
+        />
+      )}
     </motion.div>
+  );
+}
+
+function OpenSourceProjectsBatchModal({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (rows: OpenSourceProjectCreate[]) => Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const rows = useMemo(() => parseOpenSourceProjectsFromText(text), [text]);
+
+  const submit = async () => {
+    if (rows.length === 0) return;
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await onSubmit(rows);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "开源项目批量导入失败");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <BaseModal
+      isOpen
+      onClose={onClose}
+      title="批量识别开源项目"
+      maxWidth="2xl"
+      closeOnBackdropClick={!isSubmitting}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={isSubmitting} className="rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">取消</button>
+          <button type="button" onClick={() => void submit()} disabled={rows.length === 0 || isSubmitting} className="inline-flex items-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700 disabled:opacity-50">
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            提交 {rows.length > 0 ? `${rows.length} 条` : ""}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <p className="text-sm font-medium text-gray-800">粘贴开源项目文本</p>
+          <p className="mt-1 text-xs text-gray-500">每行一条，格式为“项目名称 | 仓库 URL | 语言 | Stars | Forks | 平台”。</p>
+        </div>
+        <textarea
+          aria-label="粘贴开源项目文本"
+          value={text}
+          rows={7}
+          disabled={isSubmitting}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="Scholar Toolkit | https://github.com/example/toolkit | TypeScript | 128 | 9 | GitHub"
+          className="w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary-400"
+        />
+        {error && <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span></div>}
+        <div className="rounded-md border border-blue-100 bg-blue-50/30 p-3">
+          <p className="mb-2 text-xs font-medium text-blue-700">自动识别预览 {rows.length} 条</p>
+          {rows.length === 0 ? <p className="py-3 text-center text-xs text-gray-400">粘贴内容后在这里预览</p> : (
+            <div className="space-y-2">
+              {rows.map((row, index) => <div key={`${row.name}-${index}`} className="rounded border border-blue-100 bg-white px-3 py-2"><p className="text-sm font-medium text-gray-800">{row.name}</p><p className="mt-1 text-xs text-gray-500">{[row.platform, row.language, row.stars != null ? `${row.stars} Stars` : ""].filter(Boolean).join(" · ")}</p></div>)}
+            </div>
+          )}
+        </div>
+      </div>
+    </BaseModal>
   );
 }
 
@@ -162,13 +497,6 @@ function PublicationsSection({ scholar }: { scholar: ScholarDetail }) {
   const pubs = scholar.representative_publications;
   return (
     <div className="mb-5">
-      <div className="flex items-center gap-2 mb-3">
-        <BookOpen className="w-4 h-4 text-gray-400" />
-        <h4 className="text-sm font-semibold text-gray-600">代表性论文</h4>
-        {pubs && pubs.length > 0 && (
-          <span className="text-xs text-gray-400">{pubs.length} 篇</span>
-        )}
-      </div>
       {pubs && pubs.length > 0 ? (
         <>
           <div className="space-y-3">
@@ -273,13 +601,6 @@ function PatentsSection({ scholar }: { scholar: ScholarDetail }) {
   const patents = scholar.patents;
   return (
     <div className="mb-1">
-      <div className="flex items-center gap-2 mb-3">
-        <Award className="w-4 h-4 text-gray-400" />
-        <h4 className="text-sm font-semibold text-gray-600">专利</h4>
-        {patents && patents.length > 0 && (
-          <span className="text-xs text-gray-400">{patents.length} 项</span>
-        )}
-      </div>
       {patents && patents.length > 0 ? (
         <div className="space-y-3">
           {patents.map((patent, i) => (
@@ -346,13 +667,6 @@ function AwardsSection({
 }) {
   return (
     <div className="mb-1">
-      <div className="flex items-center gap-2 mb-3">
-        <Trophy className="w-4 h-4 text-gray-400" />
-        <h4 className="text-sm font-semibold text-gray-600">荣誉奖项</h4>
-        {awards.length > 0 && (
-          <span className="text-xs text-gray-400">{awards.length} 个</span>
-        )}
-      </div>
       {awards.length > 0 ? (
         <div className="space-y-3">
           {awards.map((award, i) => {
@@ -427,42 +741,92 @@ function AwardsSection({
   );
 }
 
-/* -- Grants (科研项目) -- */
-function GrantsSection({
-  grants,
+function ResourceState({
+  loading,
+  error,
+  retryLabel,
+  onRetry,
+  children,
 }: {
-  grants: JointProject[];
+  loading: boolean;
+  error: string;
+  retryLabel: string;
+  onRetry: () => Promise<void>;
+  children: React.ReactNode;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-400">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        加载中
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-8 text-center">
+        <AlertCircle className="h-6 w-6 text-red-400" />
+        <p className="text-sm text-red-600">{error}</p>
+        <button
+          type="button"
+          aria-label={retryLabel}
+          onClick={() => void onRetry()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          重试
+        </button>
+      </div>
+    );
+  }
+  return children;
+}
+
+function ResearchProjectsSection({
+  projects,
+  onAdd,
+  onEdit,
+  onDelete,
+}: {
+  projects: ResearchProject[];
+  onAdd: () => void;
+  onEdit: (item: ResearchProject) => void;
+  onDelete: (item: ResearchProject) => void;
 }) {
   return (
     <div className="mb-1">
-      <div className="flex items-center gap-2 mb-3">
-        <FileText className="w-4 h-4 text-gray-400" />
-        <h4 className="text-sm font-semibold text-gray-600">科研项目</h4>
-        {grants.length > 0 && (
-          <span className="text-xs text-gray-400">{grants.length} 项</span>
-        )}
+      <div className="mb-3 flex justify-end">
+        <button type="button" onClick={onAdd} aria-label="新增科研项目" className="ml-auto inline-flex items-center gap-1 rounded-md border border-primary-100 bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100">
+          <Plus className="h-3.5 w-3.5" /> 新增
+        </button>
       </div>
-      {grants.length > 0 ? (
+      {projects.length > 0 ? (
         <div className="space-y-3">
-          {grants.map((grant, i) => (
+          {projects.map((project) => (
             <div
-              key={i}
+              key={project.id}
               className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 transition-colors"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <p className="text-sm font-medium text-gray-800 leading-snug">
-                    {grant.title || "项目"}
+                    {project.name}
                   </p>
-                  {grant.year && (
-                    <span className="text-xs text-gray-500 whitespace-nowrap">
-                      {grant.year}
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="text-xs text-gray-400">
+                      {formatPeriod(project.start_date, project.end_date)}
                     </span>
-                  )}
+                    <ResourceActions label="科研项目" name={project.name} onEdit={() => onEdit(project)} onDelete={() => onDelete(project)} />
+                  </div>
                 </div>
-                {grant.description && (
+                <div className="flex flex-wrap gap-1.5 text-xs text-gray-500">
+                  {project.role && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{project.role}</span>}
+                  {project.organization && <span>{project.organization}</span>}
+                  {project.status && <span>{project.status}</span>}
+                </div>
+                {project.description && (
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    {grant.description}
+                    {project.description}
                   </p>
                 )}
               </div>
@@ -474,6 +838,162 @@ function GrantsSection({
           暂无科研项目数据
         </p>
       )}
+    </div>
+  );
+}
+
+function OpenSourceProjectsSection({
+  projects,
+  onDelete,
+}: {
+  projects: OpenSourceProject[];
+  onDelete: (item: OpenSourceProject) => void;
+}) {
+  const rankedProjects = useMemo(
+    () =>
+      [...projects].sort((a, b) => {
+        const byStars = (b.stars ?? -1) - (a.stars ?? -1);
+        if (byStars !== 0) return byStars;
+        return a.name.localeCompare(b.name, "zh-CN");
+      }),
+    [projects],
+  );
+  return (
+    <div className="mb-1">
+      {projects.length > 0 ? (
+        <div className="border-y border-gray-200 bg-white">
+          <div className="grid grid-cols-[minmax(0,1fr)_72px_64px] items-center border-b border-gray-100 py-2 text-[11px] font-medium text-gray-400">
+            <span>项目仓库</span>
+            <span className="text-right">Stars</span>
+            <span aria-hidden="true" />
+          </div>
+
+          <div>
+            {rankedProjects.map((project) => (
+              <div key={project.id} className="group grid grid-cols-[minmax(0,1fr)_72px_64px] items-center gap-2 border-b border-gray-100 py-3 transition-colors last:border-0 hover:bg-gray-50/60">
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <FolderGit2 className="h-4 w-4 shrink-0 text-gray-400" />
+                    <p className="truncate text-sm font-semibold leading-snug text-gray-900">{project.name}</p>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                    {project.platform && <span>{project.platform}</span>}
+                    {project.repository_url && (
+                      <span className="max-w-[220px] truncate text-gray-400">
+                        {formatRepositoryHost(project.repository_url)}
+                      </span>
+                    )}
+                    {project.language && (
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">
+                        {project.language}
+                      </span>
+                    )}
+                    {project.role && (
+                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">
+                        {project.role}
+                      </span>
+                    )}
+                    {project.status && <span>{project.status}</span>}
+                  </div>
+                  {project.description && (
+                    <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-gray-500">
+                      {project.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-right">
+                  <div className="inline-flex items-center gap-1 text-sm font-semibold text-gray-900">
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    {formatCompactNumber(project.stars)}
+                  </div>
+                  {typeof project.forks === "number" && (
+                    <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-gray-400">
+                      <GitFork className="h-3 w-3" />
+                      {formatCompactNumber(project.forks)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-1">
+                  {project.repository_url && (
+                    <a
+                      href={project.repository_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="打开仓库"
+                      title="打开仓库"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-primary-600 transition-colors hover:bg-primary-50"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onDelete(project)}
+                    aria-label={`删除开源项目：${project.name}`}
+                    title="删除"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="border-y border-dashed border-gray-200 px-4 py-8 text-center">
+          <FolderGit2 className="mx-auto h-7 w-7 text-gray-300" />
+          <p className="mt-2 text-sm text-gray-400">暂无开源项目数据</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatCompactNumber(value?: number | null): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
+  return value.toLocaleString("zh-CN");
+}
+
+function formatRepositoryHost(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/^\/|\/$/g, "");
+    return path ? `${parsed.hostname}/${path.split("/").slice(0, 2).join("/")}` : parsed.hostname;
+  } catch {
+    return url;
+  }
+}
+
+function formatPeriod(start?: string | null, end?: string | null): string {
+  const startLabel = start?.slice(0, 7) ?? "";
+  const endLabel = end?.slice(0, 7) ?? "";
+  if (startLabel && endLabel) return `${startLabel} - ${endLabel}`;
+  if (startLabel) return `${startLabel} 至今`;
+  return endLabel;
+}
+
+function ResourceActions({
+  label,
+  name,
+  onEdit,
+  onDelete,
+}: {
+  label: string;
+  name: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center">
+      <button type="button" onClick={onEdit} aria-label={`编辑${label}：${name}`} title="编辑" className="rounded p-1 text-gray-400 hover:bg-primary-50 hover:text-primary-600">
+        <Edit3 className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" onClick={onDelete} aria-label={`删除${label}：${name}`} title="删除" className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

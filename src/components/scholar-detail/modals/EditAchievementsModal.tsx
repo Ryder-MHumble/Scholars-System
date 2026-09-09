@@ -7,12 +7,16 @@ import type {
   PatentRecord,
   AwardRecord,
   JointProject,
+  AcademicPositionCreate,
+  OpenSourceProjectCreate,
 } from "@/services/scholarApi";
 import {
   parsePublicationsFromText,
   parsePatentsFromText,
   parseAwardsFromText,
   parseProjectsFromText,
+  parseAcademicPositionsFromText,
+  parseOpenSourceProjectsFromText,
 } from "@/utils/textParsers";
 
 interface EditAchievementsModalProps {
@@ -27,6 +31,10 @@ interface EditAchievementsModalProps {
     awards: AwardRecord[];
     projects: JointProject[];
   }) => void | Promise<void>;
+  onSubmitResources?: (data: {
+    openSourceProjects: OpenSourceProjectCreate[];
+    academicPositions: AcademicPositionCreate[];
+  }) => void | Promise<void>;
 }
 
 type AchievementsTab = "publications" | "patents" | "awards" | "projects";
@@ -38,6 +46,7 @@ export function EditAchievementsModal({
   projects,
   onClose,
   onSubmit,
+  onSubmitResources,
 }: EditAchievementsModalProps) {
   const [activeTab, setActiveTab] = useState<AchievementsTab>("publications");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,6 +65,8 @@ export function EditAchievementsModal({
     patents: "",
     awards: "",
     projects: "",
+    openSourceProjects: "",
+    academicPositions: "",
   });
 
   const parsedBatchItems = useMemo(
@@ -64,6 +75,8 @@ export function EditAchievementsModal({
       patents: parsePatentsFromText(batchInputs.patents),
       awards: parseAwardsFromText(batchInputs.awards),
       projects: parseProjectsFromText(batchInputs.projects),
+      openSourceProjects: parseOpenSourceProjectsFromText(batchInputs.openSourceProjects),
+      academicPositions: parseAcademicPositionsFromText(batchInputs.academicPositions),
     }),
     [batchInputs],
   );
@@ -73,6 +86,8 @@ export function EditAchievementsModal({
       patents: parsedBatchItems.patents.length,
       awards: parsedBatchItems.awards.length,
       projects: parsedBatchItems.projects.length,
+      openSourceProjects: parsedBatchItems.openSourceProjects.length,
+      academicPositions: parsedBatchItems.academicPositions.length,
     }),
     [parsedBatchItems],
   );
@@ -116,6 +131,12 @@ export function EditAchievementsModal({
         awards: finalAwards,
         projects: finalProjects,
       });
+      if (onSubmitResources) {
+        await onSubmitResources({
+          openSourceProjects: parsedBatchItems.openSourceProjects,
+          academicPositions: parsedBatchItems.academicPositions,
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -291,7 +312,7 @@ export function EditAchievementsModal({
             </div>
           </div>
           <p className="mt-2 text-xs text-gray-500">
-            支持同时识别论文、专利、获奖、科研项目，点击顶部"保存全部"后一次性提交四类数据。
+            支持同时识别论文、专利、获奖、科研项目、开源项目和学术兼职，点击顶部"保存全部"后一次性提交。
           </p>
           <p className="mt-1 text-[11px] text-gray-400">
             无需 Excel；复制粘贴到批量识别框后，保存时会自动识别并导入文本框内容。
@@ -330,6 +351,24 @@ export function EditAchievementsModal({
                   placeholder={"项目名称 | 年份 | 描述\n项目名称：基于大模型的代码生成；年份：2024；描述：校企联合项目"}
                   onChange={(v) => handleBatchChange("projects", v)}
                 />
+                {onSubmitResources && (
+                  <BatchImportCard
+                    title="开源项目批量识别"
+                    value={batchInputs.openSourceProjects}
+                    count={parsedBatchCounts.openSourceProjects}
+                    placeholder="项目名称 | 仓库 URL | 语言 | Stars | Forks | 平台"
+                    onChange={(v) => handleBatchChange("openSourceProjects", v)}
+                  />
+                )}
+                {onSubmitResources && (
+                  <BatchImportCard
+                    title="学术兼职批量识别"
+                    value={batchInputs.academicPositions}
+                    count={parsedBatchCounts.academicPositions}
+                    placeholder="机构 | 职务 | 开始 | 结束"
+                    onChange={(v) => handleBatchChange("academicPositions", v)}
+                  />
+                )}
               </div>
               <div className="flex items-center justify-end">
                 <p className="text-[11px] text-gray-400">
@@ -800,6 +839,7 @@ function BatchImportCard({
     <div className="rounded-lg border border-blue-100 bg-white p-3 space-y-2">
       <p className="text-xs font-semibold text-gray-600">{title}</p>
       <textarea
+        aria-label={title}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={4}

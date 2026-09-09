@@ -114,18 +114,15 @@ export interface ScholarDetail extends ScholarListItem {
   supervised_students_count: number;
   joint_research_projects: JointProject[];
   joint_management_roles: ManagementRole[];
-  academic_positions: AcademicPositionRecord[];
   academic_exchange_records: ExchangeRecord[];
   institute_relation_notes: string;
   relation_updated_by: string;
   relation_updated_at: string;
   recent_updates: ScholarUpdate[];
-  news: ScholarNewsRecord[];
-  research_projects: ResearchProjectRecord[];
-  open_source_projects: OpenSourceProjectRecord[];
   representative_publications: PublicationRecord[];
   patents: PatentRecord[];
   awards: AwardRecord[];
+  academic_positions: AcademicPosition[];
   coauthors?: CoauthorInfo[];
   custom_fields?: Record<string, unknown>;
 }
@@ -158,63 +155,6 @@ export interface ManagementRole {
   organization?: string;
   start_year?: number | string;
   end_year?: number | string;
-}
-
-/** Normalized employment/appointment history from scholar_academic_positions. */
-export interface AcademicPositionRecord {
-  id?: string;
-  scholar_id?: string;
-  organization: string;
-  department?: string | null;
-  title: string;
-  position_type?: string | null;
-  start_date?: string | null;
-  end_date?: string | null;
-  is_current?: boolean;
-  description?: string | null;
-  source_url?: string | null;
-  source_type?: string | null;
-  source_record_id?: string | null;
-  evidence?: Record<string, unknown>;
-  added_by?: string;
-}
-
-export interface ScholarNewsRecord {
-  id?: string;
-  title: string;
-  summary?: string | null;
-  content?: string | null;
-  news_type?: string | null;
-  published_at?: string | null;
-  source_url?: string | null;
-  source_type?: string | null;
-  source_record_id?: string | null;
-  review_status?: string;
-}
-
-export interface ResearchProjectRecord {
-  id?: string;
-  name: string;
-  role?: string | null;
-  organization?: string | null;
-  project_type?: string | null;
-  start_date?: string | null;
-  end_date?: string | null;
-  status?: string | null;
-  description?: string | null;
-}
-
-export interface OpenSourceProjectRecord {
-  id?: string;
-  name: string;
-  repository_url?: string | null;
-  homepage_url?: string | null;
-  platform?: string | null;
-  role?: string | null;
-  stars?: number | null;
-  forks?: number | null;
-  status?: string | null;
-  description?: string | null;
 }
 
 export interface ExchangeRecord {
@@ -275,6 +215,122 @@ export interface AwardRecord {
   grantor?: string;
   description?: string;
   added_by?: string;
+}
+
+export type ScholarMatchStatus = "matched" | "pending_match" | "unmatched";
+export type ScholarNewsReviewStatus = "pending" | "approved" | "rejected";
+export type BatchRowStatus =
+  | "created"
+  | "updated"
+  | "skipped"
+  | "pending_match"
+  | "failed";
+
+export interface ScholarResourceProvenance {
+  source_url?: string | null;
+  source_type?: string | null;
+  source_record_id?: string | null;
+  evidence?: Record<string, unknown>;
+  added_by?: string;
+}
+
+export interface ScholarResourceRecord {
+  id: string;
+  scholar_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScholarNewsCreate extends ScholarResourceProvenance {
+  title: string;
+  summary?: string | null;
+  content?: string | null;
+  news_type?: string | null;
+  published_at: string;
+  event_id?: string | null;
+  source_id?: string | null;
+  extraction_id?: string | null;
+  raw_payload?: Record<string, unknown>;
+  match_status?: ScholarMatchStatus;
+  match_method?: string | null;
+  match_confidence?: number | null;
+  matched_by?: string | null;
+  matched_at?: string | null;
+  review_status?: ScholarNewsReviewStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+  content_fingerprint?: string | null;
+}
+
+export type ScholarNewsUpdate = Partial<ScholarNewsCreate>;
+export type ScholarNews = ScholarNewsCreate & ScholarResourceRecord;
+export type ScholarNewsBatchRow = Partial<ScholarNewsCreate> & {
+  scholar_id?: string;
+  name?: string;
+  institution?: string;
+};
+
+export interface ResearchProjectCreate extends ScholarResourceProvenance {
+  name: string;
+  role?: string | null;
+  organization?: string | null;
+  project_type?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status?: string | null;
+  description?: string | null;
+}
+
+export type ResearchProjectUpdate = Partial<ResearchProjectCreate>;
+export type ResearchProject = ResearchProjectCreate & ScholarResourceRecord;
+
+export interface OpenSourceProjectCreate extends ScholarResourceProvenance {
+  name: string;
+  repository_url?: string | null;
+  homepage_url?: string | null;
+  platform?: string | null;
+  role?: string | null;
+  language?: string | null;
+  stars?: number | null;
+  forks?: number | null;
+  status?: string | null;
+  released_at?: string | null;
+  description?: string | null;
+}
+
+export type OpenSourceProjectUpdate = Partial<OpenSourceProjectCreate>;
+export type OpenSourceProject = OpenSourceProjectCreate & ScholarResourceRecord;
+
+export interface AcademicPositionCreate extends ScholarResourceProvenance {
+  organization: string;
+  department?: string | null;
+  title: string;
+  position_type?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current?: boolean;
+  description?: string | null;
+}
+
+export type AcademicPositionUpdate = Partial<AcademicPositionCreate>;
+export type AcademicPosition = AcademicPositionCreate & ScholarResourceRecord;
+
+export interface BatchRowResult {
+  row: number;
+  status: BatchRowStatus;
+  item_id: string;
+  error: string;
+}
+
+export interface BatchImportResponse {
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  pending_match: number;
+  failed: number;
+  rows: BatchRowResult[];
 }
 
 export interface ScholarListResponse {
@@ -376,6 +432,7 @@ export interface ScholarDetailPatch {
   publications_count?: number;
   h_index?: number;
   citations_count?: number;
+  coauthors?: CoauthorInfo[];
 }
 
 export interface AchievementsPatch {

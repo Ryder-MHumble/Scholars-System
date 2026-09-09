@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -73,8 +74,6 @@ export function DetailLeftSidebar({
       iconClassName: "text-violet-500",
     },
   ];
-  const academicPositions = scholar.academic_positions ?? [];
-
   const eduItems =
     scholar.education && scholar.education.length > 0
       ? scholar.education
@@ -92,16 +91,27 @@ export function DetailLeftSidebar({
 
   return (
     <motion.aside
-      className="w-[400px] shrink-0 max-xl:w-full"
+      className="w-full xl:w-[400px] xl:shrink-0"
       variants={staggerContainer}
       initial="hidden"
       animate="visible"
     >
       <motion.div
         variants={slideInLeft}
-        className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+        className="bg-white"
       >
-        <div className="p-6">
+        <div className="relative px-1 pb-4 pt-1">
+          {onEditProfile && (
+            <button
+              type="button"
+              aria-label="编辑基础信息"
+              title="编辑基础信息"
+              onClick={onEditProfile}
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-primary-50 hover:text-primary-700"
+            >
+              <Edit3 className="h-4 w-4" />
+            </button>
+          )}
           <div className="flex items-center gap-4 mb-5">
             <div className="flex-shrink-0 relative">
               <ScholarAvatar
@@ -140,47 +150,31 @@ export function DetailLeftSidebar({
             </div>
           </div>
 
-          {onEditProfile && (
-            <div className="mt-3 flex justify-end">
-              <button
-                type="button"
-                onClick={onEditProfile}
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white transition-colors hover:bg-primary-700"
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                编辑资料
-              </button>
-            </div>
-          )}
-
           <ProfileLinkIcons profileLinks={profileLinks} />
 
           {showMetrics && (
-            <>
-              <div className="mt-4 mb-4 rounded-xl border border-gray-100 bg-gray-50/80 overflow-hidden">
-                <div className="grid grid-cols-3 divide-x divide-gray-100">
-                  {metrics.map((metric) => {
-                    const MetricIcon = metric.icon;
-                    return (
-                      <div key={metric.label} className="px-3 py-3">
-                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
-                          <MetricIcon className={`w-3.5 h-3.5 ${metric.iconClassName}`} />
-                          <span>{metric.label}</span>
-                        </div>
-                        <div className="mt-1 text-lg font-semibold text-gray-900 leading-none">
-                          {formatMetricValue(metric.value)}
-                        </div>
+            <div className="mb-3 mt-3 overflow-hidden border-y border-gray-100 bg-gray-50/70">
+              <div className="grid grid-cols-3 divide-x divide-gray-100">
+                {metrics.map((metric) => {
+                  const MetricIcon = metric.icon;
+                  return (
+                    <div key={metric.label} className="px-3 py-3">
+                      <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
+                        <MetricIcon className={`w-3.5 h-3.5 ${metric.iconClassName}`} />
+                        <span>{metric.label}</span>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="mt-1 text-lg font-semibold text-gray-900 leading-none">
+                        {formatMetricValue(metric.value)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-
-            </>
+            </div>
           )}
 
-          <div className="mt-3 flex items-start gap-3">
-            <div className="min-w-0 flex flex-1 flex-wrap gap-1.5">
+          <div className="mt-4 flex items-center gap-3">
+            <div className="min-w-0 flex flex-wrap gap-1.5">
               {scholar.academic_titles.length > 0 && (
                 <>
                   {scholar.academic_titles.slice(0, 3).map((t) => (
@@ -205,7 +199,7 @@ export function DetailLeftSidebar({
 
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="border-t border-gray-100 px-1 py-3">
           <SideLabel icon={Mail} title="联系方式" />
           <div className="space-y-2.5">
             {scholar.email && (
@@ -237,7 +231,7 @@ export function DetailLeftSidebar({
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="border-t border-gray-100 px-1 py-3">
           <SideLabel icon={User} title="个人简介" />
           {bioText ? (
             <>
@@ -268,12 +262,12 @@ export function DetailLeftSidebar({
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="border-t border-gray-100 px-1 py-3">
           <SideLabel icon={GraduationCap} title="教育经历" />
           {eduItems.length === 0 ? (
             <p className="text-xs text-gray-300 italic">暂无教育经历</p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {eduItems.map((edu, i) => (
                 <div key={i} className="relative pl-5">
                   <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-primary-500 border-2 border-white shadow-sm" />
@@ -313,29 +307,36 @@ export function DetailLeftSidebar({
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
-          <SideLabel icon={Briefcase} title={`任职经历${academicPositions.length ? ` ${academicPositions.length}` : ""}`} />
-          {academicPositions.length > 0 ? (
-            <div className="space-y-3">
-              {academicPositions.map((item, index) => (
-                <div key={item.id || `${item.organization}-${item.title}-${index}`} className="relative pl-5">
-                  <div className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm" />
-                  <p className="text-sm font-medium leading-snug text-gray-700">{item.title}</p>
-                  <p className="text-xs text-gray-500">{item.organization}</p>
-                  {(item.start_date || item.end_date || item.is_current) && (
+        <div className="border-t border-gray-100 px-1 py-3">
+          <SideLabel icon={Briefcase} title="任职经历" />
+          {scholar.academic_positions && scholar.academic_positions.length > 0 ? (
+            <div className="space-y-2">
+              {scholar.academic_positions.map((position, i) => (
+                <div key={i} className="relative pl-5">
+                  <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
+                  <p className="text-sm text-gray-700">
+                    {position.title || "任职记录"}
+                  </p>
+                  {position.organization && (
+                    <p className="text-xs text-gray-500">
+                      {position.organization}
+                      {position.department ? ` · ${position.department}` : ""}
+                    </p>
+                  )}
+                  {(position.start_date || position.end_date || position.is_current) && (
                     <p className="text-[11px] text-gray-400">
-                      {formatPositionDates(item.start_date, item.end_date, item.is_current)}
+                      {formatPositionPeriod(position)}
                     </p>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-xs text-gray-300 italic">暂无任职经历记录</p>
+            <p className="text-xs text-gray-300 italic">暂无任职经历</p>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="border-t border-gray-100 px-1 py-3">
           <SideLabel icon={BookOpen} title="研究方向" />
           {scholar.research_areas && scholar.research_areas.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
@@ -362,7 +363,7 @@ function buildOrcidHref(orcid: string): string {
 }
 
 function formatMetricValue(value: number | null | undefined): string {
-  if (typeof value !== "number" || value <= 0) return "—";
+  if (typeof value !== "number" || value < 0) return "—";
   return value.toLocaleString("zh-CN");
 }
 
@@ -375,11 +376,15 @@ function formatEducationYears(
   return start || end || "";
 }
 
-function formatPositionDates(start?: string | null, end?: string | null, isCurrent?: boolean): string {
-  const startText = String(start || "").slice(0, 10);
-  const endText = isCurrent ? "至今" : String(end || "").slice(0, 10);
-  if (startText && endText) return `${startText}-${endText}`;
-  return startText || endText;
+function formatPositionPeriod(
+  position: NonNullable<ScholarDetail["academic_positions"]>[number],
+): string {
+  const start = String(position.start_date || "").trim();
+  const end = position.is_current
+    ? "至今"
+    : String(position.end_date || "").trim();
+  if (start && end) return `${start}-${end}`;
+  return start || end || "";
 }
 
 function ScholarAvatar({
@@ -450,6 +455,11 @@ function ProfileLinkIcons({
 }: {
   profileLinks: ReturnType<typeof resolveProfileLinks>;
 }) {
+  const [tooltip, setTooltip] = useState<{
+    label: string;
+    left: number;
+    top: number;
+  } | null>(null);
   const links = [
     {
       label: "个人主页",
@@ -531,28 +541,52 @@ function ProfileLinkIcons({
     return null;
   }
 
+  const showTooltip = (anchor: HTMLElement, label: string) => {
+    const rect = anchor.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || rect.right + 144;
+    const left = Math.min(
+      Math.max(rect.left + rect.width / 2, 72),
+      Math.max(72, viewportWidth - 72),
+    );
+    setTooltip({ label, left, top: rect.bottom + 8 });
+  };
+
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-start gap-2">
-      {links.map((link) => {
-        const Icon = link.Icon;
-        return (
-          <a
-            key={`${link.label}-${link.value}`}
-            href={"href" in link && link.href ? link.href : link.value}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={link.label}
-            aria-label={link.label}
-            className={`group/link relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors ${link.className}`}
+    <>
+      <div className="mb-5 flex flex-wrap items-center justify-start gap-2">
+        {links.map((link) => {
+          const Icon = link.Icon;
+          return (
+            <a
+              key={`${link.label}-${link.value}`}
+              href={"href" in link && link.href ? link.href : link.value}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={link.label}
+              onMouseEnter={(event) => showTooltip(event.currentTarget, link.label)}
+              onMouseLeave={() => setTooltip(null)}
+              onFocus={(event) => showTooltip(event.currentTarget, link.label)}
+              onBlur={() => setTooltip(null)}
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors ${link.className}`}
+            >
+              <Icon className="h-4.5 w-4.5" />
+            </a>
+          );
+        })}
+      </div>
+      {tooltip &&
+        createPortal(
+          <span
+            role="tooltip"
+            aria-label={tooltip.label}
+            style={{ left: tooltip.left, top: tooltip.top }}
+            className="pointer-events-none fixed z-[100] -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg"
           >
-            <Icon className="h-4.5 w-4.5" />
-            <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover/link:opacity-100 group-focus-visible/link:opacity-100">
-              {link.label}
-              <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-gray-900" />
-            </span>
-          </a>
-        );
-      })}
-    </div>
+            <span className="absolute bottom-full left-1/2 h-2 w-2 -translate-x-1/2 translate-y-1/2 rotate-45 bg-gray-900" />
+            {tooltip.label}
+          </span>,
+          document.body,
+        )}
+    </>
   );
 }

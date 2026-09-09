@@ -1,5 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useCallback, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   GraduationCap,
@@ -12,9 +11,10 @@ import {
   ClipboardList,
   ArrowUpRight,
   Users,
+  Newspaper,
   Upload,
-  X,
-  Save,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import {
@@ -26,16 +26,24 @@ import {
   type StudentCreate,
   type StudentPatch,
   type ScholarDetail,
+  type CoauthorInfo,
+  patchScholarDetail,
 } from "@/services/scholarApi";
 import {
-  createActivity,
-  fetchScholarActivities,
-  invalidateScholarActivityCache,
-  type ActivityCreateRequest,
-  type ActivityEvent,
-} from "@/services/activityApi";
+  createScholarNews,
+  deleteScholarNews,
+  fetchScholarNews,
+  updateScholarNews,
+} from "@/services/scholarResourcesApi";
+import type {
+  ScholarNews,
+  ScholarNewsCreate,
+  ScholarNewsUpdate,
+} from "@/services/scholarApi/types";
+import { EditNewsModal } from "@/components/scholar-detail/modals/EditNewsModal";
+import { NewsBatchImportModal } from "@/components/scholar-detail/modals/NewsBatchImportModal";
+import { BaseModal } from "@/components/common/BaseModal";
 import { SelectInput } from "@/components/ui/SelectInput";
-import { parseScholarActivitiesFromText } from "@/utils/textParsers";
 
 interface Props {
   scholar: ScholarDetail;
@@ -68,23 +76,7 @@ const emptyAddForm = (): StudentCreate => ({
   notes: "",
 });
 
-function formatActivityDate(event: ActivityEvent): string {
-  const date = new Date(event.event_date);
-  if (Number.isNaN(date.getTime())) return "日期待定";
-  const dateLabel = date.toLocaleDateString("zh-CN");
-  const timeLabel =
-    event.event_time?.trim() ||
-    (() => {
-      const h = date.getHours();
-      const m = date.getMinutes();
-      if (h === 0 && m === 0) return "";
-      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-    })();
-  return timeLabel ? `${dateLabel} ${timeLabel}` : dateLabel;
-}
-
 export function RightSidebar({ scholar }: Props) {
-  const location = useLocation();
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -93,43 +85,55 @@ export function RightSidebar({ scholar }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState<StudentCreate>(emptyAddForm());
   const [isSaving, setIsSaving] = useState(false);
-  const [scholarActivities, setScholarActivities] = useState<ActivityEvent[]>([]);
-  const [isActivityLoading, setIsActivityLoading] = useState(true);
-  const [activityError, setActivityError] = useState<string | null>(null);
-  const [showActivityImport, setShowActivityImport] = useState(false);
-  const [activeTab, setActiveTab] = useState<"coauthors" | "activities">(
+  const [news, setNews] = useState<ScholarNews[]>([]);
+  const [isNewsLoading, setIsNewsLoading] = useState(true);
+  const [newsError, setNewsError] = useState("");
+  const [newsModal, setNewsModal] = useState<
+    { mode: "create" } | { mode: "edit"; news: ScholarNews } | null
+  >(null);
+  const [showBatchImport, setShowBatchImport] = useState(false);
+  const [activeTab, setActiveTab] = useState<"coauthors" | "news">("coauthors");
+  const [isRelationManagerOpen, setIsRelationManagerOpen] = useState(false);
+  const [relationManagerTab, setRelationManagerTab] = useState<"coauthors" | "news">(
     "coauthors",
   );
+  const [localCoauthors, setLocalCoauthors] = useState<CoauthorInfo[]>(
+    scholar.coauthors ?? [],
+  );
+  const [relationError, setRelationError] = useState("");
+  const [isRelationSaving, setIsRelationSaving] = useState(false);
 
   // Check if scholar is adjunct supervisor
   const isAdjunctSupervisor = Boolean(scholar.adjunct_supervisor?.status);
-  const coauthors = [...(scholar.coauthors ?? [])].sort(
+  const coauthors = [...localCoauthors].sort(
     (a, b) => b.weight - a.weight,
   );
+  const approvedNews = news
+    .filter((item) => item.review_status === "approved")
+    .sort(
+      (a, b) =>
+        new Date(b.published_at).getTime() - new Date(a.published_at).getTime(),
+    );
 
-  const loadScholarActivities = useCallback(async (isActive: () => boolean = () => true) => {
-    setIsActivityLoading(true);
-    setActivityError(null);
+  const loadNews = useCallback(async () => {
+    setIsNewsLoading(true);
+    setNewsError("");
     try {
-      const items = await fetchScholarActivities(scholar.url_hash);
-      if (!isActive()) return;
-      setScholarActivities(items);
-    } catch {
-      if (!isActive()) return;
-      setScholarActivities([]);
-      setActivityError("学者活动加载失败");
+      setNews(await fetchScholarNews(scholar.url_hash));
+    } catch (error) {
+      setNewsError(error instanceof Error ? error.message : "学者活动加载失败");
     } finally {
-      if (isActive()) setIsActivityLoading(false);
+      setIsNewsLoading(false);
     }
   }, [scholar.url_hash]);
 
   useEffect(() => {
-    let isActive = true;
-    void loadScholarActivities(() => isActive);
-    return () => {
-      isActive = false;
-    };
-  }, [loadScholarActivities]);
+    void loadNews();
+  }, [loadNews]);
+
+  useEffect(() => {
+    setLocalCoauthors(scholar.coauthors ?? []);
+  }, [scholar.coauthors]);
 
   useEffect(() => {
     if (!isAdjunctSupervisor) {
@@ -214,72 +218,77 @@ export function RightSidebar({ scholar }: Props) {
     }
   };
 
-  const handleImportActivities = async (activities: ActivityCreateRequest[]) => {
-    const normalize = (value: string) => value.trim().toLocaleLowerCase();
-    const existingKeys = new Set(
-      scholarActivities.map(
-        (item) => `${normalize(item.title)}|${String(item.event_date ?? "").slice(0, 10)}`,
-      ),
-    );
-    const rows = activities
-      .map((item) => ({
-        ...item,
-        scholar_ids: [scholar.url_hash],
-      }))
-      .filter((item) => {
-        if (!item.title.trim()) return false;
-        const key = `${normalize(item.title)}|${String(item.event_date ?? "").slice(0, 10)}`;
-        if (existingKeys.has(key)) return false;
-        existingKeys.add(key);
-        return true;
-      });
-    if (rows.length === 0) return;
-
-    for (const row of rows) {
-      await createActivity(row);
+  const handleNewsSubmit = async (
+    payload: ScholarNewsCreate | ScholarNewsUpdate,
+  ) => {
+    if (newsModal?.mode === "edit") {
+      await updateScholarNews(scholar.url_hash, newsModal.news.id, payload);
+    } else {
+      await createScholarNews(scholar.url_hash, payload as ScholarNewsCreate);
     }
-    invalidateScholarActivityCache(scholar.url_hash);
-    await loadScholarActivities();
-    setActiveTab("activities");
+    await loadNews();
+  };
+
+  const handleNewsDelete = async (item: ScholarNews) => {
+    if (!window.confirm(`确认删除“${item.title}”？`)) return;
+    try {
+      await deleteScholarNews(scholar.url_hash, item.id);
+      await loadNews();
+    } catch (error) {
+      setNewsError(error instanceof Error ? error.message : "删除学者活动失败");
+    }
+  };
+
+  const handleCoauthorDelete = async (coauthor: CoauthorInfo) => {
+    const displayName = coauthor.name_zh || coauthor.name || "未知学者";
+    if (!window.confirm(`确认删除合作学者“${displayName}”？`)) return;
+
+    const remaining = localCoauthors.filter((item) => item !== coauthor);
+    setIsRelationSaving(true);
+    setRelationError("");
+    try {
+      await patchScholarDetail(scholar.url_hash, { coauthors: remaining });
+      setLocalCoauthors(remaining);
+    } catch (error) {
+      setRelationError(error instanceof Error ? error.message : "删除合作学者失败");
+    } finally {
+      setIsRelationSaving(false);
+    }
   };
 
   return (
-    <aside className="w-80 shrink-0 space-y-4">
+    <aside className="w-full space-y-4 xl:w-80 xl:shrink-0">
       {/* Scholar Activities Card */}
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+        className="overflow-hidden bg-white"
       >
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+        <div className="flex items-center gap-2 border-b border-gray-200 pb-3">
           <ClipboardList className="w-4 h-4 text-primary-600" />
-          <h3 className="text-sm font-semibold text-gray-900">学者活动</h3>
-          <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-            {activeTab === "coauthors"
-              ? `${coauthors.length} 人`
-              : `${scholarActivities.length} 条`}
-          </span>
+          <h3 className="text-sm font-semibold text-gray-900">学者关系</h3>
           <button
             type="button"
+            aria-label="编辑学者关系"
+            title="编辑学者关系"
             onClick={() => {
-              setActiveTab("activities");
-              setShowActivityImport(true);
+              setRelationManagerTab(activeTab);
+              setIsRelationManagerOpen(true);
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 rounded-full transition-colors"
+            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-primary-50 hover:text-primary-700"
           >
-            <Upload className="w-3 h-3" />
-            批量识别
+            <Edit3 className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="px-5 pt-2 border-b border-gray-100">
-          <div className="flex items-center gap-2">
+        <div className="border-b border-gray-100 pt-2">
+          <div className="grid grid-cols-2">
             <button
               type="button"
               onClick={() => setActiveTab("coauthors")}
               className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-lg border-b-2 transition-colors",
+                "inline-flex min-w-0 items-center justify-center gap-1 px-1 py-2 text-[11px] whitespace-nowrap border-b-2 transition-colors",
                 activeTab === "coauthors"
                   ? "text-primary-700 border-primary-600 bg-primary-50/40"
                   : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
@@ -290,21 +299,21 @@ export function RightSidebar({ scholar }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab("activities")}
+              onClick={() => setActiveTab("news")}
               className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-lg border-b-2 transition-colors",
-                activeTab === "activities"
+                "inline-flex min-w-0 items-center justify-center gap-1 px-1 py-2 text-[11px] whitespace-nowrap border-b-2 transition-colors",
+                activeTab === "news"
                   ? "text-primary-700 border-primary-600 bg-primary-50/40"
                   : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
               )}
             >
-              <ClipboardList className="w-3.5 h-3.5" />
+              <Newspaper className="w-3.5 h-3.5" />
               <span>学者活动</span>
             </button>
           </div>
         </div>
 
-        <div className="px-5 py-3 max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-hide">
+        <div className="py-3">
           {activeTab === "coauthors" ? (
             coauthors.length > 0 ? (
               <div className="space-y-3">
@@ -314,7 +323,7 @@ export function RightSidebar({ scholar }: Props) {
                     href={`https://www.aminer.cn/profile/${coauthor.aminer_id}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="block p-3 border border-gray-100 hover:border-primary-200 rounded-lg transition-all duration-200 hover:bg-primary-50/30"
+                    className="block border-b border-gray-100 py-3 transition-colors last:border-0 hover:bg-primary-50/30"
                   >
                     <div className="flex items-start gap-3">
                       {coauthor.avatar ? (
@@ -382,60 +391,64 @@ export function RightSidebar({ scholar }: Props) {
                 <p className="text-sm text-gray-400">暂无合作学者</p>
               </div>
             )
-          ) : isActivityLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
-            </div>
-          ) : activityError ? (
-            <div className="flex flex-col items-center gap-2 py-8">
-              <ClipboardList className="w-8 h-8 text-red-100" />
-              <p className="text-sm text-red-500">{activityError}</p>
-              <button
-                type="button"
-                onClick={() => loadScholarActivities()}
-                className="text-xs text-primary-600 hover:underline"
-              >
-                重新加载
-              </button>
-            </div>
-          ) : scholarActivities.length > 0 ? (
+          ) : activeTab === "news" ? (
             <div className="space-y-3">
-              {scholarActivities.map((activity) => (
-                <Link
-                  key={activity.id}
-                  to={`/activities/${activity.id}`}
-                  state={{
-                    from: {
-                      pathname: location.pathname,
-                      search: location.search,
-                    },
-                  }}
-                  className="block p-3 border border-gray-100 hover:border-primary-200 rounded-lg transition-all duration-200 hover:bg-primary-50/30"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <span className="text-xs font-medium text-gray-900 line-clamp-2">
-                      {activity.title || "未命名活动"}
-                    </span>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500">
-                    <span className="bg-gray-100 px-1.5 py-0.5 rounded">
-                      {activity.event_type || "活动"}
-                    </span>
-                    <span className="bg-gray-100 px-1.5 py-0.5 rounded">
-                      {activity.category || "未分类"}
-                    </span>
-                    <span>{formatActivityDate(activity)}</span>
-                  </div>
-                </Link>
-              ))}
+              {isNewsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-300" />
+                </div>
+              ) : newsError ? (
+                <div className="flex flex-col items-center gap-2 py-7 text-center">
+                  <AlertCircle className="h-6 w-6 text-red-300" />
+                  <p className="text-xs text-red-600">{newsError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void loadNews()}
+                    aria-label="重试学者活动"
+                    className="inline-flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                  >
+                    <RefreshCw className="h-3 w-3" /> 重试
+                  </button>
+                </div>
+              ) : approvedNews.length > 0 ? (
+                approvedNews.map((item) => (
+                  <article key={item.id} className="border-b border-gray-100 py-3 last:border-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p data-testid="news-title" className="text-sm font-medium text-gray-900">
+                          {item.title}
+                        </p>
+                        <p className="mt-1 text-[11px] text-gray-400">
+                          {new Date(item.published_at).toLocaleDateString("zh-CN")}
+                          {item.news_type ? ` · ${item.news_type}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    {(item.summary || item.content) && (
+                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-gray-600">
+                        {item.summary || item.content}
+                      </p>
+                    )}
+                    {item.source_url && (
+                      <a
+                        href={item.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
+                      >
+                        查看来源 <ArrowUpRight className="h-3 w-3" />
+                      </a>
+                    )}
+                  </article>
+                ))
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-8">
+                  <Newspaper className="h-8 w-8 text-gray-200" />
+                  <p className="text-sm text-gray-400">暂无学者活动</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 py-8">
-              <ClipboardList className="w-8 h-8 text-gray-200" />
-              <p className="text-sm text-gray-400">暂无关联活动</p>
-            </div>
-          )}
+          ) : null}
         </div>
       </motion.div>
 
@@ -445,7 +458,7 @@ export function RightSidebar({ scholar }: Props) {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+          className="overflow-hidden border-t border-gray-200 bg-white pt-4"
         >
           <div
             className={cn(
@@ -476,7 +489,7 @@ export function RightSidebar({ scholar }: Props) {
             )}
           </div>
 
-          <div className="px-5 py-3 max-h-[540px] overflow-y-auto scrollbar-hide">
+          <div className="py-3">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
@@ -563,147 +576,160 @@ export function RightSidebar({ scholar }: Props) {
           </div>
         </motion.div>
       )}
-      {showActivityImport && (
-        <ScholarActivityPasteImportModal
-          onClose={() => setShowActivityImport(false)}
-          onSubmit={async (items) => {
-            await handleImportActivities(items);
-            setShowActivityImport(false);
+
+      {newsModal && (
+        <EditNewsModal
+          news={newsModal.mode === "edit" ? newsModal.news : undefined}
+          onClose={() => {
+            setNewsModal(null);
+            setRelationManagerTab("news");
+            setIsRelationManagerOpen(true);
           }}
+          onSubmit={handleNewsSubmit}
         />
       )}
-    </aside>
-  );
-}
-
-function ScholarActivityPasteImportModal({
-  onClose,
-  onSubmit,
-}: {
-  onClose: () => void;
-  onSubmit: (items: ActivityCreateRequest[]) => Promise<void>;
-}) {
-  const [text, setText] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const parsedItems = useMemo(() => parseScholarActivitiesFromText(text), [text]);
-
-  const handleSubmit = async () => {
-    if (parsedItems.length === 0) return;
-    setIsSubmitting(true);
-    try {
-      await onSubmit(parsedItems);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.96, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }}
-        className="mx-4 flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
+      <NewsBatchImportModal
+        isOpen={showBatchImport}
+        scholarRef={scholar.url_hash}
+        onClose={() => {
+          setShowBatchImport(false);
+          setRelationManagerTab("news");
+          setIsRelationManagerOpen(true);
+        }}
+        onSuccess={() => void loadNews()}
+      />
+      <BaseModal
+        isOpen={isRelationManagerOpen}
+        onClose={() => setIsRelationManagerOpen(false)}
+        title="编辑学者关系"
+        maxWidth="xl"
       >
-        <div className="shrink-0 border-b border-slate-100 px-6 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-base font-semibold text-slate-900">
-                批量识别学者活动
-              </h3>
-              <p className="mt-1 text-xs text-slate-500">
-                直接复制粘贴多行活动文本，系统会自动识别标题、日期、类型、分类和地点。
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
+        <div className="border-b border-gray-200">
+          <div className="grid grid-cols-2">
+            {(["coauthors", "news"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setRelationManagerTab(tab)}
+                className={cn(
+                  "border-b-2 px-3 py-2.5 text-sm transition-colors",
+                  relationManagerTab === tab
+                    ? "border-primary-600 text-primary-700"
+                    : "border-transparent text-gray-500 hover:text-gray-800",
+                )}
+              >
+                {tab === "coauthors" ? "合作学者" : "学者活动"}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          <textarea
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            autoFocus
-            rows={8}
-            placeholder={
-              "示例：\n学者活动标题 | 2026-09-08 14:00 | 学术报告 | 学者活动 | 武汉大学 | 活动摘要\n标题：AI for Science Seminar；日期：2026-09-09；类型：讲座；分类：学者活动；地点：线上；摘要：分享最新研究进展"
-            }
-            className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-          />
+        {relationError && (
+          <p className="mt-4 text-sm text-red-600">{relationError}</p>
+        )}
 
-          <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-medium text-blue-700">
-                自动识别预览 {parsedItems.length} 条
-              </p>
-              <p className="text-[11px] text-slate-400">
-                导入后会自动绑定当前学者
-              </p>
-            </div>
-            {parsedItems.length === 0 ? (
-              <p className="py-4 text-center text-xs text-slate-400">
-                粘贴活动文本后在这里预览
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {parsedItems.map((item, index) => (
+        {relationManagerTab === "coauthors" ? (
+          <div className="divide-y divide-gray-100">
+            {coauthors.length > 0 ? (
+              coauthors.map((coauthor) => {
+                const displayName = coauthor.name_zh || coauthor.name || "未知学者";
+                return (
                   <div
-                    key={`${item.title}-${index}`}
-                    className="rounded-lg border border-blue-100 bg-white px-3 py-2"
+                    key={coauthor.aminer_id || `${coauthor.name}-${coauthor.name_zh}`}
+                    className="flex items-center gap-3 py-4"
                   >
-                    <p className="text-sm font-medium text-slate-800">
-                      {item.title}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {[item.event_date, item.event_time, item.event_type, item.category, item.location]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                    {item.abstract && (
-                      <p className="mt-1 line-clamp-2 text-xs text-slate-400">
-                        {item.abstract}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900">
+                        {displayName}
                       </p>
-                    )}
+                      {coauthor.name_zh && coauthor.name && (
+                        <p className="truncate text-xs text-gray-500">{coauthor.name}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isRelationSaving}
+                      onClick={() => void handleCoauthorDelete(coauthor)}
+                      aria-label={`删除合作学者：${displayName}`}
+                      title="删除合作学者"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
-                ))}
-              </div>
+                );
+              })
+            ) : (
+              <p className="py-10 text-center text-sm text-gray-400">暂无合作学者</p>
             )}
           </div>
-        </div>
-
-        <div className="flex shrink-0 gap-3 border-t border-slate-100 bg-white px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-10 flex-1 rounded-xl border border-slate-200 px-4 text-sm text-slate-600 hover:bg-slate-50"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting || parsedItems.length === 0}
-            className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            {isSubmitting ? "导入中..." : `导入 ${parsedItems.length} 条`}
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+        ) : (
+          <div className="pt-4">
+            <div className="flex justify-end gap-2 border-b border-gray-100 pb-3">
+              <button
+                type="button"
+                aria-label="新增学者活动"
+                onClick={() => {
+                  setIsRelationManagerOpen(false);
+                  setNewsModal({ mode: "create" });
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Plus className="h-4 w-4" /> 新增
+              </button>
+              <button
+                type="button"
+                aria-label="批量识别学者活动"
+                onClick={() => {
+                  setIsRelationManagerOpen(false);
+                  setShowBatchImport(true);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary-600 px-3 py-2 text-sm text-white hover:bg-primary-700"
+              >
+                <Upload className="h-4 w-4" /> 批量识别
+              </button>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {approvedNews.length > 0 ? (
+                approvedNews.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3 py-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        {new Date(item.published_at).toLocaleDateString("zh-CN")}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRelationManagerOpen(false);
+                        setNewsModal({ mode: "edit", news: item });
+                      }}
+                      aria-label={`编辑 ${item.title}`}
+                      title="编辑学者活动"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-primary-50 hover:text-primary-600"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleNewsDelete(item)}
+                      aria-label={`删除 ${item.title}`}
+                      title="删除学者活动"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="py-10 text-center text-sm text-gray-400">暂无学者活动</p>
+              )}
+            </div>
+          </div>
+        )}
+      </BaseModal>
+    </aside>
   );
 }
 

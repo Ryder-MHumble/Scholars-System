@@ -38,7 +38,7 @@ export function ManagementRoleFormModal({
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-900">
-            {role ? "编辑任职经历" : "添加任职经历"}
+            {role ? "编辑学术兼职" : "添加学术兼职"}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
@@ -46,7 +46,7 @@ export function ManagementRoleFormModal({
         </div>
         <div>
           <label className="text-xs font-medium text-gray-500 block mb-1">
-            职务描述 *
+            兼职描述 *
           </label>
           <input
             autoFocus
@@ -54,7 +54,7 @@ export function ManagementRoleFormModal({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            placeholder="如：教授、顾问委员会委员…"
+            placeholder="如：兼职导师、顾问委员会委员…"
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-400"
           />
         </div>

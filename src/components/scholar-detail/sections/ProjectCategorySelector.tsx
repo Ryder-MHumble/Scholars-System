@@ -2,10 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   FolderKanban,
   Check,
-  Sparkles,
-  Link2,
   Edit3,
-  ChevronDown,
   X,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
@@ -20,8 +17,8 @@ import type { ScholarProjectTag } from "@/services/scholarApi";
 
 interface ProjectCategorySelectorProps {
   projectTags: ScholarProjectTag[];
-  onChange?: (projectTags: ScholarProjectTag[]) => void;
   onSave: (projectTags: ScholarProjectTag[]) => Promise<void>;
+  variant?: "card" | "embedded";
 }
 
 function normalizeProjectTags(tags: ScholarProjectTag[]): ScholarProjectTag[] {
@@ -54,8 +51,8 @@ function buildProjectSignature(tags: ScholarProjectTag[]): string {
 
 export function ProjectCategorySelector({
   projectTags,
-  onChange,
   onSave,
+  variant = "card",
 }: ProjectCategorySelectorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedPrimary, setSelectedPrimary] = useState<string>("");
@@ -75,40 +72,38 @@ export function ProjectCategorySelector({
     setSelectedPrimary(primary);
   };
 
-  const commitProjectTags = (next: ScholarProjectTag[]) => {
-    setSelectedProjectTags(next);
-    onChange?.(next);
-  };
-
   const handleSubToggle = (sub: ProjectSubcategory) => {
     const primary = getPrimaryCategoryForSubcategory(sub);
     const resolvedPrimary = primary ?? selectedPrimary;
     if (!resolvedPrimary) return;
     setSelectedPrimary(resolvedPrimary);
 
-    const normalizedPrev = normalizeProjectTags(selectedProjectTags);
-    const exists = normalizedPrev.some(
-      (tag) => tag.category === resolvedPrimary && tag.subcategory === sub,
-    );
-    const next = exists
-      ? normalizedPrev.filter(
-        (tag) =>
-          !(tag.category === resolvedPrimary && tag.subcategory === sub),
-      )
-      : [...normalizedPrev, { category: resolvedPrimary, subcategory: sub }];
-    commitProjectTags(next);
+    setSelectedProjectTags((prev) => {
+      const normalizedPrev = normalizeProjectTags(prev);
+      const exists = normalizedPrev.some(
+        (tag) => tag.category === resolvedPrimary && tag.subcategory === sub,
+      );
+      if (exists) {
+        return normalizedPrev.filter(
+          (tag) =>
+            !(tag.category === resolvedPrimary && tag.subcategory === sub),
+        );
+      }
+      return [...normalizedPrev, { category: resolvedPrimary, subcategory: sub }];
+    });
   };
 
   const handleRemoveProjectTag = (tag: ScholarProjectTag) => {
-    const next = selectedProjectTags.filter(
-      (item) =>
-        !(
-          item.category === tag.category &&
-          normalizeProjectSubcategoryLabel(item.subcategory) ===
-            normalizeProjectSubcategoryLabel(tag.subcategory)
-        ),
+    setSelectedProjectTags((prev) =>
+      prev.filter(
+        (item) =>
+          !(
+            item.category === tag.category &&
+            normalizeProjectSubcategoryLabel(item.subcategory) ===
+              normalizeProjectSubcategoryLabel(tag.subcategory)
+          ),
+      ),
     );
-    commitProjectTags(next);
   };
 
   const handleSave = async () => {
@@ -124,6 +119,7 @@ export function ProjectCategorySelector({
   const originalProjectSignature = buildProjectSignature(projectTags ?? []);
   const hasChanges = projectSignature !== originalProjectSignature;
   const hasAnyCategory = selectedProjectTags.length > 0;
+  const embedded = variant === "embedded";
 
   const selectedProjectTagKeys = useMemo(
     () =>
@@ -139,49 +135,56 @@ export function ProjectCategorySelector({
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-primary-50 via-sky-50 to-cyan-50">
+    <div
+      className={cn(
+        "border-gray-200",
+        embedded
+          ? "border-b bg-white"
+          : "rounded-2xl bg-white shadow-sm",
+      )}
+    >
+      <div
+        className={cn(
+          "border-b border-gray-100 bg-white",
+          embedded ? "px-4 py-3" : "px-6 py-4",
+        )}
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <FolderKanban className="w-5 h-5 text-primary-700" />
             <h3 className="text-base font-semibold text-gray-900">共建关系分类</h3>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border",
-                hasAnyCategory
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-gray-50 text-gray-500 border-gray-200",
-              )}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              {hasAnyCategory ? "共建导师" : "未建立关系"}
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsExpanded((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-primary-200 text-primary-700 bg-white hover:bg-primary-50 transition-colors"
-            >
-              <Edit3 className="w-3 h-3" />
-              {isExpanded ? "收起" : "编辑"}
-              <ChevronDown
-                className={cn(
-                  "w-3.5 h-3.5 transition-transform",
-                  isExpanded && "rotate-180",
-                )}
-              />
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-label="编辑共建关系分类"
+            title="编辑共建关系分类"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            className={cn(
+              "inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-primary-50 hover:text-primary-700",
+              isExpanded && "bg-primary-50 text-primary-700",
+            )}
+          >
+            <Edit3 className="h-4 w-4" />
+          </button>
         </div>
-        <p className="mt-2 text-xs text-gray-600">
-          学者与两院关系仅由项目分类定义，任一项目分类非空即视为共建导师。
-        </p>
+        {!isExpanded && hasAnyCategory && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedProjectTags.map((tag, idx) => (
+              <span
+                key={`project-chip-${tag.category}-${tag.subcategory}-${idx}`}
+                className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs text-primary-700"
+              >
+                {tag.category}
+                {tag.subcategory ? ` / ${tag.subcategory}` : ""}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {isExpanded && (
-        <div className="p-6">
-          <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+        <div className={embedded ? "p-4" : "p-6"}>
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-4">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               项目分类
             </p>
@@ -257,54 +260,36 @@ export function ProjectCategorySelector({
               </div>
             )}
 
-            <button
-              onClick={() => {
-                setSelectedPrimary("");
-                commitProjectTags([]);
-              }}
-              className="mt-4 text-xs text-gray-500 hover:text-gray-700"
-            >
-              清空项目分类
-            </button>
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPrimary("");
+                  setSelectedProjectTags([]);
+                }}
+                className="text-xs text-gray-500 hover:text-gray-700"
+              >
+                清空项目分类
+              </button>
+              {hasChanges && (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+                >
+                  {saving ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
+                  保存关系分类
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
-
-      <div className="px-6 py-4 border-t border-gray-100 bg-white flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2 text-xs text-gray-600 min-h-6">
-          <Link2 className="w-3.5 h-3.5 text-gray-400" />
-          {hasAnyCategory ? (
-            <div className="flex flex-wrap gap-2">
-              {selectedProjectTags.map((tag, idx) => (
-                <span
-                  key={`project-chip-${tag.category}-${tag.subcategory}-${idx}`}
-                  className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-primary-700"
-                >
-                  项目：{tag.category}
-                  {tag.subcategory ? ` / ${tag.subcategory}` : ""}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <span>当前未配置项目分类</span>
-          )}
-        </div>
-
-        {isExpanded && hasChanges && (
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60 shadow-sm"
-          >
-            {saving ? (
-              <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Check className="w-4 h-4" />
-            )}
-            保存关系分类
-          </button>
-        )}
-      </div>
     </div>
   );
 }

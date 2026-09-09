@@ -41,13 +41,6 @@ export {
   batchCreateScholars,
 } from "./scholarWrite";
 
-export {
-  createAcademicPosition,
-  updateAcademicPosition,
-  deleteAcademicPosition,
-  batchCreateAcademicPositions,
-} from "./resourceApi";
-
 // ====== Student operations ======
 export {
   fetchStudents,
